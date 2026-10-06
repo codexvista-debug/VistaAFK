@@ -1,7 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Play, Square, Plus, Settings, Wifi, WifiOff, Box } from 'lucide-react';
+import { Play, Square, Plus, Settings, Wifi, WifiOff, Box, Server, Users, Terminal } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 interface NavbarProps {
   isConnected: boolean;
@@ -24,6 +26,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   botCount,
   onlineCount,
 }) => {
+  const pathname = usePathname();
+
   return (
     <header className="sticky top-0 z-40 w-full border-b-2 border-[#2b3a4f] bg-[#121a27]/95 backdrop-blur-md shadow-lg">
       {/* Minecraft Emerald Accent Top Glow Line */}
@@ -32,25 +36,64 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Minecraft Brand Logo */}
         <div className="flex items-center space-x-3.5">
-          {/* Minecraft Pixel Block Icon */}
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-b from-[#22c55e] to-[#15803d] border-2 border-[#4ade80] flex items-center justify-center shadow-lg shadow-emerald-500/25 relative overflow-hidden">
-            {/* Block texture imitation */}
-            <div className="absolute inset-x-0 bottom-0 h-4 bg-[#854d0e] border-t-2 border-[#166534]" />
-            <Box className="h-5 w-5 text-white relative z-10 drop-shadow" />
-          </div>
-
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-black text-xl tracking-tight text-white drop-shadow-sm font-sans">
-                Vista<span className="text-emerald-400">AFK</span>
-              </span>
-              <span className="px-2 py-0.5 text-[10px] font-mono font-bold bg-[#1b2738] text-emerald-300 border border-[#2d4059] rounded-md shadow-inner">
-                JAVA 24/7
-              </span>
+          <Link href="/" className="flex items-center space-x-3">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-b from-[#22c55e] to-[#15803d] border-2 border-[#4ade80] flex items-center justify-center shadow-lg shadow-emerald-500/25 relative overflow-hidden">
+              <div className="absolute inset-x-0 bottom-0 h-4 bg-[#854d0e] border-t-2 border-[#166534]" />
+              <Box className="h-5 w-5 text-white relative z-10 drop-shadow" />
             </div>
-            <p className="text-[11px] text-slate-400 font-medium hidden sm:block">Minecraft Headless Chunk Loader & Bot Controller</p>
-          </div>
+
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="font-black text-xl tracking-tight text-white drop-shadow-sm font-sans">
+                  Vista<span className="text-emerald-400">AFK</span>
+                </span>
+                <span className="px-2 py-0.5 text-[10px] font-mono font-bold bg-[#1b2738] text-emerald-300 border border-[#2d4059] rounded-md shadow-inner">
+                  JAVA 24/7
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 font-medium hidden sm:block">Minecraft Chunk Loader & Multi-Server Bot Controller</p>
+            </div>
+          </Link>
         </div>
+
+        {/* Center Tabs: Server Fleet, Accounts Vault, Live Console */}
+        <nav className="hidden md:flex items-center space-x-1 bg-[#0b121e] p-1 rounded-2xl border border-slate-800">
+          <Link
+            href="/"
+            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+              pathname === '/'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <Server className="h-3.5 w-3.5" />
+            <span>Server Fleet</span>
+          </Link>
+
+          <Link
+            href="/accounts"
+            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+              pathname === '/accounts'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <Users className="h-3.5 w-3.5" />
+            <span>Accounts Vault</span>
+          </Link>
+
+          <Link
+            href="/chat"
+            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+              pathname === '/chat'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <Terminal className="h-3.5 w-3.5" />
+            <span>Live Console</span>
+          </Link>
+        </nav>
 
         {/* Daemon Connection Pill */}
         <button
@@ -115,7 +158,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-700/30 transition transform active:scale-95 border border-emerald-400/30"
           >
             <Plus className="h-4 w-4 stroke-[3]" />
-            <span>Add Account</span>
+            <span>Deploy Bot</span>
           </button>
         </div>
       </div>

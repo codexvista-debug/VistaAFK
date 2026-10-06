@@ -19,6 +19,17 @@ function broadcast(msg: ServerMessage) {
   }
 }
 
+// 15-second keepalive ping to maintain uninterrupted connection across Wi-Fi and mobile
+setInterval(() => {
+  for (const client of clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      try {
+        client.ping();
+      } catch (e) {}
+    }
+  }
+}, 15000);
+
 const botManager = new BotManager({
   onTelemetryUpdate: (telemetry) => {
     broadcast({ type: 'TELEMETRY_UPDATE', payload: telemetry });

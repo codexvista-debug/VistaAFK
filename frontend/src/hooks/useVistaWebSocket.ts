@@ -1,7 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { BotConfig, BotTelemetry, ChatMessage, VistaNotification } from '../types';
+import { BotConfig, BotTelemetry, ChatMessage, VistaNotification, SavedAccount, ServerPreset } from '../types';
+
+const DEFAULT_SERVER_PRESETS: ServerPreset[] = [
+  { id: 'freshsmp', name: 'FreshSMP', host: 'play.freshsmp.fun', port: 25565, version: '1.20.4' },
+  { id: 'hypixel', name: 'Hypixel Network', host: 'mc.hypixel.net', port: 25565, version: '1.20.4' },
+  { id: 'local', name: 'Local Test Server', host: 'localhost', port: 25565, version: '' },
+];
 
 export function useVistaWebSocket() {
   const [daemonUrl, setDaemonUrl] = useState<string>('ws://localhost:8080');
@@ -15,18 +21,77 @@ export function useVistaWebSocket() {
   const [chatLogs, setChatLogs] = useState<Record<string, ChatMessage[]>>({});
   const [notifications, setNotifications] = useState<VistaNotification[]>([]);
 
+  // Persistent Accounts & Server Vault
+  const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
+  const [serverPresets, setServerPresets] = useState<ServerPreset[]>(DEFAULT_SERVER_PRESETS);
+
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const keepAliveIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load saved daemon URL and token from localStorage
+  // Load saved daemon URL, token, accounts, and server presets from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedUrl = localStorage.getItem('vistaafk_daemon_url');
       const savedToken = localStorage.getItem('vistaafk_secret_token');
       if (savedUrl) setDaemonUrl(savedUrl);
       if (savedToken) setSecretToken(savedToken);
+
+      const accountsRaw = localStorage.getItem('vistaafk_saved_accounts');
+      if (accountsRaw) {
+        try {
+          setSavedAccounts(JSON.parse(accountsRaw));
+        } catch (e) {}
+      }
+
+      const presetsRaw = localStorage.getItem('vistaafk_server_presets');
+      if (presetsRaw) {
+        try {
+          setServerPresets(JSON.parse(presetsRaw));
+        } catch (e) {}
+      }
     }
   }, []);
+
+  const saveAccount = (account: SavedAccount) => {
+    setSavedAccounts((prev) => {
+      const updated = [...prev.filter((a) => a.id !== account.id), account];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('vistaafk_saved_accounts', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
+
+  const deleteSavedAccount = (id: string) => {
+    setSavedAccounts((prev) => {
+      const updated = prev.filter((a) => a.id !== id);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('vistaafk_saved_accounts', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
+
+  const saveServerPreset = (preset: ServerPreset) => {
+    setServerPresets((prev) => {
+      const updated = [...prev.filter((p) => p.id !== preset.id), preset];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('vistaafk_server_presets', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
+
+  const deleteServerPreset = (id: string) => {
+    setServerPresets((prev) => {
+      const updated = prev.filter((p) => p.id !== id);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('vistaafk_server_presets', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
 
   const connect = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -48,6 +113,14 @@ export function useVistaWebSocket() {
 
         // Authenticate immediately upon connection
         ws.send(JSON.stringify({ type: 'AUTH', payload: { token: secretToken || undefined } }));
+
+        // Start client keepalive ping every 10 seconds to keep connection rock solid
+        if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
+        keepAliveIntervalRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'GET_STATE' }));
+          }
+        }, 10000);
       };
 
       ws.onmessage = (event) => {
@@ -127,12 +200,13 @@ export function useVistaWebSocket() {
         setIsConnected(false);
         setIsConnecting(false);
         wsRef.current = null;
+        if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
 
-        // Auto reconnect every 4 seconds
+        // Auto reconnect every 3 seconds
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = setTimeout(() => {
           connect();
-        }, 4000);
+        }, 3000);
       };
 
       ws.onerror = () => {
@@ -148,6 +222,7 @@ export function useVistaWebSocket() {
     connect();
     return () => {
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
       if (wsRef.current) {
         wsRef.current.close();
       }
@@ -188,6 +263,41 @@ export function useVistaWebSocket() {
     send({ type: 'LOOK_AT', payload: { botId, yaw, pitch } });
   const clearNotifications = () => setNotifications([]);
 
+  // Deploy a saved account to a specific server instance
+  const deployAccountToServer = (
+    account: SavedAccount,
+    server: { host: string; port: number; version?: string }
+  ) => {
+    const newBotConfig: BotConfig = {
+      id: `${account.id}-${server.host.replace(/[^a-zA-Z0-9]/g, '')}`,
+      name: account.name,
+      authType: account.authType,
+      host: server.host,
+      port: server.port,
+      version: server.version || undefined,
+      autoReconnect: true,
+      reconnectDelayMs: 5000,
+      antiAfk: {
+        enabled: true,
+        rotateHead: true,
+        jump: false,
+        sneak: true,
+        swingArm: true,
+        intervalSeconds: 12,
+      },
+      survival: {
+        autoEat: true,
+        eatThreshold: 14,
+        autoTotem: true,
+      },
+    };
+    addBot(newBotConfig);
+    // Automatically trigger start
+    setTimeout(() => {
+      startBot(newBotConfig.id);
+    }, 500);
+  };
+
   return {
     daemonUrl,
     secretToken,
@@ -198,6 +308,13 @@ export function useVistaWebSocket() {
     telemetry,
     chatLogs,
     notifications,
+    savedAccounts,
+    serverPresets,
+    saveAccount,
+    deleteSavedAccount,
+    saveServerPreset,
+    deleteServerPreset,
+    deployAccountToServer,
     updateDaemonConfig,
     connect,
     addBot,

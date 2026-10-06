@@ -1,5 +1,21 @@
 export type AuthType = 'microsoft' | 'offline';
 
+export interface SavedAccount {
+  id: string;
+  name: string;
+  authType: AuthType;
+  notes?: string;
+  createdAt: number;
+}
+
+export interface ServerPreset {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  version?: string;
+}
+
 export interface BotConfig {
   id: string;
   name: string;
