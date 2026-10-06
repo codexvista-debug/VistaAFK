@@ -19,6 +19,7 @@ import {
   Terminal,
   ChevronDown,
   ChevronUp,
+  Package,
 } from 'lucide-react';
 import { BotConfig, BotTelemetry, ChatMessage, ActivityLog } from '../types';
 
@@ -32,6 +33,7 @@ interface BotCardProps {
   onDelete: (id: string) => void;
   onOpenChat: (id: string) => void;
   onOpenSightModal?: (config: BotConfig) => void;
+  onOpenInventory?: (config: BotConfig) => void;
   onEdit: (config: BotConfig) => void;
 }
 
@@ -45,6 +47,7 @@ export const BotCard: React.FC<BotCardProps> = ({
   onDelete,
   onOpenChat,
   onOpenSightModal,
+  onOpenInventory,
   onEdit,
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
@@ -378,6 +381,17 @@ export const BotCard: React.FC<BotCardProps> = ({
               title="Tactical Radar & Movement Controls"
             >
               <Compass className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* Player Inventory & Lore Viewer */}
+          {onOpenInventory && (
+            <button
+              onClick={() => onOpenInventory(config)}
+              className="p-1.5 bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-700 rounded-lg border border-slate-200 shadow-sm transition"
+              title="View Player Inventory, Items & Lore"
+            >
+              <Package className="h-4 w-4" />
             </button>
           )}
 

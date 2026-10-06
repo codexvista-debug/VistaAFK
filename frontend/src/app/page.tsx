@@ -11,6 +11,7 @@ import { LiveChatTerminal } from '../components/LiveChatTerminal';
 import { DaemonSettingsModal } from '../components/DaemonSettingsModal';
 import { NotificationToast } from '../components/NotificationToast';
 import { BotVisualControlModal } from '../components/BotVisualControlModal';
+import { BotInventoryModal } from '../components/BotInventoryModal';
 import { BotConfig, SavedAccount } from '../types';
 import { Plus, Server, AlertTriangle, RefreshCw, Layers, Users, Play } from 'lucide-react';
 import Link from 'next/link';
@@ -49,6 +50,7 @@ export default function Dashboard() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [chatBotId, setChatBotId] = useState<string | null>(null);
   const [sightModalBot, setSightModalBot] = useState<BotConfig | null>(null);
+  const [inventoryModalBot, setInventoryModalBot] = useState<BotConfig | null>(null);
 
   const activeChatConfig = configs.find((c) => c.id === chatBotId);
   const activeChatTelemetry = chatBotId ? telemetry[chatBotId] : undefined;
@@ -279,6 +281,7 @@ export default function Dashboard() {
                   onDelete={removeBot}
                   onOpenChat={(id) => setChatBotId(id)}
                   onOpenSightModal={(c) => setSightModalBot(c)}
+                  onOpenInventory={(c) => setInventoryModalBot(c)}
                   onEdit={handleEditBot}
                 />
               ))}
@@ -318,6 +321,15 @@ export default function Dashboard() {
           onMove={moveBot}
           onTogglePatrol={togglePatrol}
           onLook={lookAt}
+        />
+      )}
+
+      {/* Live Inventory & Lore Modal */}
+      {inventoryModalBot && (
+        <BotInventoryModal
+          config={inventoryModalBot}
+          telemetry={telemetry[inventoryModalBot.id]}
+          onClose={() => setInventoryModalBot(null)}
         />
       )}
 

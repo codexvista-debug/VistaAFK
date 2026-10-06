@@ -1,6 +1,6 @@
 import mineflayer, { Bot } from 'mineflayer';
 import { SocksProxyAgent } from 'socks-proxy-agent';
-import { BotConfig, BotTelemetry, ChatMessage, ActivityLog } from './types.js';
+import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, InventoryItem, ItemEnchantment } from './types.js';
 import path from 'path';
 
 export interface BotInstanceCallbacks {
@@ -8,6 +8,66 @@ export interface BotInstanceCallbacks {
   onChatMessage: (message: ChatMessage) => void;
   onActivityLog?: (log: ActivityLog) => void;
   onNotification: (level: 'info' | 'warn' | 'error' | 'success', message: string, botId?: string) => void;
+}
+
+function romanNumeral(num: number): string {
+  const romanMap: [number, string][] = [
+    [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']
+  ];
+  let result = '';
+  let n = num;
+  for (const [val, str] of romanMap) {
+    while (n >= val) {
+      result += str;
+      n -= val;
+    }
+  }
+  return result || String(num);
+}
+
+function formatEnchantName(rawId: string, lvl: number): string {
+  const cleanId = String(rawId || '').replace(/^minecraft:/, '');
+  const title = cleanId
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+
+  if (lvl > 1) {
+    return `${title} ${romanNumeral(lvl)}`;
+  }
+  // Single-level max enchants like Mending, Infinity, Silk Touch, Flame
+  if (['mending', 'flame', 'infinity', 'silk_touch', 'aqua_affinity', 'channeling', 'multishot', 'curse_of_binding', 'curse_of_vanishing'].includes(cleanId)) {
+    return title;
+  }
+  return `${title} I`;
+}
+
+function cleanMinecraftJsonText(raw: any): string {
+  if (!raw) return '';
+  if (typeof raw === 'string') {
+    if (raw.startsWith('{') || raw.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(raw);
+        return cleanMinecraftJsonText(parsed);
+      } catch (e) {}
+    }
+    return raw.replace(/§[0-9a-fk-or]/gi, '').trim();
+  }
+  if (typeof raw === 'object') {
+    let out = '';
+    if (raw.text) out += raw.text;
+    if (Array.isArray(raw.extra)) {
+      for (const ex of raw.extra) {
+        out += cleanMinecraftJsonText(ex);
+      }
+    }
+    if (raw.value) {
+      if (typeof raw.value === 'string') out += raw.value;
+      else if (Array.isArray(raw.value)) out += raw.value.map(cleanMinecraftJsonText).join(' ');
+    }
+    return out.replace(/§[0-9a-fk-or]/gi, '').trim();
+  }
+  return String(raw).replace(/§[0-9a-fk-or]/gi, '').trim();
 }
 
 function parseMinecraftChat(raw: any): string {
@@ -77,6 +137,7 @@ export class BotInstance {
   private lastChatText: string = '';
   private lastChatTimestamp: number = 0;
   private lastAntiAfkLogTime: number = 0;
+  private isEatingFood: boolean = false;
 
   constructor(config: BotConfig, callbacks: BotInstanceCallbacks) {
     this.config = config;
@@ -402,6 +463,7 @@ export class BotInstance {
 
     this.antiAfkInterval = setInterval(() => {
       if (!this.bot || !this.bot.entity) return;
+      if (this.isEatingFood) return; // Never interrupt eating motion
 
       try {
         const { rotateHead, jump, sneak, swingArm } = this.config.antiAfk;
@@ -445,7 +507,7 @@ export class BotInstance {
       try {
         const offhand = (this.bot.inventory.slots as any)[45];
         if (!offhand || offhand.name !== 'totem_of_undying') {
-          const totem = this.bot.inventory.items().find(i => i.name === 'totem_of_undying');
+          const totem = this.bot.inventory.items().find((i) => i.name === 'totem_of_undying');
           if (totem) {
             this.bot.equip(totem, 'off-hand').then(() => {
               this.emitActivity('survival', '🛡️ Auto-totem: Equipped Totem of Undying in off-hand');
@@ -457,24 +519,84 @@ export class BotInstance {
       }
     }
 
-    // 2. Auto Eat
-    if (this.config.survival.autoEat && this.bot.food < (this.config.survival.eatThreshold || 14)) {
-      if ((this.bot as any).autoEat) {
-        // if autoEat plugin exists
-        return;
-      }
+    // 2. Universal Auto Eat & Healing
+    if (this.config.survival.autoEat && !this.isEatingFood && this.bot.inventory) {
       try {
-        const food = this.bot.inventory.items().find(i =>
-          ['golden_carrot', 'cooked_beef', 'cooked_porkchop', 'bread', 'baked_potato', 'cooked_mutton', 'cooked_chicken', 'apple'].includes(i.name)
-        );
-        if (food && !(this.bot as any).isEating) {
-          this.bot.equip(food, 'hand').then(() => {
-            this.emitActivity('survival', `🍖 Auto-eat: Consumed ${food.name} (Hunger: ${this.bot?.food}/20)`);
-            this.bot?.consume().catch(() => {});
-          }).catch(() => {});
+        const currentHealth = this.bot.health ?? 20;
+        const currentFood = this.bot.food ?? 20;
+        const isInjured = currentHealth < 20;
+        const isHungry = currentFood < 20;
+        const eatThreshold = this.config.survival.eatThreshold || 18;
+        const hungerBelowThreshold = currentFood <= eatThreshold;
+
+        // In Minecraft:
+        // - Golden apple can be eaten anytime (even when food is 20) and grants instant Absorption + Regeneration!
+        // - Regular foods can be consumed whenever food < 20.
+        // - Natural regeneration occurs when food >= 18.
+        // If injured and hungry (or hunger below threshold), eating is urgent!
+        const shouldEatRegular = isHungry && (isInjured || hungerBelowThreshold);
+        const shouldEatGolden = isInjured || shouldEatRegular;
+
+        if (shouldEatRegular || shouldEatGolden) {
+          const items = this.bot.inventory.items();
+
+          // 1. Check for golden apple if injured
+          let selectedFood = items.find((i) => ['enchanted_golden_apple', 'golden_apple'].includes(i.name));
+
+          // 2. If no golden apple or food is < 20, search all slots for any edible food
+          if (!selectedFood && shouldEatRegular) {
+            const FOOD_PRIORITY = [
+              'golden_carrot',
+              'cooked_beef', 'steak', 'cooked_porkchop', 'cooked_mutton', 'cooked_salmon', 'cooked_chicken',
+              'baked_potato', 'bread', 'cooked_cod', 'cooked_rabbit',
+              'apple', 'carrot', 'sweet_berries', 'glow_berries', 'melon_slice',
+              'pumpkin_pie', 'honey_bottle', 'cookie', 'dried_kelp', 'beetroot',
+              'mushroom_stew', 'rabbit_stew', 'beetroot_soup',
+              'potato', 'beef', 'porkchop', 'mutton', 'chicken', 'salmon', 'cod', 'rabbit'
+            ];
+
+            for (const fname of FOOD_PRIORITY) {
+              const match = items.find((i) => i.name === fname);
+              if (match) {
+                selectedFood = match;
+                break;
+              }
+            }
+
+            // Universal fallback: check minecraft-data foods registry
+            if (!selectedFood) {
+              selectedFood = items.find((i) =>
+                Boolean((this.bot as any)?.registry?.foodsByName?.[i.name]) &&
+                !['rotten_flesh', 'pufferfish', 'poisonous_potato', 'spider_eye'].includes(i.name)
+              );
+            }
+          }
+
+          if (selectedFood) {
+            this.isEatingFood = true;
+            const foodToEat = selectedFood;
+            const foodName = foodToEat.displayName || foodToEat.name;
+
+            this.bot.equip(foodToEat, 'hand')
+              .then(async () => {
+                this.emitActivity('survival', `🍖 Auto-eat: Consuming ${foodName} (HP: ${Math.round(currentHealth)}/20, Hunger: ${currentFood}/20)`);
+                try {
+                  await this.bot?.consume();
+                  this.emitActivity('survival', `✨ Finished eating ${foodName} (Now HP: ${Math.round(this.bot?.health || 0)}/20, Hunger: ${this.bot?.food || 0}/20)`);
+                } catch (err: any) {
+                  // Eating interrupted or failed
+                } finally {
+                  this.isEatingFood = false;
+                  this.emitTelemetry();
+                }
+              })
+              .catch(() => {
+                this.isEatingFood = false;
+              });
+          }
         }
       } catch (e) {
-        // ignore
+        this.isEatingFood = false;
       }
     }
   }
@@ -643,6 +765,83 @@ export class BotInstance {
       nearbyEntities.sort((a, b) => a.distance - b.distance);
     } catch (e) {}
 
+    // Inventory serialization with enchantments and lore
+    const inventoryList: InventoryItem[] = [];
+    try {
+      if (this.bot.inventory && Array.isArray(this.bot.inventory.slots)) {
+        for (let s = 0; s < this.bot.inventory.slots.length; s++) {
+          const it = this.bot.inventory.slots[s];
+          if (!it) continue;
+
+          // Parse enchantments
+          const enchants: ItemEnchantment[] = [];
+          if (Array.isArray(it.enchants)) {
+            for (const e of it.enchants) {
+              enchants.push({
+                name: e.name,
+                level: e.lvl,
+                displayName: formatEnchantName(e.name, e.lvl),
+              });
+            }
+          }
+          if (enchants.length === 0 && (it as any).nbt?.value) {
+            const nbtVal = (it as any).nbt.value;
+            const rawList = nbtVal.StoredEnchantments?.value?.value || nbtVal.Enchantments?.value?.value;
+            if (Array.isArray(rawList)) {
+              for (const itemEnch of rawList) {
+                const rawId = itemEnch.id?.value || itemEnch.id || 'enchantment';
+                const lvl = itemEnch.lvl?.value ?? itemEnch.lvl ?? 1;
+                enchants.push({
+                  name: String(rawId).replace(/^minecraft:/, ''),
+                  level: Number(lvl),
+                  displayName: formatEnchantName(String(rawId), Number(lvl)),
+                });
+              }
+            }
+          }
+
+          // Parse Lore
+          const loreLines: string[] = [];
+          if (Array.isArray(it.customLore)) {
+            for (const l of it.customLore) {
+              const cleaned = cleanMinecraftJsonText(l);
+              if (cleaned) loreLines.push(cleaned);
+            }
+          }
+          if (loreLines.length === 0 && (it as any).nbt?.value?.display?.value?.Lore?.value?.value) {
+            const rawLore = (it as any).nbt.value.display.value.Lore.value.value;
+            if (Array.isArray(rawLore)) {
+              for (const l of rawLore) {
+                const cleaned = cleanMinecraftJsonText(typeof l === 'string' ? l : l?.value || String(l));
+                if (cleaned) loreLines.push(cleaned);
+              }
+            }
+          }
+
+          // Custom Name
+          let customName: string | undefined = undefined;
+          if (it.customName) {
+            customName = cleanMinecraftJsonText(it.customName);
+          } else if ((it as any).nbt?.value?.display?.value?.Name?.value) {
+            customName = cleanMinecraftJsonText((it as any).nbt.value.display.value.Name.value);
+          }
+
+          inventoryList.push({
+            slot: s,
+            name: it.name,
+            displayName: customName || it.displayName || it.name,
+            count: it.count,
+            maxStackSize: it.stackSize,
+            durabilityUsed: it.durabilityUsed,
+            maxDurability: it.maxDurability,
+            customName,
+            lore: loreLines.length > 0 ? loreLines : undefined,
+            enchantments: enchants.length > 0 ? enchants : undefined,
+          });
+        }
+      }
+    } catch (e) {}
+
     return {
       id: this.config.id,
       name: this.config.name,
@@ -664,6 +863,8 @@ export class BotInstance {
       heldItem: held?.name,
       offhandItem: offhand?.name,
       inventoryCount: this.bot.inventory ? this.bot.inventory.items().length : 0,
+      inventory: inventoryList,
+      selectedSlot: (this.bot as any).quickBarSlot ?? 0,
       facing,
       yaw: Math.round(yaw * 100) / 100,
       pitch: Math.round(pitch * 100) / 100,

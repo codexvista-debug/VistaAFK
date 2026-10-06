@@ -32,6 +32,25 @@ export interface BotConfig {
 
 export type BotStatus = 'offline' | 'authenticating' | 'connecting' | 'online' | 'error' | 'reconnecting';
 
+export interface ItemEnchantment {
+  name: string;
+  level: number;
+  displayName: string;
+}
+
+export interface InventoryItem {
+  slot: number;
+  name: string;
+  displayName: string;
+  count: number;
+  maxStackSize?: number;
+  durabilityUsed?: number;
+  maxDurability?: number;
+  customName?: string;
+  lore?: string[];
+  enchantments?: ItemEnchantment[];
+}
+
 export interface BotTelemetry {
   id: string;
   name: string;
@@ -57,6 +76,8 @@ export interface BotTelemetry {
   heldItem?: string;
   offhandItem?: string;
   inventoryCount: number;
+  inventory?: InventoryItem[];
+  selectedSlot?: number;
   facing?: string;
   yaw?: number;
   pitch?: number;

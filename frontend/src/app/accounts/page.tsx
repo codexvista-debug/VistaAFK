@@ -17,7 +17,10 @@ import {
   CheckCircle2,
   X,
   ExternalLink,
+  Package,
 } from 'lucide-react';
+import { BotInventoryModal } from '../../components/BotInventoryModal';
+import { BotConfig } from '../../types';
 import Link from 'next/link';
 
 export default function AccountsPage() {
@@ -44,6 +47,7 @@ export default function AccountsPage() {
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
   const [selectedAccountForDeploy, setSelectedAccountForDeploy] = useState<SavedAccount | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [inventoryModalBot, setInventoryModalBot] = useState<BotConfig | null>(null);
 
   // New Account Form State
   const [newAccountName, setNewAccountName] = useState('');
@@ -206,9 +210,21 @@ export default function AccountsPage() {
                             {activeDeployments.map((d) => (
                               <div key={d.id} className="flex items-center justify-between text-[11px] font-mono font-medium text-slate-700">
                                 <span>&bull; {d.host}:{d.port}</span>
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${telemetry[d.id]?.status === 'online' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
-                                  {telemetry[d.id]?.status || 'offline'}
-                                </span>
+                                <div className="flex items-center space-x-1.5">
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${telemetry[d.id]?.status === 'online' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
+                                    {telemetry[d.id]?.status || 'offline'}
+                                  </span>
+                                  {telemetry[d.id]?.status === 'online' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setInventoryModalBot(d)}
+                                      className="p-1 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded transition"
+                                      title="View Inventory, Items & Lore"
+                                    >
+                                      <Package className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -443,6 +459,15 @@ export default function AccountsPage() {
           currentUrl={daemonUrl}
           currentToken={secretToken}
           onSave={updateDaemonConfig}
+        />
+      )}
+
+      {/* Live Inventory & Lore Modal */}
+      {inventoryModalBot && (
+        <BotInventoryModal
+          config={inventoryModalBot}
+          telemetry={telemetry[inventoryModalBot.id]}
+          onClose={() => setInventoryModalBot(null)}
         />
       )}
 
