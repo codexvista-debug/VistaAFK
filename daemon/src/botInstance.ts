@@ -9,6 +9,47 @@ export interface BotInstanceCallbacks {
   onNotification: (level: 'info' | 'warn' | 'error' | 'success', message: string, botId?: string) => void;
 }
 
+function parseMinecraftChat(raw: any): string {
+  if (!raw) return 'Unknown reason';
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return parseMinecraftChat(parsed);
+    } catch {
+      return raw;
+    }
+  }
+  // Check NBT compound format
+  if (raw.type === 'compound' && raw.value) {
+    let text = '';
+    if (raw.value.text?.value) text += raw.value.text.value;
+    if (raw.value.extra?.value?.value) {
+      const extraList = raw.value.extra.value.value;
+      for (const item of extraList) {
+        if (Array.isArray(item)) {
+          for (const sub of item) {
+            if (sub.text?.value) text += sub.text.value;
+          }
+        } else if (item.text?.value) {
+          text += item.text.value;
+        }
+      }
+    }
+    return text.replace(/\n+/g, ' ').trim() || JSON.stringify(raw);
+  }
+  // Standard Mojang Chat component
+  if (raw.text) {
+    let text = raw.text;
+    if (Array.isArray(raw.extra)) {
+      for (const part of raw.extra) {
+        text += typeof part === 'string' ? part : (part.text || '');
+      }
+    }
+    return text.replace(/\n+/g, ' ').trim();
+  }
+  return typeof raw === 'object' ? JSON.stringify(raw) : String(raw);
+}
+
 export class BotInstance {
   public config: BotConfig;
   private bot: Bot | null = null;
@@ -164,6 +205,20 @@ export class BotInstance {
       this.checkSurvivalActions();
     });
 
+    // Auto accept resource packs (critical for SMP sub-servers like Lifesteal with custom packs)
+    (this.bot as any).on('resourcePack', (url: string, hash: string) => {
+      try {
+        this.bot?.acceptResourcePack();
+      } catch (e) {
+        // ignore
+      }
+    });
+
+    this.bot.on('respawn', () => {
+      this.setupAntiAfk();
+      this.checkSurvivalActions();
+    });
+
     this.bot.on('death', () => {
       this.callbacks.onNotification('error', `${this.config.name} died in the world!`, this.config.id);
       this.sendDiscordAlert(`☠️ **${this.config.name}** died at [${this.getCoordinatesString()}]`);
@@ -176,8 +231,8 @@ export class BotInstance {
       }, 1500);
     });
 
-    this.bot.on('kicked', (reason: string) => {
-      const cleanReason = typeof reason === 'string' ? reason : JSON.stringify(reason);
+    this.bot.on('kicked', (reason: any) => {
+      const cleanReason = parseMinecraftChat(reason);
       this.updateStatus('offline', `Kicked: ${cleanReason}`);
       this.callbacks.onNotification('warn', `${this.config.name} was kicked: ${cleanReason}`, this.config.id);
       this.sendDiscordAlert(`⚠️ **${this.config.name}** was kicked: \`${cleanReason}\``);
