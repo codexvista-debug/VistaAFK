@@ -183,9 +183,17 @@ export class BotInstance {
       this.sendDiscordAlert(`⚠️ **${this.config.name}** was kicked: \`${cleanReason}\``);
     });
 
-    this.bot.on('error', (err: Error) => {
-      this.updateStatus('error', err.message);
-      this.callbacks.onNotification('error', `Error with ${this.config.name}: ${err.message}`, this.config.id);
+    this.bot.on('error', (err: any) => {
+      let friendlyMsg = err?.message || 'Connection failed';
+      if (friendlyMsg.includes('ECONNREFUSED')) {
+        friendlyMsg = `Cannot connect to ${this.config.host}:${this.config.port} — no Minecraft server is running there.`;
+      } else if (friendlyMsg.includes('ENOTFOUND')) {
+        friendlyMsg = `Server address not found: ${this.config.host}`;
+      } else if (friendlyMsg.includes('ETIMEDOUT')) {
+        friendlyMsg = `Connection to ${this.config.host}:${this.config.port} timed out.`;
+      }
+      this.updateStatus('error', friendlyMsg);
+      this.callbacks.onNotification('error', `[${this.config.name}] ${friendlyMsg}`, this.config.id);
     });
 
     this.bot.on('end', () => {

@@ -264,13 +264,13 @@ export const BotCard: React.FC<BotCardProps> = ({
       {/* Action Footer */}
       <div className="bg-slate-50/80 px-5 py-3 border-t border-slate-200/80 flex items-center justify-between">
         {/* Toggle Connect / Disconnect */}
-        {isOnline ? (
+        {isOnline || isConnecting || isAuthenticating ? (
           <button
             onClick={() => onStop(config.id)}
             className="flex items-center space-x-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-lg shadow-sm transition"
           >
             <Square className="h-3 w-3 fill-current" />
-            <span>Disconnect</span>
+            <span>{isConnecting ? 'Cancel' : 'Disconnect'}</span>
           </button>
         ) : (
           <button
