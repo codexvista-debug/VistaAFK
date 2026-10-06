@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Bot, Server, Zap, Heart, Bell } from 'lucide-react';
+import { X, Bot, Server, Zap, Heart, Bell, Terminal } from 'lucide-react';
 import { BotConfig } from '../types';
 
 interface AddBotModalProps {
@@ -33,6 +33,10 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
       autoEat: initialConfig?.survival?.autoEat ?? true,
       eatThreshold: initialConfig?.survival?.eatThreshold || 14,
       autoTotem: initialConfig?.survival?.autoTotem ?? true,
+      onSpawnCommand: initialConfig?.survival?.onSpawnCommand || '',
+      onSpawnDelaySeconds: initialConfig?.survival?.onSpawnDelaySeconds || 2,
+      recurringCommand: initialConfig?.survival?.recurringCommand || '',
+      recurringIntervalSeconds: initialConfig?.survival?.recurringIntervalSeconds || undefined,
     },
     discordWebhookUrl: initialConfig?.discordWebhookUrl || '',
   });
@@ -47,22 +51,22 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-      <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-xl flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 bg-slate-900/65 backdrop-blur-sm overflow-y-auto">
+      <div className="bg-white border-2 border-slate-300 rounded-3xl w-full max-w-xl flex flex-col shadow-2xl overflow-hidden my-auto max-h-[92vh]">
         {/* Header */}
-        <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div className="px-6 py-4.5 border-b-2 border-slate-200 flex items-center justify-between bg-slate-100/90">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600">
-              <Bot className="h-5 w-5" />
+            <div className="p-2.5 rounded-xl bg-emerald-100 border-2 border-emerald-300 text-emerald-800">
+              <Bot className="h-5 w-5 stroke-[2.5]" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">
+              <h2 className="text-base font-black text-slate-900 uppercase tracking-tight">
                 {initialConfig ? 'Edit Bot Account' : 'Add Minecraft AFK Account'}
               </h2>
               <p className="text-xs text-slate-500 font-medium">Configure connection and autonomous survival routines</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition">
+          <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -385,6 +389,116 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
                   }
                   className="w-4 h-4 rounded text-emerald-600 border-slate-300"
                 />
+              </div>
+
+              {/* Auto Commands Section */}
+              <div className="pt-4 border-t-2 border-slate-200 space-y-4">
+                <div className="flex items-center space-x-2 text-slate-900 font-bold text-xs">
+                  <Terminal className="h-4 w-4 text-emerald-600" />
+                  <span>Auto Commands (SMP Subserver Navigation & AFK Maintenance)</span>
+                </div>
+
+                {/* On-Spawn Command */}
+                <div className="p-3.5 bg-slate-50 border-2 border-slate-200 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-800">
+                      On-Spawn Command <span className="font-normal text-slate-500">(e.g. /lifesteal)</span>
+                    </label>
+                    <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-bold">
+                      Runs on join
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="col-span-3">
+                      <input
+                        type="text"
+                        placeholder="e.g. /lifesteal or /server lifesteal"
+                        value={formData.survival.onSpawnCommand || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            survival: { ...formData.survival, onSpawnCommand: e.target.value },
+                          })
+                        }
+                        className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 font-bold focus:outline-none focus:border-emerald-600"
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        placeholder="Delay (s)"
+                        value={formData.survival.onSpawnDelaySeconds || 2}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            survival: {
+                              ...formData.survival,
+                              onSpawnDelaySeconds: parseInt(e.target.value, 10) || 2,
+                            },
+                          })
+                        }
+                        className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 font-bold focus:outline-none focus:border-emerald-600"
+                        title="Delay in seconds before running command on join"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-tight">
+                    Automatically typed into chat after entering the server lobby to enter the subserver.
+                  </p>
+                </div>
+
+                {/* Recurring Command */}
+                <div className="p-3.5 bg-slate-50 border-2 border-slate-200 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-800">
+                      Recurring Command <span className="font-normal text-slate-500">(Optional)</span>
+                    </label>
+                    <span className="text-[10px] font-mono text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200 font-bold">
+                      Repeats periodically
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="col-span-3">
+                      <input
+                        type="text"
+                        placeholder="e.g. /lifesteal or /afk"
+                        value={formData.survival.recurringCommand || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            survival: { ...formData.survival, recurringCommand: e.target.value },
+                          })
+                        }
+                        className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 font-bold focus:outline-none focus:border-emerald-600"
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        min="10"
+                        max="3600"
+                        placeholder="Every (s)"
+                        value={formData.survival.recurringIntervalSeconds || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            survival: {
+                              ...formData.survival,
+                              recurringIntervalSeconds: parseInt(e.target.value, 10) || undefined,
+                            },
+                          })
+                        }
+                        className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 font-bold focus:outline-none focus:border-emerald-600"
+                        title="Repeat interval in seconds (e.g. 180 = every 3 mins)"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-tight">
+                    Repeats this command every X seconds (e.g. 180s for 3 minutes) while chunk-loading.
+                  </p>
+                </div>
               </div>
             </div>
           )}

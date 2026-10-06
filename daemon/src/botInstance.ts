@@ -71,6 +71,8 @@ export class BotInstance {
   private reconnectAttempts: number = 0;
   private patrolInterval: NodeJS.Timeout | null = null;
   private isPatrolling: boolean = false;
+  private recurringCommandInterval: NodeJS.Timeout | null = null;
+  private spawnCommandTimeout: NodeJS.Timeout | null = null;
 
   constructor(config: BotConfig, callbacks: BotInstanceCallbacks) {
     this.config = config;
@@ -81,6 +83,7 @@ export class BotInstance {
     this.config = newConfig;
     if (this.bot && this.currentStatus === 'online') {
       this.setupAntiAfk();
+      this.setupAutoCommands();
     }
   }
 
@@ -178,6 +181,7 @@ export class BotInstance {
       this.setupAntiAfk();
       this.setupTelemetryLoop();
       this.checkSurvivalActions();
+      this.setupAutoCommands();
 
       this.callbacks.onChatMessage({
         botId: this.config.id,
@@ -591,10 +595,65 @@ export class BotInstance {
     if (this.antiAfkInterval) clearInterval(this.antiAfkInterval);
     if (this.telemetryInterval) clearInterval(this.telemetryInterval);
     if (this.patrolInterval) clearInterval(this.patrolInterval);
+    if (this.recurringCommandInterval) clearInterval(this.recurringCommandInterval);
+    if (this.spawnCommandTimeout) clearTimeout(this.spawnCommandTimeout);
     this.reconnectTimeout = null;
     this.antiAfkInterval = null;
     this.telemetryInterval = null;
     this.patrolInterval = null;
+    this.recurringCommandInterval = null;
+    this.spawnCommandTimeout = null;
+  }
+
+  private setupAutoCommands() {
+    if (this.recurringCommandInterval) {
+      clearInterval(this.recurringCommandInterval);
+      this.recurringCommandInterval = null;
+    }
+    if (this.spawnCommandTimeout) {
+      clearTimeout(this.spawnCommandTimeout);
+      this.spawnCommandTimeout = null;
+    }
+
+    // On-Spawn Auto Command (e.g. /lifesteal)
+    const onSpawnCmd = this.config.survival?.onSpawnCommand?.trim();
+    if (onSpawnCmd) {
+      const delayMs = (this.config.survival.onSpawnDelaySeconds || 2) * 1000;
+      this.spawnCommandTimeout = setTimeout(() => {
+        if (this.bot && this.currentStatus === 'online') {
+          try {
+            this.bot.chat(onSpawnCmd);
+            this.callbacks.onChatMessage({
+              botId: this.config.id,
+              timestamp: Date.now(),
+              sender: 'AutoCommand',
+              message: `⚡ Executed spawn command: ${onSpawnCmd}`,
+              isSystem: true,
+            });
+          } catch (e) {}
+        }
+      }, delayMs);
+    }
+
+    // Recurring Auto Command (e.g. /lifesteal every 300 seconds)
+    const recurringCmd = this.config.survival?.recurringCommand?.trim();
+    const intervalSec = this.config.survival?.recurringIntervalSeconds;
+    if (recurringCmd && intervalSec && intervalSec > 0) {
+      this.recurringCommandInterval = setInterval(() => {
+        if (this.bot && this.currentStatus === 'online') {
+          try {
+            this.bot.chat(recurringCmd);
+            this.callbacks.onChatMessage({
+              botId: this.config.id,
+              timestamp: Date.now(),
+              sender: 'AutoCommand',
+              message: `⏱️ Executed recurring command: ${recurringCmd}`,
+              isSystem: true,
+            });
+          } catch (e) {}
+        }
+      }, intervalSec * 1000);
+    }
   }
 
   private getCoordinatesString(): string {

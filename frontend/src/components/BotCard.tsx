@@ -254,11 +254,12 @@ export const BotCard: React.FC<BotCardProps> = ({
               <span>Totem</span>
             </span>
 
-            {isOnline && telemetry?.uptimeSeconds ? (
-              <span className="ml-auto font-mono text-slate-500 font-medium">
-                Up: {formatUptime(telemetry.uptimeSeconds)}
+            {isOnline && (
+              <span className="ml-auto flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full font-mono font-bold text-[10px] bg-emerald-100 text-emerald-800 border-2 border-emerald-400 shadow-xs">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>UPTIME: {formatUptime(telemetry?.uptimeSeconds || 0)}</span>
               </span>
-            ) : null}
+            )}
           </div>
 
           {/* In-Card Live Player Activity Logs */}

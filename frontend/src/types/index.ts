@@ -38,6 +38,10 @@ export interface BotConfig {
     autoEat: boolean;
     eatThreshold: number;
     autoTotem: boolean;
+    onSpawnCommand?: string;
+    onSpawnDelaySeconds?: number;
+    recurringCommand?: string;
+    recurringIntervalSeconds?: number;
   };
   discordWebhookUrl?: string;
 }

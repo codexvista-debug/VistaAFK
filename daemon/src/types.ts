@@ -22,6 +22,10 @@ export interface BotConfig {
     autoEat: boolean;
     eatThreshold: number; // Hunger level below which bot eats (default 14)
     autoTotem: boolean;   // Equip totem to offhand if available
+    onSpawnCommand?: string;
+    onSpawnDelaySeconds?: number;
+    recurringCommand?: string;
+    recurringIntervalSeconds?: number;
   };
   discordWebhookUrl?: string;
 }
