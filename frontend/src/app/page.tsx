@@ -10,7 +10,7 @@ import { LiveChatTerminal } from '../components/LiveChatTerminal';
 import { DaemonSettingsModal } from '../components/DaemonSettingsModal';
 import { NotificationToast } from '../components/NotificationToast';
 import { BotConfig } from '../types';
-import { Plus, Bot, Shield, AlertTriangle, RefreshCw, Layers } from 'lucide-react';
+import { Plus, Bot, AlertTriangle, RefreshCw, Layers } from 'lucide-react';
 
 export default function Dashboard() {
   const {
@@ -33,7 +33,6 @@ export default function Dashboard() {
     startAll,
     stopAll,
     sendChat,
-    clearNotifications,
   } = useVistaWebSocket();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -59,13 +58,13 @@ export default function Dashboard() {
   };
 
   const handleDismissNotification = (id: string) => {
-    // Notifications auto-manage, or dismiss
+    // handled by notification toast
   };
 
   const onlineCount = Object.values(telemetry).filter((t) => t.status === 'online').length;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#090d16] text-gray-100">
+    <div className="min-h-screen flex flex-col bg-[#f8fafc] text-slate-800">
       {/* Navigation Bar */}
       <Navbar
         isConnected={isConnected}
@@ -85,14 +84,14 @@ export default function Dashboard() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Auth Error Banner */}
         {authError && (
-          <div className="mb-6 p-4 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 flex items-center justify-between text-xs">
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="h-4 w-4" />
-              <span>Authentication Error: {authError}</span>
+          <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center justify-between text-xs shadow-sm">
+            <div className="flex items-center space-x-2.5">
+              <AlertTriangle className="h-4 w-4 text-rose-600" />
+              <span className="font-medium">Authentication Error: {authError}</span>
             </div>
             <button
               onClick={() => setIsSettingsModalOpen(true)}
-              className="underline hover:text-white"
+              className="font-bold underline hover:text-rose-900"
             >
               Configure Token
             </button>
@@ -101,27 +100,29 @@ export default function Dashboard() {
 
         {/* Daemon Disconnected Notice */}
         {!isConnected && !isConnecting && (
-          <div className="mb-6 p-4 rounded-xl bg-amber-950/40 border border-amber-800/80 text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center space-x-2.5">
-              <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0" />
+          <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-sm">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-amber-100 rounded-xl text-amber-700 shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
               <div>
-                <p className="font-semibold text-white">Bot Daemon is currently offline or unreachable.</p>
-                <p className="text-amber-300/80 mt-0.5">
-                  Start the daemon on your PC or VPS (<code className="bg-black/40 px-1 py-0.5 rounded">npm run dev</code> in <code className="bg-black/40 px-1 py-0.5 rounded">daemon/</code>).
+                <p className="font-bold text-slate-900">Bot Daemon is currently offline or unreachable.</p>
+                <p className="text-amber-800 text-[11px] mt-0.5">
+                  Start the daemon on your PC or VPS (<code className="bg-amber-100/80 px-1 py-0.5 rounded font-mono font-semibold">npm run dev</code> in <code className="bg-amber-100/80 px-1 py-0.5 rounded font-mono font-semibold">daemon/</code>).
                 </p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
               <button
                 onClick={connect}
-                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-black font-semibold rounded-lg transition flex items-center space-x-1"
+                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition flex items-center space-x-1.5 shadow-sm"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
                 <span>Retry Connection</span>
               </button>
               <button
                 onClick={() => setIsSettingsModalOpen(true)}
-                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition"
+                className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-semibold rounded-xl transition shadow-sm"
               >
                 Settings
               </button>
@@ -136,21 +137,23 @@ export default function Dashboard() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <Layers className="h-4 w-4 text-emerald-400" />
-              <h2 className="text-base font-bold text-white tracking-tight">Active Accounts</h2>
-              <span className="text-xs text-gray-400 font-mono">({configs.length})</span>
+              <Layers className="h-4 w-4 text-emerald-600" />
+              <h2 className="text-base font-bold text-slate-900 tracking-tight">Active Accounts</h2>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono border border-slate-200">
+                {configs.length}
+              </span>
             </div>
           </div>
 
           {configs.length === 0 ? (
             /* Empty State */
-            <div className="p-12 border-2 border-dashed border-gray-800 rounded-2xl flex flex-col items-center justify-center text-center bg-gray-900/20">
-              <div className="h-16 w-16 rounded-2xl bg-emerald-950/40 border border-emerald-800 flex items-center justify-center text-emerald-400 mb-4 shadow-lg shadow-emerald-900/10">
+            <div className="p-12 border-2 border-dashed border-slate-300 rounded-3xl flex flex-col items-center justify-center text-center bg-white shadow-sm">
+              <div className="h-16 w-16 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 mb-4 shadow-sm">
                 <Bot className="h-8 w-8" />
               </div>
-              <h3 className="text-lg font-bold text-white">No Minecraft Accounts Configured</h3>
-              <p className="text-xs text-gray-400 max-w-md mt-1.5 leading-relaxed">
-                Add your first Minecraft Java account to start chunk-loading your farms, monitoring health/inventory, and bypassing AFK kick plugins.
+              <h3 className="text-lg font-bold text-slate-900">No Minecraft Accounts Configured</h3>
+              <p className="text-xs text-slate-500 max-w-md mt-1.5 leading-relaxed font-medium">
+                Add your first Minecraft Java account to start chunk-loading your mob farms, monitoring health/inventory, and bypassing AFK kicks.
               </p>
               <button
                 onClick={() => {
@@ -158,9 +161,9 @@ export default function Dashboard() {
                   setIsAddModalOpen(true);
                 }}
                 disabled={!isConnected}
-                className="mt-6 flex items-center space-x-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-semibold text-xs rounded-xl shadow-lg shadow-emerald-700/25 transition"
+                className="mt-6 flex items-center space-x-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-600/25 transition"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-4 w-4 stroke-[2.5]" />
                 <span>Add Your First Account</span>
               </button>
             </div>
