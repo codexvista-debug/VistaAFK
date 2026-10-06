@@ -42,6 +42,28 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
   });
 
   const [activeTab, setActiveTab] = useState<'connection' | 'antiAfk' | 'survival' | 'alerts'>('connection');
+  const [testWebhookStatus, setTestWebhookStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+
+  const handleTestWebhook = async () => {
+    if (!formData.discordWebhookUrl?.trim()) return;
+    setTestWebhookStatus('testing');
+    try {
+      await fetch(formData.discordWebhookUrl.trim(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: 'VistaAFK Monitor',
+          avatar_url: `https://mc-heads.net/avatar/${formData.name || 'steve'}/128`,
+          content: `🔔 **[Test Alert]** VistaAFK Discord Webhook is configured correctly for **${formData.name || 'Account'}**!`,
+        }),
+      });
+      setTestWebhookStatus('success');
+      setTimeout(() => setTestWebhookStatus('idle'), 3000);
+    } catch (e: any) {
+      setTestWebhookStatus('error');
+      setTimeout(() => setTestWebhookStatus('idle'), 3000);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -516,8 +538,33 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition"
                 />
                 <p className="text-[11px] text-slate-500 mt-1.5">
-                  Receives instant Discord alerts if this bot dies, gets kicked, or receives whispers from staff/players.
+                  Receives instant Discord alerts when this bot joins, types commands, dies, gets kicked, or disconnects (with session uptime).
                 </p>
+
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={handleTestWebhook}
+                    disabled={!formData.discordWebhookUrl?.trim() || testWebhookStatus === 'testing'}
+                    className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition border flex items-center space-x-1.5 shadow-2xs ${
+                      testWebhookStatus === 'success'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                        : testWebhookStatus === 'error'
+                        ? 'bg-rose-50 text-rose-700 border-rose-300'
+                        : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 disabled:opacity-40'
+                    }`}
+                  >
+                    <span>
+                      {testWebhookStatus === 'testing'
+                        ? 'Sending Test Alert...'
+                        : testWebhookStatus === 'success'
+                        ? '✓ Test Alert Sent to Discord!'
+                        : testWebhookStatus === 'error'
+                        ? '❌ Webhook Failed (Check URL)'
+                        : '🔔 Send Test Alert to Discord'}
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
           )}

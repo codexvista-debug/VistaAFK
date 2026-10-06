@@ -756,11 +756,12 @@ export class BotInstance {
   }
 
   private async sendDiscordAlert(content: string) {
-    const url = this.config.discordWebhookUrl;
+    const url = this.config.discordWebhookUrl?.trim();
     if (!url || !url.startsWith('http')) return;
 
     try {
-      await fetch(url, {
+      console.log(`[VistaAFK Discord Webhook] Sending: "${content}"`);
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -769,8 +770,13 @@ export class BotInstance {
           content,
         }),
       });
-    } catch (e) {
-      // ignore webhook failures
+      if (res.ok) {
+        console.log(`[VistaAFK Discord Webhook] Alert delivered successfully!`);
+      } else {
+        console.warn(`[VistaAFK Discord Webhook] HTTP Error ${res.status}: ${res.statusText}`);
+      }
+    } catch (e: any) {
+      console.error('[VistaAFK Discord Webhook Failed]:', e?.message);
     }
   }
 }

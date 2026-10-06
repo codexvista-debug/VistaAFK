@@ -131,18 +131,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
           <Settings className="h-3 w-3 text-slate-400 ml-1 hover:text-white" />
         </button>
-
-        {/* Action Controls */}
-        <div className="flex items-center space-x-2 sm:space-x-3">
-          <button
-            onClick={onOpenAddModal}
-            disabled={!isConnected}
-            className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-700/30 transition transform active:scale-95 border border-emerald-400/30"
-          >
-            <Plus className="h-4 w-4 stroke-[3]" />
-            <span>Deploy Bot</span>
-          </button>
-        </div>
       </div>
     </header>
   );
