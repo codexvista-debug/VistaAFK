@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Lock, ShieldAlert, KeyRound, AlertOctagon, CheckCircle2 } from 'lucide-react';
+import { ShieldAlert, AlertOctagon, Box, KeyRound } from 'lucide-react';
 
 const CORRECT_PASSCODE = '3012';
 const MAX_ATTEMPTS = 3;
@@ -20,13 +20,11 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ children }) => {
   const [attemptsLeft, setAttemptsLeft] = useState<number>(MAX_ATTEMPTS);
 
   useEffect(() => {
-    // Check existing auth session
     const authSession = localStorage.getItem('vistaafk_passcode_auth');
     if (authSession === 'authenticated') {
       setIsAuthenticated(true);
     }
 
-    // Check lockout state
     const savedLockout = localStorage.getItem('vistaafk_lockout');
     if (savedLockout) {
       try {
@@ -45,7 +43,6 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ children }) => {
     }
   }, []);
 
-  // Update countdown timer while locked out
   useEffect(() => {
     if (!lockedUntil) return;
 
@@ -108,7 +105,7 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ children }) => {
           JSON.stringify({ failedAttempts })
         );
         setAttemptsLeft(remaining);
-        setErrorMessage(`Incorrect passcode! ${remaining} ${remaining === 1 ? 'attempt' : 'attempts'} remaining before 12-hour lockout.`);
+        setErrorMessage(`Incorrect passcode! ${remaining} ${remaining === 1 ? 'attempt' : 'attempts'} remaining.`);
       }
       setPasscode('');
     }
@@ -119,59 +116,54 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ children }) => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[#0d141e] text-slate-100 relative overflow-hidden font-sans">
-      {/* Minecraft styled background ambient pattern */}
+    <div className="min-h-screen flex items-center justify-center p-4 bg-[#4a3b2c] relative overflow-hidden font-sans">
+      {/* Minecraft Classic Dirt Background Pattern */}
       <div 
-        className="absolute inset-0 opacity-20 pointer-events-none"
+        className="absolute inset-0 opacity-40 pointer-events-none"
         style={{
-          backgroundImage: `radial-gradient(#10b981 1px, transparent 1px), radial-gradient(#065f46 1px, #0d141e 1px)`,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h8v8H0V0zm8 8h8v8H8V8z' fill='%232e2217' fill-opacity='0.6' fill-rule='evenodd'/%3E%3Cpath d='M0 8h8v8H0V8zm8-8h8v8H8V0z' fill='%235c4935' fill-opacity='0.4' fill-rule='evenodd'/%3E%3C/svg%3E")`,
           backgroundSize: '32px 32px',
-          backgroundPosition: '0 0, 16px 16px',
         }}
       />
 
-      <div className="relative z-10 w-full max-w-md bg-[#162030] border-2 border-[#223348] rounded-3xl p-8 shadow-2xl backdrop-blur-md">
-        {/* Brand Icon */}
+      {/* Classic Minecraft GUI Box (Light Stone with 3D Beveled Borders) */}
+      <div className="relative z-10 w-full max-w-md bg-[#c6c6c6] border-4 border-t-white border-l-white border-b-[#555555] border-r-[#555555] rounded-xl p-8 shadow-2xl">
+        {/* Brand Header */}
         <div className="flex flex-col items-center text-center">
-          <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 border border-emerald-400/40 flex items-center justify-center text-white shadow-xl shadow-emerald-500/20 mb-4">
-            <Lock className="h-8 w-8 stroke-[2.5]" />
+          {/* Minecraft Grass Block */}
+          <div className="h-16 w-16 rounded-xl bg-[#22c55e] border-4 border-t-[#86efac] border-l-[#86efac] border-b-[#166534] border-r-[#166534] flex items-center justify-center text-white shadow-md relative overflow-hidden mb-3">
+            <div className="absolute inset-x-0 bottom-0 h-6 bg-[#78350f] border-t-2 border-[#15803d]" />
+            <Box className="h-8 w-8 text-white relative z-10 drop-shadow" />
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-white flex items-center space-x-2">
-            <span>Vista<span className="text-emerald-400">AFK</span></span>
-            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
-              Protected
-            </span>
+
+          <h1 className="text-2xl font-black tracking-tight text-[#222222] font-mono uppercase">
+            Vista<span className="text-[#16a34a]">AFK</span>
           </h1>
-          <p className="text-xs text-slate-400 mt-1.5 font-medium">
-            Enter authorized access key to enter the command portal
+          <p className="text-xs text-[#555555] mt-1 font-semibold">
+            Authentication Required &bull; Enter Access Code
           </p>
         </div>
 
-        {/* Lockout Warning State */}
+        {/* Lockout Screen */}
         {lockedUntil ? (
-          <div className="mt-6 p-4 rounded-2xl bg-rose-950/70 border-2 border-rose-800 text-rose-200 text-center space-y-2 animate-in fade-in">
-            <div className="flex items-center justify-center space-x-2 text-rose-400 font-bold text-sm">
-              <AlertOctagon className="h-5 w-5" />
-              <span>Security Lockout Active</span>
+          <div className="mt-6 p-4 bg-[#fecdd3] border-2 border-[#e11d48] rounded-lg text-[#881337] text-center space-y-2">
+            <div className="flex items-center justify-center space-x-1.5 font-bold text-xs">
+              <AlertOctagon className="h-4 w-4 text-[#e11d48]" />
+              <span>LOCKOUT ACTIVE (12 HOURS)</span>
             </div>
-            <p className="text-xs text-rose-300/90 leading-relaxed">
-              Exceeded 3 incorrect attempts. This device is locked out for 12 hours from accessing the dashboard.
-            </p>
-            <div className="pt-2">
-              <span className="text-[11px] text-slate-400 uppercase font-semibold">Remaining Lockout Time</span>
-              <div className="text-xl font-mono font-bold text-white tracking-wider mt-0.5">
-                {remainingTimeStr}
-              </div>
+            <p className="text-xs font-medium">3 incorrect attempts detected. Access blocked.</p>
+            <div className="text-lg font-mono font-black tracking-wider text-[#9f1239]">
+              {remainingTimeStr}
             </div>
           </div>
         ) : (
           /* Passcode Input Form */
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
-              <div className="flex items-center justify-between text-xs font-semibold text-slate-300 mb-1.5">
+              <div className="flex items-center justify-between text-xs font-bold text-[#333333] mb-1.5">
                 <label htmlFor="passcode">Portal Passcode</label>
-                <span className={`text-[11px] ${attemptsLeft <= 1 ? 'text-rose-400 font-bold' : 'text-slate-400'}`}>
-                  {attemptsLeft} / {MAX_ATTEMPTS} attempts
+                <span className="text-[11px] text-[#666666] font-mono">
+                  {attemptsLeft} / {MAX_ATTEMPTS} tries
                 </span>
               </div>
               <div className="relative">
@@ -181,34 +173,34 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ children }) => {
                   autoFocus
                   required
                   maxLength={10}
-                  placeholder="Enter 4-digit code"
+                  placeholder="Enter code"
                   value={passcode}
                   onChange={(e) => setPasscode(e.target.value)}
-                  className="w-full bg-[#0b111a] border-2 border-[#2b3d54] focus:border-emerald-500 rounded-2xl px-4 py-3.5 text-center text-lg font-mono tracking-[0.5em] text-white placeholder-slate-600 focus:outline-none transition shadow-inner"
+                  className="w-full bg-white border-4 border-t-[#555555] border-l-[#555555] border-b-white border-r-white px-4 py-3 text-center text-xl font-mono font-bold tracking-[0.4em] text-[#111111] focus:outline-none shadow-inner"
                 />
-                <KeyRound className="h-5 w-5 text-slate-500 absolute left-4 top-4 pointer-events-none" />
               </div>
             </div>
 
             {errorMessage && (
-              <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-300 text-xs flex items-center space-x-2">
-                <ShieldAlert className="h-4 w-4 shrink-0 text-rose-400" />
+              <div className="p-2.5 bg-[#fee2e2] border-2 border-[#ef4444] text-[#991b1b] text-xs rounded font-medium flex items-center space-x-2">
+                <ShieldAlert className="h-4 w-4 shrink-0 text-[#dc2626]" />
                 <span>{errorMessage}</span>
               </div>
             )}
 
+            {/* Classic Minecraft Button Style */}
             <button
               type="submit"
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm rounded-2xl shadow-lg shadow-emerald-700/30 transition transform active:scale-[0.98]"
+              className="w-full py-3 bg-[#16a34a] hover:bg-[#15803d] border-4 border-t-[#86efac] border-l-[#86efac] border-b-[#14532d] border-r-[#14532d] text-white font-black text-sm uppercase tracking-wider shadow-md transition active:border-t-[#14532d] active:border-l-[#14532d] active:border-b-[#86efac] active:border-r-[#86efac]"
             >
-              Authenticate & Enter
+              Enter Portal
             </button>
           </form>
         )}
 
-        <div className="mt-6 pt-4 border-t border-slate-800/80 text-center">
-          <p className="text-[11px] text-slate-500">
-            Protected with brute-force prevention: 3 failed attempts = 12-hour lockout
+        <div className="mt-5 pt-3 border-t-2 border-[#aaaaaa] text-center">
+          <p className="text-[10px] text-[#555555] font-semibold">
+            Passcode Protected &bull; 3 fails = 12-hour lockout
           </p>
         </div>
       </div>

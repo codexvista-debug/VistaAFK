@@ -10,11 +10,7 @@ import {
   Heart,
   Utensils,
   MapPin,
-  Bot,
-  Volume2,
-  VolumeX,
-  Trash2,
-  ExternalLink,
+  Box,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -27,13 +23,11 @@ function ChatContent() {
     telemetry,
     chatLogs,
     sendChat,
-    isConnected,
   } = useVistaWebSocket();
 
   const [selectedBotId, setSelectedBotId] = useState<string>(botIdParam || '');
   const [inputMessage, setInputMessage] = useState('');
   const [filter, setFilter] = useState<'all' | 'chat' | 'system'>('all');
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -72,27 +66,27 @@ function ChatContent() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#0b111a] text-slate-100 font-sans">
-      {/* Top Navbar */}
-      <header className="h-16 px-6 border-b border-[#1f2d42] bg-[#101826] flex items-center justify-between shadow-md">
+    <div className="h-screen flex flex-col bg-[#e2e8f0] text-slate-800 font-sans">
+      {/* Minecraft Themed Top Bar */}
+      <header className="h-16 px-6 border-b-2 border-slate-300 bg-white flex items-center justify-between shadow-sm">
         <div className="flex items-center space-x-4">
           <Link
             href="/"
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#1b2637] hover:bg-[#25354d] text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-300 transition"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Dashboard</span>
           </Link>
 
-          <div className="h-5 w-px bg-slate-700" />
+          <div className="h-5 w-px bg-slate-300" />
 
-          {/* Account Selector Dropdown */}
+          {/* Account Selector */}
           <div className="flex items-center space-x-2">
-            <span className="text-xs text-slate-400 font-medium">Account:</span>
+            <span className="text-xs font-bold text-slate-600">Account:</span>
             <select
               value={selectedBotId}
               onChange={(e) => setSelectedBotId(e.target.value)}
-              className="bg-[#1b2637] border border-slate-700 text-white text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none focus:border-emerald-500"
+              className="bg-white border-2 border-slate-300 text-slate-900 text-xs font-bold rounded-lg px-3 py-1.5 focus:outline-none focus:border-emerald-600 shadow-xs"
             >
               {configs.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -103,19 +97,19 @@ function ChatContent() {
           </div>
         </div>
 
-        {/* Live Bot Quick Stats */}
+        {/* Live Bot Stats in Header */}
         {currentConfig && (
           <div className="flex items-center space-x-4 text-xs font-mono">
-            <div className="flex items-center space-x-1.5 text-rose-400">
-              <Heart className="h-3.5 w-3.5 fill-current" />
+            <div className="flex items-center space-x-1.5 text-rose-600 font-bold">
+              <Heart className="h-4 w-4 fill-current" />
               <span>{isOnline ? `${Math.round(currentTelemetry?.health || 0)}/20` : '--'}</span>
             </div>
-            <div className="flex items-center space-x-1.5 text-amber-400">
-              <Utensils className="h-3.5 w-3.5" />
+            <div className="flex items-center space-x-1.5 text-amber-600 font-bold">
+              <Utensils className="h-4 w-4" />
               <span>{isOnline ? `${Math.round(currentTelemetry?.food || 0)}/20` : '--'}</span>
             </div>
-            <div className="flex items-center space-x-1.5 text-slate-400 hidden sm:flex">
-              <MapPin className="h-3.5 w-3.5" />
+            <div className="flex items-center space-x-1.5 text-slate-600 font-bold hidden sm:flex">
+              <MapPin className="h-4 w-4 text-slate-500" />
               <span>
                 {isOnline
                   ? `${currentTelemetry?.coordinates?.x || 0}, ${currentTelemetry?.coordinates?.y || 0}, ${currentTelemetry?.coordinates?.z || 0}`
@@ -123,8 +117,10 @@ function ChatContent() {
               </span>
             </div>
             <span
-              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                isOnline ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-slate-800 text-slate-400'
+              className={`px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                isOnline
+                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                  : 'bg-slate-200 text-slate-600 border-slate-300'
               }`}
             >
               {isOnline ? 'Online' : 'Offline'}
@@ -135,112 +131,110 @@ function ChatContent() {
 
       {/* Main Terminal Window */}
       <main className="flex-1 flex flex-col overflow-hidden max-w-6xl w-full mx-auto p-4 sm:p-6">
-        <div className="flex-1 flex flex-col bg-[#070b12] border-2 border-[#1a2638] rounded-3xl overflow-hidden shadow-2xl">
-          {/* Terminal Sub-Header */}
-          <div className="px-5 py-3 border-b border-[#1a2638] bg-[#0e1624] flex items-center justify-between">
+        <div className="flex-1 flex flex-col bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-2xl overflow-hidden shadow-lg">
+          {/* Sub Header */}
+          <div className="px-5 py-3 border-b-2 border-slate-200 bg-slate-50 flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="p-1.5 rounded-lg bg-emerald-950/80 text-emerald-400 border border-emerald-800">
-                <Terminal className="h-4 w-4" />
+              <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-200">
+                <Terminal className="h-4 w-4 stroke-[2.5]" />
               </div>
               <div>
-                <span className="font-bold text-white text-xs">
-                  {currentConfig?.name || 'No Bot Selected'} &mdash; Live Server Console
+                <span className="font-black text-slate-900 text-xs uppercase tracking-wide">
+                  {currentConfig?.name || 'No Bot Selected'} &bull; Live Game Console
                 </span>
-                <p className="text-[10px] text-slate-400 font-mono">
+                <p className="text-[10px] text-slate-500 font-mono font-medium">
                   {currentConfig ? `${currentConfig.host}:${currentConfig.port}` : ''}
                 </p>
               </div>
             </div>
 
-            {/* Filter pills */}
-            <div className="flex items-center space-x-2">
-              <div className="bg-[#172233] p-0.5 rounded-xl border border-slate-700 text-xs flex">
-                <button
-                  onClick={() => setFilter('all')}
-                  className={`px-3 py-1 rounded-lg transition ${
-                    filter === 'all' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  All Logs
-                </button>
-                <button
-                  onClick={() => setFilter('chat')}
-                  className={`px-3 py-1 rounded-lg transition ${
-                    filter === 'chat' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Players
-                </button>
-                <button
-                  onClick={() => setFilter('system')}
-                  className={`px-3 py-1 rounded-lg transition ${
-                    filter === 'system' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  System
-                </button>
-              </div>
+            {/* Filter buttons */}
+            <div className="bg-slate-200/80 p-0.5 rounded-lg border border-slate-300 text-xs flex font-bold">
+              <button
+                onClick={() => setFilter('all')}
+                className={`px-3 py-1 rounded-md transition ${
+                  filter === 'all' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setFilter('chat')}
+                className={`px-3 py-1 rounded-md transition ${
+                  filter === 'chat' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Players
+              </button>
+              <button
+                onClick={() => setFilter('system')}
+                className={`px-3 py-1 rounded-md transition ${
+                  filter === 'system' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                System
+              </button>
             </div>
           </div>
 
-          {/* Quick Commands Bar */}
-          <div className="px-5 py-2.5 bg-[#090f1a] border-b border-[#1a2638] flex items-center space-x-2 overflow-x-auto text-xs">
-            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Quick:</span>
+          {/* Quick Commands */}
+          <div className="px-5 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center space-x-2 overflow-x-auto text-xs">
+            <span className="text-[10px] uppercase font-black text-slate-500 tracking-wider">Quick:</span>
             {['/afk', '/lifesteal', '/home', '/spawn', '/tpa accept', '/help'].map((cmd) => (
               <button
                 key={cmd}
                 onClick={() => sendQuickCommand(cmd)}
                 disabled={!isOnline}
-                className="px-2.5 py-1 bg-[#152030] hover:bg-emerald-600 hover:text-white disabled:opacity-40 text-slate-300 font-mono text-[11px] font-semibold rounded-lg border border-slate-700 transition"
+                className="px-2.5 py-1 bg-white hover:bg-emerald-600 hover:text-white disabled:opacity-40 text-slate-800 font-mono text-[11px] font-bold rounded-md border border-slate-300 shadow-2xs transition"
               >
                 {cmd}
               </button>
             ))}
           </div>
 
-          {/* Scrollable Chat Terminal */}
-          <div className="flex-1 p-5 overflow-y-auto font-mono text-xs space-y-2.5 bg-[#070b12]">
+          {/* Chat Terminal Box */}
+          <div className="flex-1 p-5 overflow-y-auto font-mono text-xs space-y-2 bg-[#fcfcfc]">
             {filteredLogs.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-2">
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2">
                 <Terminal className="h-10 w-10 stroke-[1.5]" />
-                <p className="font-sans">No messages yet. Any game chat or whispers will stream here live.</p>
-                {!isOnline && <p className="text-amber-500/80 text-xs font-sans">Bot is currently offline.</p>}
+                <p className="font-sans font-medium text-xs">No chat messages received yet.</p>
+                {!isOnline && <p className="text-amber-600 font-sans text-xs font-bold">Bot is offline.</p>}
               </div>
             ) : (
               filteredLogs.map((msg, idx) => (
                 <div
                   key={idx}
-                  className={`p-2 rounded-xl transition ${
-                    msg.isSystem ? 'bg-[#0d1522]/60 text-slate-400' : 'bg-[#101b2c]/80 text-slate-100 hover:bg-[#132035]'
+                  className={`p-2 rounded-lg border transition ${
+                    msg.isSystem ? 'bg-slate-50 border-slate-200 text-slate-600' : 'bg-white border-slate-100 text-slate-900 hover:bg-slate-50 shadow-2xs'
                   }`}
                 >
-                  <span className="text-slate-500 mr-2 text-[10px]">
+                  <span className="text-slate-400 mr-2 text-[10px]">
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </span>
-                  <span className={`font-bold mr-2 ${msg.isSystem ? 'text-teal-400' : 'text-emerald-400'}`}>
+                  <span className={`font-black mr-2 ${msg.isSystem ? 'text-teal-700' : 'text-emerald-700'}`}>
                     [{msg.sender}]:
                   </span>
-                  <span className="whitespace-pre-wrap break-words">{msg.message}</span>
+                  <span className="whitespace-pre-wrap break-words font-medium">{msg.message}</span>
                 </div>
               ))
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Bar */}
-          <form onSubmit={handleSend} className="p-4 border-t border-[#1a2638] bg-[#0e1624] flex items-center space-x-3">
+          {/* Send Input Bar */}
+          <form onSubmit={handleSend} className="p-3.5 border-t-2 border-slate-200 bg-slate-50 flex items-center space-x-2">
             <input
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               disabled={!isOnline}
               placeholder={isOnline ? 'Type a chat message or server command (e.g. /spawn)...' : 'Connect bot to chat'}
-              className="flex-1 bg-black/60 border border-slate-700 focus:border-emerald-500 focus:outline-none rounded-2xl px-5 py-3 text-xs text-white placeholder-slate-500 disabled:opacity-50 transition"
+              className="flex-1 bg-white border-2 border-slate-300 focus:border-emerald-600 focus:outline-none rounded-xl px-4 py-2.5 text-xs text-slate-900 font-medium placeholder-slate-400 disabled:opacity-50"
             />
             <button
               type="submit"
               disabled={!isOnline || !inputMessage.trim()}
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-xs rounded-2xl transition flex items-center space-x-2 shadow-lg shadow-emerald-600/25"
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition flex items-center space-x-2 shadow-sm"
             >
               <Send className="h-4 w-4" />
               <span>Send</span>
@@ -254,7 +248,7 @@ function ChatContent() {
 
 export default function ChatPage() {
   return (
-    <Suspense fallback={<div className="h-screen flex items-center justify-center text-slate-400">Loading Chat...</div>}>
+    <Suspense fallback={<div className="h-screen flex items-center justify-center text-slate-600">Loading Chat...</div>}>
       <ChatContent />
     </Suspense>
   );
