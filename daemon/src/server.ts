@@ -92,6 +92,15 @@ wss.on('connection', (ws) => {
         case 'SEND_CHAT':
           botManager.sendChat(msg.payload.botId, msg.payload.message);
           break;
+        case 'MOVE_BOT':
+          botManager.moveBot(msg.payload.botId, msg.payload.control, msg.payload.state);
+          break;
+        case 'TOGGLE_PATROL':
+          botManager.togglePatrol(msg.payload.botId, msg.payload.enabled);
+          break;
+        case 'LOOK_AT':
+          botManager.lookAt(msg.payload.botId, msg.payload.yaw, msg.payload.pitch);
+          break;
       }
     } catch (err: any) {
       console.error('[VistaAFK Daemon] Error processing message:', err.message);

@@ -180,6 +180,12 @@ export function useVistaWebSocket() {
   const startAll = () => send({ type: 'START_ALL' });
   const stopAll = () => send({ type: 'STOP_ALL' });
   const sendChat = (botId: string, message: string) => send({ type: 'SEND_CHAT', payload: { botId, message } });
+  const moveBot = (botId: string, control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean) =>
+    send({ type: 'MOVE_BOT', payload: { botId, control, state } });
+  const togglePatrol = (botId: string, enabled: boolean) =>
+    send({ type: 'TOGGLE_PATROL', payload: { botId, enabled } });
+  const lookAt = (botId: string, yaw: number, pitch: number) =>
+    send({ type: 'LOOK_AT', payload: { botId, yaw, pitch } });
   const clearNotifications = () => setNotifications([]);
 
   return {
@@ -202,6 +208,9 @@ export function useVistaWebSocket() {
     startAll,
     stopAll,
     sendChat,
+    moveBot,
+    togglePatrol,
+    lookAt,
     clearNotifications,
   };
 }

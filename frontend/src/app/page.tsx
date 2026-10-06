@@ -9,6 +9,7 @@ import { AddBotModal } from '../components/AddBotModal';
 import { LiveChatTerminal } from '../components/LiveChatTerminal';
 import { DaemonSettingsModal } from '../components/DaemonSettingsModal';
 import { NotificationToast } from '../components/NotificationToast';
+import { BotVisualControlModal } from '../components/BotVisualControlModal';
 import { BotConfig } from '../types';
 import { Plus, Bot, AlertTriangle, RefreshCw, Layers } from 'lucide-react';
 
@@ -33,12 +34,16 @@ export default function Dashboard() {
     startAll,
     stopAll,
     sendChat,
+    moveBot,
+    togglePatrol,
+    lookAt,
   } = useVistaWebSocket();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingBot, setEditingBot] = useState<BotConfig | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [chatBotId, setChatBotId] = useState<string | null>(null);
+  const [sightModalBot, setSightModalBot] = useState<BotConfig | null>(null);
 
   const activeChatConfig = configs.find((c) => c.id === chatBotId);
   const activeChatTelemetry = chatBotId ? telemetry[chatBotId] : undefined;
@@ -178,6 +183,7 @@ export default function Dashboard() {
                   onStop={stopBot}
                   onDelete={removeBot}
                   onOpenChat={(id) => setChatBotId(id)}
+                  onOpenSightModal={(c) => setSightModalBot(c)}
                   onEdit={handleEditBot}
                 />
               ))}
@@ -195,6 +201,18 @@ export default function Dashboard() {
           }}
           onSave={handleSaveBot}
           initialConfig={editingBot}
+        />
+      )}
+
+      {/* Tactical Sight Radar & Movement Modal */}
+      {sightModalBot && (
+        <BotVisualControlModal
+          config={sightModalBot}
+          telemetry={telemetry[sightModalBot.id]}
+          onClose={() => setSightModalBot(null)}
+          onMove={moveBot}
+          onTogglePatrol={togglePatrol}
+          onLook={lookAt}
         />
       )}
 

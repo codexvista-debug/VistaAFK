@@ -53,6 +53,12 @@ export interface BotTelemetry {
   heldItem?: string;
   offhandItem?: string;
   inventoryCount: number;
+  facing?: string;
+  yaw?: number;
+  pitch?: number;
+  targetBlock?: { name: string; x: number; y: number; z: number } | null;
+  nearbyEntities?: Array<{ id: number; name: string; type: string; distance: number; x: number; z: number; isPlayer: boolean; isHostile: boolean }>;
+  isPatrolling?: boolean;
 }
 
 export interface ChatMessage {
@@ -73,7 +79,10 @@ export type ClientMessage =
   | { type: 'STOP_BOT'; payload: { botId: string } }
   | { type: 'START_ALL' }
   | { type: 'STOP_ALL' }
-  | { type: 'SEND_CHAT'; payload: { botId: string; message: string } };
+  | { type: 'SEND_CHAT'; payload: { botId: string; message: string } }
+  | { type: 'MOVE_BOT'; payload: { botId: string; control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak'; state: boolean } }
+  | { type: 'TOGGLE_PATROL'; payload: { botId: string; enabled: boolean } }
+  | { type: 'LOOK_AT'; payload: { botId: string; yaw: number; pitch: number } };
 
 export type ServerMessage =
   | { type: 'AUTH_SUCCESS' }

@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Shield,
   Zap,
+  Compass,
 } from 'lucide-react';
 import { BotConfig, BotTelemetry } from '../types';
 
@@ -25,6 +26,7 @@ interface BotCardProps {
   onStop: (id: string) => void;
   onDelete: (id: string) => void;
   onOpenChat: (id: string) => void;
+  onOpenSightModal?: (config: BotConfig) => void;
   onEdit: (config: BotConfig) => void;
 }
 
@@ -35,6 +37,7 @@ export const BotCard: React.FC<BotCardProps> = ({
   onStop,
   onDelete,
   onOpenChat,
+  onOpenSightModal,
   onEdit,
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
@@ -283,6 +286,17 @@ export const BotCard: React.FC<BotCardProps> = ({
         )}
 
         <div className="flex items-center space-x-1.5">
+          {/* Tactical Sight & Movement Controls */}
+          {onOpenSightModal && (
+            <button
+              onClick={() => onOpenSightModal(config)}
+              className="p-1.5 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 rounded-lg border border-slate-200 shadow-sm transition"
+              title="Tactical Radar & Movement Controls"
+            >
+              <Compass className="h-4 w-4" />
+            </button>
+          )}
+
           {/* Live Chat */}
           <button
             onClick={() => onOpenChat(config.id)}

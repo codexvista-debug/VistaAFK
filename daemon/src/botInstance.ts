@@ -63,6 +63,8 @@ export class BotInstance {
   private statusMessage: string = 'Offline';
   private authCodeInfo?: BotTelemetry['authCodeInfo'];
   private reconnectAttempts: number = 0;
+  private patrolInterval: NodeJS.Timeout | null = null;
+  private isPatrolling: boolean = false;
 
   constructor(config: BotConfig, callbacks: BotInstanceCallbacks) {
     this.config = config;
@@ -372,6 +374,63 @@ export class BotInstance {
     this.callbacks.onTelemetryUpdate(this.getTelemetry());
   }
 
+  public togglePatrol(enabled: boolean) {
+    this.isPatrolling = enabled;
+    if (this.patrolInterval) {
+      clearInterval(this.patrolInterval);
+      this.patrolInterval = null;
+    }
+    if (!this.bot || this.currentStatus !== 'online') {
+      this.isPatrolling = false;
+      return;
+    }
+
+    if (!enabled) {
+      this.bot.setControlState('forward', false);
+      this.bot.setControlState('back', false);
+      this.callbacks.onNotification('info', `Patrol mode stopped for ${this.config.name}`, this.config.id);
+      this.emitTelemetry();
+      return;
+    }
+
+    this.callbacks.onNotification('success', `Patrol mode started for ${this.config.name} (Walking back and forth)`, this.config.id);
+    let step = 0;
+    this.patrolInterval = setInterval(() => {
+      if (!this.bot || !this.bot.entity) return;
+      step++;
+      const phase = step % 8;
+      if (phase >= 0 && phase <= 2) {
+        this.bot.setControlState('forward', true);
+      } else if (phase === 3) {
+        this.bot.setControlState('forward', false);
+      } else if (phase === 4) {
+        const currentYaw = this.bot.entity.yaw;
+        this.bot.look(currentYaw + Math.PI, 0, true);
+      } else if (phase >= 5 && phase <= 6) {
+        this.bot.setControlState('forward', true);
+      } else {
+        this.bot.setControlState('forward', false);
+        const currentYaw = this.bot.entity.yaw;
+        this.bot.look(currentYaw + Math.PI, 0, true);
+      }
+    }, 1000);
+    this.emitTelemetry();
+  }
+
+  public move(control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean) {
+    if (!this.bot || this.currentStatus !== 'online') return;
+    try {
+      this.bot.setControlState(control, state);
+    } catch (e) {}
+  }
+
+  public look(yaw: number, pitch: number) {
+    if (!this.bot || this.currentStatus !== 'online') return;
+    try {
+      this.bot.look(yaw, pitch, true);
+    } catch (e) {}
+  }
+
   public getTelemetry(): BotTelemetry {
     if (!this.bot || !this.bot.entity) {
       return {
@@ -389,12 +448,65 @@ export class BotInstance {
         gamemode: 'survival',
         uptimeSeconds: 0,
         inventoryCount: 0,
+        facing: 'North',
+        yaw: 0,
+        pitch: 0,
+        targetBlock: null,
+        nearbyEntities: [],
+        isPatrolling: false,
       };
     }
 
     const pos = this.bot.entity.position;
     const offhand = (this.bot.inventory.slots as any)[45];
     const held = this.bot.heldItem;
+    const yaw = this.bot.entity.yaw || 0;
+    const pitch = this.bot.entity.pitch || 0;
+
+    // Calculate Cardinal direction
+    const deg = (((-yaw * 180 / Math.PI) % 360) + 360) % 360;
+    let facing = 'South';
+    if (deg >= 315 || deg < 45) facing = 'South';
+    else if (deg >= 45 && deg < 135) facing = 'West';
+    else if (deg >= 135 && deg < 225) facing = 'North';
+    else facing = 'East';
+
+    // Target block in crosshair
+    let targetBlock: { name: string; x: number; y: number; z: number } | null = null;
+    try {
+      const b = (this.bot as any).blockAtCursor ? (this.bot as any).blockAtCursor(6) : null;
+      if (b) {
+        targetBlock = { name: b.name, x: b.position.x, y: b.position.y, z: b.position.z };
+      }
+    } catch (e) {}
+
+    // Nearby entities in radar range (up to 24 blocks)
+    const nearbyEntities: Array<{ id: number; name: string; type: string; distance: number; x: number; z: number; isPlayer: boolean; isHostile: boolean }> = [];
+    try {
+      const myPos = this.bot.entity.position;
+      for (const ent of Object.values(this.bot.entities)) {
+        if (!ent || ent.id === this.bot.entity.id || !ent.position) continue;
+        const dx = ent.position.x - myPos.x;
+        const dz = ent.position.z - myPos.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist <= 24) {
+          const entName = ent.username || ent.name || (ent as any).displayName || 'entity';
+          const isPlayer = ent.type === 'player';
+          const isHostile = ['zombie', 'skeleton', 'creeper', 'spider', 'enderman', 'witch', 'blaze', 'ghast', 'warden', 'phantom', 'drowned'].includes(ent.name?.toLowerCase() || '');
+          nearbyEntities.push({
+            id: ent.id,
+            name: entName,
+            type: ent.type || 'mob',
+            distance: Math.round(dist * 10) / 10,
+            x: Math.round(ent.position.x * 10) / 10,
+            z: Math.round(ent.position.z * 10) / 10,
+            isPlayer,
+            isHostile,
+          });
+        }
+      }
+      nearbyEntities.sort((a, b) => a.distance - b.distance);
+    } catch (e) {}
 
     return {
       id: this.config.id,
@@ -417,6 +529,12 @@ export class BotInstance {
       heldItem: held?.name,
       offhandItem: offhand?.name,
       inventoryCount: this.bot.inventory ? this.bot.inventory.items().length : 0,
+      facing,
+      yaw: Math.round(yaw * 100) / 100,
+      pitch: Math.round(pitch * 100) / 100,
+      targetBlock,
+      nearbyEntities: nearbyEntities.slice(0, 15),
+      isPatrolling: this.isPatrolling,
     };
   }
 
@@ -430,9 +548,11 @@ export class BotInstance {
     if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
     if (this.antiAfkInterval) clearInterval(this.antiAfkInterval);
     if (this.telemetryInterval) clearInterval(this.telemetryInterval);
+    if (this.patrolInterval) clearInterval(this.patrolInterval);
     this.reconnectTimeout = null;
     this.antiAfkInterval = null;
     this.telemetryInterval = null;
+    this.patrolInterval = null;
   }
 
   private getCoordinatesString(): string {

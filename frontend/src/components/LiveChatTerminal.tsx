@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Terminal, MessageSquare, Shield, Clock } from 'lucide-react';
+import { X, Send, Terminal, MessageSquare, Shield, Clock, ExternalLink } from 'lucide-react';
 import { BotConfig, ChatMessage } from '../types';
 
 interface LiveChatTerminalProps {
@@ -87,6 +87,16 @@ export const LiveChatTerminal: React.FC<LiveChatTerminalProps> = ({
                 System
               </button>
             </div>
+
+            <a
+              href={`/chat?bot=${botConfig.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition"
+              title="Open chat in dedicated full new page"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </a>
 
             <button
               onClick={onClose}

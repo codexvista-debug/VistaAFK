@@ -53,6 +53,12 @@ export interface BotTelemetry {
   heldItem?: string;
   offhandItem?: string;
   inventoryCount: number;
+  facing?: string;
+  yaw?: number;
+  pitch?: number;
+  targetBlock?: { name: string; x: number; y: number; z: number } | null;
+  nearbyEntities?: Array<{ id: number; name: string; type: string; distance: number; x: number; z: number; isPlayer: boolean; isHostile: boolean }>;
+  isPatrolling?: boolean;
 }
 
 export interface ChatMessage {

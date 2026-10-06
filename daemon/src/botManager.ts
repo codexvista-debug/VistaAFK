@@ -123,6 +123,27 @@ export class BotManager {
     }
   }
 
+  public moveBot(botId: string, control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean) {
+    const instance = this.bots.get(botId);
+    if (instance) {
+      instance.move(control, state);
+    }
+  }
+
+  public togglePatrol(botId: string, enabled: boolean) {
+    const instance = this.bots.get(botId);
+    if (instance) {
+      instance.togglePatrol(enabled);
+    }
+  }
+
+  public lookAt(botId: string, yaw: number, pitch: number) {
+    const instance = this.bots.get(botId);
+    if (instance) {
+      instance.look(yaw, pitch);
+    }
+  }
+
   public getAllConfigs(): BotConfig[] {
     return Array.from(this.configs.values());
   }
