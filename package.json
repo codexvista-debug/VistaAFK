@@ -4,6 +4,8 @@
   "private": true,
   "description": "Headless Minecraft Java AFK Manager & Live Dashboard",
   "scripts": {
+    "build": "npm run build --prefix frontend",
+    "start": "npm run start --prefix frontend",
     "start:daemon": "node daemon/dist/server.js",
     "build:daemon": "npm run build --prefix daemon",
     "dev:frontend": "cd frontend && npm run dev",
