@@ -1,11 +1,12 @@
 import mineflayer, { Bot } from 'mineflayer';
 import { SocksProxyAgent } from 'socks-proxy-agent';
-import { BotConfig, BotTelemetry, ChatMessage } from './types.js';
+import { BotConfig, BotTelemetry, ChatMessage, ActivityLog } from './types.js';
 import path from 'path';
 
 export interface BotInstanceCallbacks {
   onTelemetryUpdate: (telemetry: BotTelemetry) => void;
   onChatMessage: (message: ChatMessage) => void;
+  onActivityLog?: (log: ActivityLog) => void;
   onNotification: (level: 'info' | 'warn' | 'error' | 'success', message: string, botId?: string) => void;
 }
 
@@ -73,11 +74,42 @@ export class BotInstance {
   private isPatrolling: boolean = false;
   private recurringCommandInterval: NodeJS.Timeout | null = null;
   private spawnCommandTimeout: NodeJS.Timeout | null = null;
+  private lastChatText: string = '';
+  private lastChatTimestamp: number = 0;
+  private lastAntiAfkLogTime: number = 0;
 
   constructor(config: BotConfig, callbacks: BotInstanceCallbacks) {
     this.config = config;
     this.callbacks = callbacks;
   }
+
+  private emitActivity(type: ActivityLog['type'], message: string) {
+    if (this.callbacks.onActivityLog) {
+      this.callbacks.onActivityLog({
+        id: Math.random().toString(36).substring(2, 9),
+        botId: this.config.id,
+        timestamp: Date.now(),
+        type,
+        message,
+      });
+    }
+  }
+
+  private formatUptime(seconds: number): string {
+    if (!seconds || seconds <= 0) return '0s';
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hrs > 0) return `${hrs}h ${mins}m ${secs}s`;
+    if (mins > 0) return `${mins}m ${secs}s`;
+    return `${secs}s`;
+  }
+
+  private getSessionUptime(): string {
+    const sec = this.connectStartTime ? Math.floor((Date.now() - this.connectStartTime) / 1000) : 0;
+    return this.formatUptime(sec);
+  }
+
 
   public updateConfig(newConfig: BotConfig) {
     this.config = newConfig;
@@ -96,6 +128,7 @@ export class BotInstance {
     this.isManuallyStopped = false;
     this.clearTimers();
     this.updateStatus('connecting', 'Connecting to Minecraft server...');
+    this.emitActivity('connect', `Connecting to ${this.config.host}:${this.config.port || 25565}...`);
 
     const tokenFolder = path.resolve(process.cwd(), 'tokens');
 
@@ -114,6 +147,7 @@ export class BotInstance {
           expiresIn: data.expires_in,
         };
         this.updateStatus('authenticating', `Device Code: ${data.user_code}`);
+        this.emitActivity('status', `Microsoft Auth Required: Visit ${data.verification_uri} (Code: ${data.user_code})`);
         this.callbacks.onNotification(
           'warn',
           `Microsoft Auth required for ${this.config.name}: Visit ${data.verification_uri} and enter code ${data.user_code}`,
@@ -142,6 +176,7 @@ export class BotInstance {
   }
 
   public stop() {
+    const uptime = this.getSessionUptime();
     this.isManuallyStopped = true;
     this.clearTimers();
     if (this.bot) {
@@ -153,6 +188,11 @@ export class BotInstance {
       this.bot = null;
     }
     this.updateStatus('offline', 'Disconnected');
+    if (this.connectStartTime) {
+      this.emitActivity('disconnect', `⏹️ Disconnected by user (Session Uptime: ${uptime})`);
+      this.sendDiscordAlert(`🔴 **${this.config.name}** disconnected from \`${this.config.host}:${this.config.port || 25565}\` (Session Uptime: ${uptime})`);
+      this.connectStartTime = 0;
+    }
   }
 
   public sendChat(message: string) {
@@ -162,6 +202,12 @@ export class BotInstance {
     }
     try {
       this.bot.chat(message);
+      if (message.startsWith('/')) {
+        this.emitActivity('command', `⚡ Executed command: ${message}`);
+        this.sendDiscordAlert(`⚡ **${this.config.name}** typed command: \`${message}\``);
+      } else {
+        this.emitActivity('chat', `💬 Sent chat: "${message}"`);
+      }
     } catch (err: any) {
       this.callbacks.onNotification('error', `Failed to send chat: ${err.message}`, this.config.id);
     }
@@ -176,7 +222,10 @@ export class BotInstance {
       this.authCodeInfo = undefined;
       this.updateStatus('online', 'Connected and spawned in world');
       this.callbacks.onNotification('success', `${this.config.name} has entered the world!`, this.config.id);
-      this.sendDiscordAlert(`🟢 **${this.config.name}** connected to \`${this.config.host}:${this.config.port}\``);
+
+      const dimension = (this.bot?.game as any)?.dimension || 'Overworld';
+      this.emitActivity('spawn', `🟢 Spawned in ${dimension} at [${this.getCoordinatesString()}]`);
+      this.sendDiscordAlert(`🟢 **${this.config.name}** joined lobby/world on \`${this.config.host}:${this.config.port || 25565}\` (${dimension})`);
 
       this.setupAntiAfk();
       this.setupTelemetryLoop();
@@ -187,13 +236,21 @@ export class BotInstance {
         botId: this.config.id,
         timestamp: Date.now(),
         sender: 'VistaAFK',
-        message: `🟢 Connected & spawned into ${this.config.host} (${this.bot?.game?.dimension || 'Overworld'})`,
+        message: `🟢 Connected & spawned into ${this.config.host} (${dimension})`,
         isSystem: true,
       });
     });
 
     this.bot.on('chat', (username: string, message: string) => {
       if (username === this.bot?.username) return;
+
+      const cleanMsg = message.trim();
+      if (cleanMsg === this.lastChatText && (Date.now() - this.lastChatTimestamp) < 1500) {
+        return;
+      }
+      this.lastChatText = cleanMsg;
+      this.lastChatTimestamp = Date.now();
+
       this.callbacks.onChatMessage({
         botId: this.config.id,
         timestamp: Date.now(),
@@ -204,17 +261,25 @@ export class BotInstance {
 
       // Notify if whispered
       if (message.toLowerCase().includes('whisper') || message.toLowerCase().includes('-> me')) {
+        this.emitActivity('chat', `💬 Received whisper from ${username}: "${message}"`);
         this.sendDiscordAlert(`💬 **${this.config.name}** received a whisper from **${username}**: "${message}"`);
       }
     });
 
     this.bot.on('messagestr', (message: string, position: string) => {
       if (position === 'system' || position === 'game_info') {
+        const cleanMsg = message.trim();
+        if (!cleanMsg || (cleanMsg === this.lastChatText && (Date.now() - this.lastChatTimestamp) < 1500)) {
+          return;
+        }
+        this.lastChatText = cleanMsg;
+        this.lastChatTimestamp = Date.now();
+
         this.callbacks.onChatMessage({
           botId: this.config.id,
           timestamp: Date.now(),
           sender: 'Server',
-          message,
+          message: cleanMsg,
           isSystem: true,
         });
       }
@@ -229,6 +294,7 @@ export class BotInstance {
     (this.bot as any).on('resourcePack', (url: string, hash: string) => {
       try {
         this.bot?.acceptResourcePack();
+        this.emitActivity('status', '📦 Accepted server custom resource pack');
         this.callbacks.onChatMessage({
           botId: this.config.id,
           timestamp: Date.now(),
@@ -244,6 +310,7 @@ export class BotInstance {
     this.bot.on('respawn', () => {
       this.setupAntiAfk();
       this.checkSurvivalActions();
+      this.emitActivity('spawn', '♻️ Respawned in world');
       this.callbacks.onChatMessage({
         botId: this.config.id,
         timestamp: Date.now(),
@@ -255,6 +322,7 @@ export class BotInstance {
 
     this.bot.on('death', () => {
       this.callbacks.onNotification('error', `${this.config.name} died in the world!`, this.config.id);
+      this.emitActivity('status', `☠️ Bot died at [${this.getCoordinatesString()}] — Auto-respawning...`);
       this.callbacks.onChatMessage({
         botId: this.config.id,
         timestamp: Date.now(),
@@ -274,8 +342,10 @@ export class BotInstance {
 
     this.bot.on('kicked', (reason: any) => {
       const cleanReason = parseMinecraftChat(reason);
+      const uptime = this.getSessionUptime();
       this.updateStatus('offline', `Kicked: ${cleanReason}`);
       this.callbacks.onNotification('warn', `${this.config.name} was kicked: ${cleanReason}`, this.config.id);
+      this.emitActivity('disconnect', `❌ Kicked: ${cleanReason} (Session Uptime: ${uptime})`);
       this.callbacks.onChatMessage({
         botId: this.config.id,
         timestamp: Date.now(),
@@ -283,7 +353,8 @@ export class BotInstance {
         message: `❌ Kicked: ${cleanReason}`,
         isSystem: true,
       });
-      this.sendDiscordAlert(`⚠️ **${this.config.name}** was kicked: \`${cleanReason}\``);
+      this.sendDiscordAlert(`⚠️ **${this.config.name}** was kicked from \`${this.config.host}:${this.config.port || 25565}\` (Session Uptime: ${uptime})\n> **Reason:** \`${cleanReason}\``);
+      this.connectStartTime = 0;
     });
 
     this.bot.on('error', (err: any) => {
@@ -296,13 +367,20 @@ export class BotInstance {
         friendlyMsg = `Connection to ${this.config.host}:${this.config.port} timed out.`;
       }
       this.updateStatus('error', friendlyMsg);
+      this.emitActivity('status', `⚠️ Error: ${friendlyMsg}`);
       this.callbacks.onNotification('error', `[${this.config.name}] ${friendlyMsg}`, this.config.id);
     });
 
     this.bot.on('end', () => {
+      const uptime = this.getSessionUptime();
       this.clearTimers();
       this.bot = null;
       if (!this.isManuallyStopped) {
+        if (this.connectStartTime) {
+          this.emitActivity('disconnect', `🔴 Disconnected from server (Session Uptime: ${uptime})`);
+          this.sendDiscordAlert(`🔴 **${this.config.name}** disconnected from \`${this.config.host}:${this.config.port || 25565}\` (Session Uptime: ${uptime})`);
+          this.connectStartTime = 0;
+        }
         this.handleReconnect();
       } else {
         this.updateStatus('offline', 'Disconnected');
@@ -315,6 +393,12 @@ export class BotInstance {
     if (!this.config.antiAfk.enabled) return;
 
     const intervalMs = Math.max(3, this.config.antiAfk.intervalSeconds || 10) * 1000;
+
+    // Log routine once initially or every 10 mins
+    if (Date.now() - this.lastAntiAfkLogTime > 600000) {
+      this.emitActivity('anti_afk', '🛡️ Anti-AFK routine active');
+      this.lastAntiAfkLogTime = Date.now();
+    }
 
     this.antiAfkInterval = setInterval(() => {
       if (!this.bot || !this.bot.entity) return;
@@ -363,7 +447,9 @@ export class BotInstance {
         if (!offhand || offhand.name !== 'totem_of_undying') {
           const totem = this.bot.inventory.items().find(i => i.name === 'totem_of_undying');
           if (totem) {
-            this.bot.equip(totem, 'off-hand').catch(() => {});
+            this.bot.equip(totem, 'off-hand').then(() => {
+              this.emitActivity('survival', '🛡️ Auto-totem: Equipped Totem of Undying in off-hand');
+            }).catch(() => {});
           }
         }
       } catch (e) {
@@ -383,6 +469,7 @@ export class BotInstance {
         );
         if (food && !(this.bot as any).isEating) {
           this.bot.equip(food, 'hand').then(() => {
+            this.emitActivity('survival', `🍖 Auto-eat: Consumed ${food.name} (Hunger: ${this.bot?.food}/20)`);
             this.bot?.consume().catch(() => {});
           }).catch(() => {});
         }
@@ -401,7 +488,9 @@ export class BotInstance {
     this.reconnectAttempts++;
     // Exponential backoff capped at 60 seconds
     const delay = Math.min(60000, (this.config.reconnectDelayMs || 5000) * Math.pow(1.5, Math.min(this.reconnectAttempts - 1, 5)));
-    this.updateStatus('reconnecting', `Reconnecting in ${Math.round(delay / 1000)}s (attempt ${this.reconnectAttempts})...`);
+    const delaySec = Math.round(delay / 1000);
+    this.updateStatus('reconnecting', `Reconnecting in ${delaySec}s (attempt ${this.reconnectAttempts})...`);
+    this.emitActivity('reconnect', `🔄 Reconnecting in ${delaySec}s (attempt #${this.reconnectAttempts})...`);
 
     this.reconnectTimeout = setTimeout(() => {
       this.start();
@@ -623,6 +712,8 @@ export class BotInstance {
         if (this.bot && this.currentStatus === 'online') {
           try {
             this.bot.chat(onSpawnCmd);
+            this.emitActivity('command', `⚡ Executed spawn command: ${onSpawnCmd}`);
+            this.sendDiscordAlert(`⚡ **${this.config.name}** executed spawn command: \`${onSpawnCmd}\``);
             this.callbacks.onChatMessage({
               botId: this.config.id,
               timestamp: Date.now(),
@@ -643,6 +734,8 @@ export class BotInstance {
         if (this.bot && this.currentStatus === 'online') {
           try {
             this.bot.chat(recurringCmd);
+            this.emitActivity('command', `⏱️ Executed recurring command: ${recurringCmd}`);
+            this.sendDiscordAlert(`⏱️ **${this.config.name}** executed recurring command: \`${recurringCmd}\``);
             this.callbacks.onChatMessage({
               botId: this.config.id,
               timestamp: Date.now(),

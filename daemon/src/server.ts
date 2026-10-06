@@ -39,6 +39,9 @@ const botManager = new BotManager({
   onChatMessage: (chat) => {
     broadcast({ type: 'CHAT_MESSAGE', payload: chat });
   },
+  onActivityLog: (log) => {
+    broadcast({ type: 'ACTIVITY_LOG', payload: log });
+  },
   onNotification: (level, message, botId) => {
     broadcast({ type: 'NOTIFICATION', payload: { level, message, botId } });
   },
@@ -141,6 +144,7 @@ function sendInitialState(ws: WebSocket) {
     const payload = {
       configs: botManager.getAllConfigs(),
       telemetry: botManager.getAllTelemetry(),
+      activityLogs: botManager.getAllActivityLogs(),
     };
     ws.send(JSON.stringify({ type: 'INIT_STATE', payload } as ServerMessage));
   }

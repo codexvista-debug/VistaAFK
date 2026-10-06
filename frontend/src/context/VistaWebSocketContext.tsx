@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { BotConfig, BotTelemetry, ChatMessage, VistaNotification, SavedAccount, ServerPreset } from '../types';
+import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, VistaNotification, SavedAccount, ServerPreset } from '../types';
 
 const DEFAULT_SERVER_PRESETS: ServerPreset[] = [
   { id: 'freshsmp', name: 'FreshSMP', host: 'play.freshsmp.fun', port: 25565, version: '' },
@@ -37,6 +37,7 @@ export interface VistaWebSocketContextType {
   configs: BotConfig[];
   telemetry: Record<string, BotTelemetry>;
   chatLogs: Record<string, ChatMessage[]>;
+  activityLogs: Record<string, ActivityLog[]>;
   notifications: VistaNotification[];
   savedAccounts: SavedAccount[];
   serverPresets: ServerPreset[];
@@ -73,6 +74,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const [configs, setConfigs] = useState<BotConfig[]>([]);
   const [telemetry, setTelemetry] = useState<Record<string, BotTelemetry>>({});
   const [chatLogs, setChatLogs] = useState<Record<string, ChatMessage[]>>({});
+  const [activityLogs, setActivityLogs] = useState<Record<string, ActivityLog[]>>({});
   const [notifications, setNotifications] = useState<VistaNotification[]>([]);
 
   // Persistent Accounts & Server Vault
@@ -196,6 +198,9 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
             case 'INIT_STATE':
               setConfigs(msg.payload.configs || []);
               setTelemetry(msg.payload.telemetry || {});
+              if (msg.payload.activityLogs) {
+                setActivityLogs(msg.payload.activityLogs);
+              }
               break;
 
             case 'BOT_CONFIG_ADDED':
@@ -228,9 +233,30 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
               const chat: ChatMessage = msg.payload;
               setChatLogs((prev) => {
                 const current = prev[chat.botId] || [];
+                const last = current[current.length - 1];
+                if (
+                  last &&
+                  last.message === chat.message &&
+                  last.sender === chat.sender &&
+                  Math.abs(last.timestamp - chat.timestamp) < 2000
+                ) {
+                  return prev;
+                }
                 return {
                   ...prev,
                   [chat.botId]: [...current.slice(-150), chat],
+                };
+              });
+              break;
+            }
+
+            case 'ACTIVITY_LOG': {
+              const log: ActivityLog = msg.payload;
+              setActivityLogs((prev) => {
+                const current = prev[log.botId] || [];
+                return {
+                  ...prev,
+                  [log.botId]: [...current.slice(-60), log],
                 };
               });
               break;
@@ -382,6 +408,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         configs,
         telemetry,
         chatLogs,
+        activityLogs,
         notifications,
         savedAccounts,
         serverPresets,

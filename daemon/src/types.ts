@@ -73,6 +73,14 @@ export interface ChatMessage {
   isSystem: boolean;
 }
 
+export interface ActivityLog {
+  id: string;
+  botId: string;
+  timestamp: number;
+  type: 'status' | 'connect' | 'spawn' | 'command' | 'survival' | 'anti_afk' | 'disconnect' | 'reconnect' | 'chat';
+  message: string;
+}
+
 export type ClientMessage =
   | { type: 'AUTH'; payload: { token?: string } }
   | { type: 'GET_STATE' }
@@ -91,10 +99,12 @@ export type ClientMessage =
 export type ServerMessage =
   | { type: 'AUTH_SUCCESS' }
   | { type: 'AUTH_FAILED'; payload: { reason: string } }
-  | { type: 'INIT_STATE'; payload: { configs: BotConfig[]; telemetry: Record<string, BotTelemetry> } }
+  | { type: 'INIT_STATE'; payload: { configs: BotConfig[]; telemetry: Record<string, BotTelemetry>; activityLogs?: Record<string, ActivityLog[]> } }
   | { type: 'BOT_CONFIG_ADDED'; payload: BotConfig }
   | { type: 'BOT_CONFIG_UPDATED'; payload: BotConfig }
   | { type: 'BOT_CONFIG_REMOVED'; payload: { botId: string } }
   | { type: 'TELEMETRY_UPDATE'; payload: BotTelemetry }
   | { type: 'CHAT_MESSAGE'; payload: ChatMessage }
+  | { type: 'ACTIVITY_LOG'; payload: ActivityLog }
   | { type: 'NOTIFICATION'; payload: { level: 'info' | 'warn' | 'error' | 'success'; message: string; botId?: string } };
+

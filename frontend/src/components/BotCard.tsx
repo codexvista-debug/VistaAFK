@@ -20,11 +20,12 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { BotConfig, BotTelemetry, ChatMessage } from '../types';
+import { BotConfig, BotTelemetry, ChatMessage, ActivityLog } from '../types';
 
 interface BotCardProps {
   config: BotConfig;
   telemetry?: BotTelemetry;
+  activityLogs?: ActivityLog[];
   logs?: ChatMessage[];
   onStart: (id: string) => void;
   onStop: (id: string) => void;
@@ -37,6 +38,7 @@ interface BotCardProps {
 export const BotCard: React.FC<BotCardProps> = ({
   config,
   telemetry,
+  activityLogs = [],
   logs = [],
   onStart,
   onStop,
@@ -75,8 +77,20 @@ export const BotCard: React.FC<BotCardProps> = ({
     return `${secs}s`;
   };
 
-  // Recent 4 logs for in-card activity stream
-  const recentLogs = logs.slice(-6);
+  // Filter to dedicated bot activity events (connects, joins, commands, survival, kicks, reconnects)
+  const displayLogs: Array<{ id: string; timestamp: number; type?: string; message: string }> =
+    activityLogs.length > 0
+      ? activityLogs
+      : logs
+          .filter((l) => l.isSystem && (l.sender === 'VistaAFK' || l.sender === 'AutoCommand'))
+          .map((l, i) => ({
+            id: `fallback-${i}`,
+            timestamp: l.timestamp,
+            type: 'status',
+            message: l.message,
+          }));
+
+  const recentActivities = displayLogs.slice(-6);
 
   return (
     <div className="bg-white border-2 border-slate-200/90 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
@@ -263,14 +277,14 @@ export const BotCard: React.FC<BotCardProps> = ({
           </div>
 
           {/* In-Card Live Player Activity Logs */}
-          <div className="mt-3 bg-[#0f172a] border-2 border-slate-800 rounded-2xl p-3 text-xs shadow-inner">
+          <div className="mt-3 bg-[#0a0f1d] border-2 border-slate-800 rounded-2xl p-3 text-xs shadow-inner">
             <div className="flex items-center justify-between pb-1.5 border-b border-slate-800/80">
               <div className="flex items-center space-x-1.5">
                 <span className={`h-2 w-2 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
                 <span className="text-emerald-400 font-mono font-bold text-[10px] tracking-wider uppercase">
                   Player Logs & Activity
                 </span>
-                <span className="text-[10px] text-slate-500 font-mono">({logs.length})</span>
+                <span className="text-[10px] text-slate-500 font-mono">({displayLogs.length})</span>
               </div>
               <div className="flex items-center space-x-2">
                 <button
@@ -293,31 +307,20 @@ export const BotCard: React.FC<BotCardProps> = ({
               </div>
             </div>
 
-            {/* Log Stream Messages */}
+            {/* Activity Stream Messages */}
             {isLogsExpanded && (
               <div className="mt-2 space-y-1.5 max-h-32 overflow-y-auto font-mono text-[11px] leading-tight pr-1 scrollbar-thin">
-                {recentLogs.length === 0 ? (
+                {recentActivities.length === 0 ? (
                   <div className="text-slate-500 py-2 text-center text-[10px] italic">
-                    {isOnline ? 'Waiting for in-game logs from ' + config.name + '...' : 'Bot is offline. Connect to start streaming logs.'}
+                    {isOnline ? 'Bot is active in world. Waiting for next player activity...' : 'Bot is offline. Connect to start streaming logs.'}
                   </div>
                 ) : (
-                  recentLogs.map((log, idx) => (
-                    <div key={idx} className="flex items-start space-x-1.5 text-slate-300">
+                  recentActivities.map((act) => (
+                    <div key={act.id} className="flex items-start space-x-1.5 text-slate-300">
                       <span className="text-slate-500 shrink-0 text-[10px]">
-                        {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </span>
-                      <span
-                        className={`shrink-0 font-bold text-[10px] ${
-                          log.sender === 'Server'
-                            ? 'text-amber-400'
-                            : log.sender === 'VistaAFK'
-                            ? 'text-emerald-400'
-                            : 'text-cyan-400'
-                        }`}
-                      >
-                        {log.sender === 'Server' || log.sender === 'VistaAFK' ? `[${log.sender}]` : `<${log.sender}>`}
-                      </span>
-                      <span className="break-all text-slate-200">{log.message}</span>
+                      <span className="break-all text-slate-200">{act.message}</span>
                     </div>
                   ))
                 )}

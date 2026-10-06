@@ -25,6 +25,7 @@ export default function Dashboard() {
     configs,
     telemetry,
     chatLogs,
+    activityLogs,
     notifications,
     savedAccounts,
     serverPresets,
@@ -254,6 +255,7 @@ export default function Dashboard() {
                   key={cfg.id}
                   config={cfg}
                   telemetry={telemetry[cfg.id]}
+                  activityLogs={activityLogs[cfg.id] || []}
                   logs={chatLogs[cfg.id] || []}
                   onStart={startBot}
                   onStop={stopBot}

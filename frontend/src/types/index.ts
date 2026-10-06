@@ -89,6 +89,14 @@ export interface ChatMessage {
   isSystem: boolean;
 }
 
+export interface ActivityLog {
+  id: string;
+  botId: string;
+  timestamp: number;
+  type: 'status' | 'connect' | 'spawn' | 'command' | 'survival' | 'anti_afk' | 'disconnect' | 'reconnect' | 'chat';
+  message: string;
+}
+
 export interface VistaNotification {
   id: string;
   timestamp: number;
@@ -96,3 +104,4 @@ export interface VistaNotification {
   message: string;
   botId?: string;
 }
+

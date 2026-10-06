@@ -1,11 +1,12 @@
 import fs from 'fs';
 import path from 'path';
-import { BotConfig, BotTelemetry, ChatMessage } from './types.js';
+import { BotConfig, BotTelemetry, ChatMessage, ActivityLog } from './types.js';
 import { BotInstance } from './botInstance.js';
 
 export interface BotManagerCallbacks {
   onTelemetryUpdate: (telemetry: BotTelemetry) => void;
   onChatMessage: (message: ChatMessage) => void;
+  onActivityLog: (log: ActivityLog) => void;
   onNotification: (level: 'info' | 'warn' | 'error' | 'success', message: string, botId?: string) => void;
   onConfigAdded: (config: BotConfig) => void;
   onConfigUpdated: (config: BotConfig) => void;
@@ -15,6 +16,7 @@ export interface BotManagerCallbacks {
 export class BotManager {
   private bots: Map<string, BotInstance> = new Map();
   private configs: Map<string, BotConfig> = new Map();
+  private activityLogs: Map<string, ActivityLog[]> = new Map();
   private storageFile: string;
   private callbacks: BotManagerCallbacks;
 
@@ -53,6 +55,11 @@ export class BotManager {
     const instance = new BotInstance(config, {
       onTelemetryUpdate: (t) => this.callbacks.onTelemetryUpdate(t),
       onChatMessage: (m) => this.callbacks.onChatMessage(m),
+      onActivityLog: (log) => {
+        const cur = this.activityLogs.get(log.botId) || [];
+        this.activityLogs.set(log.botId, [...cur.slice(-50), log]);
+        this.callbacks.onActivityLog(log);
+      },
       onNotification: (lvl, msg, id) => this.callbacks.onNotification(lvl, msg, id),
     });
     this.bots.set(config.id, instance);
@@ -155,4 +162,13 @@ export class BotManager {
     }
     return res;
   }
+
+  public getAllActivityLogs(): Record<string, ActivityLog[]> {
+    const res: Record<string, ActivityLog[]> = {};
+    for (const [id, logs] of this.activityLogs.entries()) {
+      res[id] = logs;
+    }
+    return res;
+  }
 }
+
