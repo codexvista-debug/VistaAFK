@@ -14,6 +14,7 @@ interface NavbarProps {
   onStopAll?: () => void;
   botCount: number;
   onlineCount: number;
+  savedAccountCount?: number;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -23,6 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSettingsModal,
   botCount,
   onlineCount,
+  savedAccountCount,
 }) => {
   const pathname = usePathname();
 
@@ -54,42 +56,44 @@ export const Navbar: React.FC<NavbarProps> = ({
           </Link>
         </div>
 
-        {/* Center Tabs: Server Fleet, Accounts Vault, Live Console */}
-        <nav className="hidden md:flex items-center space-x-1 bg-[#0b121e] p-1 rounded-2xl border border-slate-800">
+        {/* Primary Page Navigation */}
+        <nav className="flex items-center space-x-2">
           <Link
             href="/"
-            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
               pathname === '/'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30'
+                : 'bg-[#1b2637]/70 text-slate-300 hover:text-white hover:bg-[#1b2637] border-slate-700'
             }`}
           >
-            <Server className="h-3.5 w-3.5" />
+            <Server className="h-4 w-4 stroke-[2.5]" />
             <span>Server Fleet</span>
+            {botCount > 0 && (
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                pathname === '/' ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-800 text-slate-300'
+              }`}>
+                {botCount}
+              </span>
+            )}
           </Link>
 
           <Link
             href="/accounts"
-            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
               pathname === '/accounts'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30'
+                : 'bg-[#1b2637]/70 text-slate-300 hover:text-white hover:bg-[#1b2637] border-slate-700'
             }`}
           >
-            <Users className="h-3.5 w-3.5" />
+            <Users className="h-4 w-4 stroke-[2.5]" />
             <span>Accounts Vault</span>
-          </Link>
-
-          <Link
-            href="/chat"
-            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
-              pathname === '/chat'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-            }`}
-          >
-            <Terminal className="h-3.5 w-3.5" />
-            <span>Live Console</span>
+            {typeof savedAccountCount === 'number' && savedAccountCount > 0 && (
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                pathname === '/accounts' ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-800 text-slate-300'
+              }`}>
+                {savedAccountCount}
+              </span>
+            )}
           </Link>
         </nav>
 

@@ -31,7 +31,7 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
     serverPresets.length > 0 ? serverPresets[0].port : 25565
   );
   const [targetServerVersion, setTargetServerVersion] = useState(
-    serverPresets.length > 0 ? (serverPresets[0].version || '1.20.4') : '1.20.4'
+    serverPresets.length > 0 ? (serverPresets[0].version || '') : ''
   );
 
   const selectedAccount = savedAccounts.find((a) => a.id === selectedAccountId);
@@ -39,7 +39,7 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
   const handlePresetSelect = (preset: ServerPreset) => {
     setTargetServerHost(preset.host);
     setTargetServerPort(preset.port);
-    setTargetServerVersion(preset.version || '1.20.4');
+    setTargetServerVersion(preset.version || '');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -193,12 +193,15 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                Version Override <span className="font-normal text-slate-400">(leave 1.20.4 for FreshSMP)</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-bold text-slate-600 uppercase">
+                  Version Override <span className="font-normal text-slate-400">(Optional)</span>
+                </label>
+                <span className="text-[10px] text-emerald-700 font-semibold">Blank = Auto-Detect Server Version</span>
+              </div>
               <input
                 type="text"
-                placeholder="1.20.4"
+                placeholder="Auto-detect (Recommended, leave blank)"
                 value={targetServerVersion}
                 onChange={(e) => setTargetServerVersion(e.target.value)}
                 className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-600 font-mono"

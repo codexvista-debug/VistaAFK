@@ -4,8 +4,8 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { BotConfig, BotTelemetry, ChatMessage, VistaNotification, SavedAccount, ServerPreset } from '../types';
 
 const DEFAULT_SERVER_PRESETS: ServerPreset[] = [
-  { id: 'freshsmp', name: 'FreshSMP', host: 'play.freshsmp.fun', port: 25565, version: '1.20.4' },
-  { id: 'hypixel', name: 'Hypixel Network', host: 'mc.hypixel.net', port: 25565, version: '1.20.4' },
+  { id: 'freshsmp', name: 'FreshSMP', host: 'play.freshsmp.fun', port: 25565, version: '' },
+  { id: 'hypixel', name: 'Hypixel Network', host: 'mc.hypixel.net', port: 25565, version: '' },
   { id: 'local', name: 'Local Test Server', host: 'localhost', port: 25565, version: '' },
 ];
 
@@ -335,7 +335,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       authType: account.authType,
       host: server.host,
       port: server.port,
-      version: server.version || undefined,
+      version: (server.version && server.version.trim() !== '') ? server.version.trim() : undefined,
       autoReconnect: true,
       reconnectDelayMs: 5000,
       antiAfk: {

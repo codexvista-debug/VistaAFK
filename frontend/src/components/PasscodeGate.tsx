@@ -116,18 +116,19 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ children }) => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[#4a3b2c] relative overflow-hidden font-sans">
-      {/* Minecraft Classic Dirt Background Pattern */}
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden font-sans bg-[#0c121e]">
+      {/* High-Resolution Modern Minecraft Panoramic Landscape Background */}
       <div 
-        className="absolute inset-0 opacity-40 pointer-events-none"
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat transform scale-105"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h8v8H0V0zm8 8h8v8H8V8z' fill='%232e2217' fill-opacity='0.6' fill-rule='evenodd'/%3E%3Cpath d='M0 8h8v8H0V8zm8-8h8v8H8V0z' fill='%235c4935' fill-opacity='0.4' fill-rule='evenodd'/%3E%3C/svg%3E")`,
-          backgroundSize: '32px 32px',
+          backgroundImage: `url("/images/minecraft_bg.jpg")`,
         }}
       />
+      {/* Cinematic Twilight Ambient Vignette & Fog Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-[#0c121e]/90 via-[#0c121e]/40 to-[#0c121e]/70 backdrop-blur-[2px]" />
 
       {/* Classic Minecraft GUI Box (Light Stone with 3D Beveled Borders) */}
-      <div className="relative z-10 w-full max-w-md bg-[#c6c6c6] border-4 border-t-white border-l-white border-b-[#555555] border-r-[#555555] rounded-xl p-8 shadow-2xl">
+      <div className="relative z-10 w-full max-w-md bg-[#c6c6c6]/95 border-4 border-t-white border-l-white border-b-[#444444] border-r-[#444444] rounded-2xl p-8 shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-md">
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center">
           {/* Minecraft Grass Block */}

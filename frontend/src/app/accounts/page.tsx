@@ -53,7 +53,7 @@ export default function AccountsPage() {
   // Deploy to Server Form State
   const [targetServerHost, setTargetServerHost] = useState('play.freshsmp.fun');
   const [targetServerPort, setTargetServerPort] = useState(25565);
-  const [targetServerVersion, setTargetServerVersion] = useState('1.20.4');
+  const [targetServerVersion, setTargetServerVersion] = useState('');
 
   const handleAddAccountSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,6 +103,7 @@ export default function AccountsPage() {
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
         botCount={configs.length}
         onlineCount={onlineCount}
+        savedAccountCount={savedAccounts.length}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -348,7 +349,7 @@ export default function AccountsPage() {
                     onClick={() => {
                       setTargetServerHost(preset.host);
                       setTargetServerPort(preset.port);
-                      setTargetServerVersion(preset.version || '1.20.4');
+                      setTargetServerVersion(preset.version || '');
                     }}
                     className={`p-2 rounded-xl border text-left text-xs transition ${
                       targetServerHost === preset.host
@@ -387,13 +388,15 @@ export default function AccountsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Version Override</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Version Override <span className="font-normal text-slate-400">(leave blank for auto-detect)</span>
+                </label>
                 <input
                   type="text"
-                  placeholder="1.20.4"
+                  placeholder="Auto-detect (recommended, leave blank)"
                   value={targetServerVersion}
                   onChange={(e) => setTargetServerVersion(e.target.value)}
-                  className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-600"
+                  className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-600 font-mono"
                 />
               </div>
 

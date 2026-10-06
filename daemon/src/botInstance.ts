@@ -37,15 +37,21 @@ function parseMinecraftChat(raw: any): string {
     }
     return text.replace(/\n+/g, ' ').trim() || JSON.stringify(raw);
   }
-  // Standard Mojang Chat component
-  if (raw.text) {
-    let text = raw.text;
+  // Standard Mojang Chat component or extra array
+  if (raw.text !== undefined || raw.extra) {
+    let text = raw.text || '';
     if (Array.isArray(raw.extra)) {
       for (const part of raw.extra) {
-        text += typeof part === 'string' ? part : (part.text || '');
+        if (typeof part === 'string') {
+          text += part;
+        } else if (part && typeof part === 'object') {
+          text += part.text || '';
+        }
       }
     }
-    return text.replace(/\n+/g, ' ').trim();
+    if (text.trim()) {
+      return text.replace(/\n+/g, ' ').trim();
+    }
   }
   return typeof raw === 'object' ? JSON.stringify(raw) : String(raw);
 }

@@ -82,6 +82,7 @@ export default function Dashboard() {
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
         botCount={configs.length}
         onlineCount={onlineCount}
+        savedAccountCount={savedAccounts.length}
       />
 
       {/* Main Content Area */}
@@ -184,7 +185,7 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-sm text-slate-900">{preset.name}</span>
                           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
-                            1.20.4
+                            Auto
                           </span>
                         </div>
                         <span className="text-xs font-mono text-slate-500 mt-1 block truncate">{preset.host}</span>
@@ -195,7 +196,7 @@ export default function Dashboard() {
                             deployAccountToServer(savedAccounts[0], {
                               host: preset.host,
                               port: preset.port,
-                              version: preset.version || '1.20.4',
+                              version: preset.version || undefined,
                             });
                           }
                         }}
