@@ -9,6 +9,25 @@ const DEFAULT_SERVER_PRESETS: ServerPreset[] = [
   { id: 'local', name: 'Local Test Server', host: 'localhost', port: 25565, version: '' },
 ];
 
+export function normalizeWsUrl(raw: string): string {
+  let url = (raw || '').trim();
+  if (!url) return 'ws://localhost:8080';
+  if (url.startsWith('https://')) {
+    url = 'wss://' + url.slice('https://'.length);
+  } else if (url.startsWith('http://')) {
+    url = 'ws://' + url.slice('http://'.length);
+  } else if (!url.startsWith('ws://') && !url.startsWith('wss://')) {
+    url = 'wss://' + url;
+  }
+  // Strip trailing slashes
+  url = url.replace(/\/+$/, '');
+  // If user pasted trycloudflare.com with :8080, strip :8080 because Cloudflare tunnel edge only accepts 443
+  if (url.includes('trycloudflare.com') && url.includes(':8080')) {
+    url = url.replace(':8080', '');
+  }
+  return url;
+}
+
 export function useVistaWebSocket() {
   const [daemonUrl, setDaemonUrl] = useState<string>('ws://localhost:8080');
   const [secretToken, setSecretToken] = useState<string>('');
@@ -34,7 +53,7 @@ export function useVistaWebSocket() {
     if (typeof window !== 'undefined') {
       const savedUrl = localStorage.getItem('vistaafk_daemon_url');
       const savedToken = localStorage.getItem('vistaafk_secret_token');
-      if (savedUrl) setDaemonUrl(savedUrl);
+      if (savedUrl) setDaemonUrl(normalizeWsUrl(savedUrl));
       if (savedToken) setSecretToken(savedToken);
 
       const accountsRaw = localStorage.getItem('vistaafk_saved_accounts');
@@ -103,10 +122,13 @@ export function useVistaWebSocket() {
     setAuthError(null);
 
     try {
-      const ws = new WebSocket(daemonUrl);
+      const targetUrl = normalizeWsUrl(daemonUrl);
+      console.log('[VistaAFK WS] Connecting to:', targetUrl);
+      const ws = new WebSocket(targetUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
+        console.log('[VistaAFK WS] Connected successfully to daemon!');
         setIsConnected(true);
         setIsConnecting(false);
         setAuthError(null);
@@ -196,7 +218,8 @@ export function useVistaWebSocket() {
         }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
+        console.warn(`[VistaAFK WS] Disconnected. Code: ${event.code}, Reason: "${event.reason}"`);
         setIsConnected(false);
         setIsConnecting(false);
         wsRef.current = null;
@@ -209,11 +232,13 @@ export function useVistaWebSocket() {
         }, 3000);
       };
 
-      ws.onerror = () => {
+      ws.onerror = (err) => {
+        console.error('[VistaAFK WS] Socket error occurred:', err);
         setIsConnected(false);
         setIsConnecting(false);
       };
     } catch (e) {
+      console.error('[VistaAFK WS] Connect exception:', e);
       setIsConnecting(false);
     }
   }, [daemonUrl, secretToken]);
@@ -235,7 +260,8 @@ export function useVistaWebSocket() {
     }
   };
 
-  const updateDaemonConfig = (url: string, token: string) => {
+  const updateDaemonConfig = (rawUrl: string, token: string) => {
+    const url = normalizeWsUrl(rawUrl);
     setDaemonUrl(url);
     setSecretToken(token);
     if (typeof window !== 'undefined') {

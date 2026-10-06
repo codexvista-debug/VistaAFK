@@ -5,8 +5,10 @@ import { ClientMessage, ServerMessage } from './types.js';
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const SECRET = process.env.VISTAAFK_SECRET || '';
 
-const wss = new WebSocketServer({ port: PORT });
-console.log(`[VistaAFK Daemon] WebSocket server listening on ws://localhost:${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0';
+
+const wss = new WebSocketServer({ port: PORT, host: HOST });
+console.log(`[VistaAFK Daemon] WebSocket server listening on ws://${HOST}:${PORT}`);
 
 const clients = new Set<WebSocket>();
 
@@ -118,8 +120,15 @@ wss.on('connection', (ws) => {
     }
   });
 
-  ws.on('close', () => {
+  console.log('[VistaAFK Daemon] Dashboard client connected!');
+
+  ws.on('error', (err) => {
+    console.error('[VistaAFK Daemon] Client WebSocket error:', err.message);
+  });
+
+  ws.on('close', (code, reason) => {
     clients.delete(ws);
+    console.log(`[VistaAFK Daemon] Dashboard client disconnected (code: ${code}, reason: "${reason.toString()}")`);
   });
 
   if (authenticated) {
