@@ -15,6 +15,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <meta httpEquiv="Content-Security-Policy" content="upgrade-insecure-requests" />
+      </head>
       <body className="min-h-screen bg-[#f8fafc] text-slate-800 antialiased selection:bg-emerald-500 selection:text-white">
         <PasscodeGate>
           <VistaWebSocketProvider>

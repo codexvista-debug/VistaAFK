@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Server, Key, Terminal } from 'lucide-react';
+import { X, Server, Key, Terminal, Smartphone, Monitor, Copy, Check, ExternalLink, BatteryCharging, Zap } from 'lucide-react';
 
 interface DaemonSettingsModalProps {
   onClose: () => void;
@@ -18,6 +18,14 @@ export const DaemonSettingsModal: React.FC<DaemonSettingsModalProps> = ({
 }) => {
   const [url, setUrl] = useState(currentUrl);
   const [token, setToken] = useState(currentToken);
+  const [activeTab, setActiveTab] = useState<'connection' | 'termux' | 'pc'>('connection');
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,87 +34,307 @@ export const DaemonSettingsModal: React.FC<DaemonSettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-      <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-lg flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+      <div className="bg-white border-2 border-slate-300 rounded-3xl w-full max-w-2xl flex flex-col shadow-2xl overflow-hidden my-auto max-h-[92vh]">
+        {/* Header */}
+        <div className="px-6 py-4.5 border-b-2 border-slate-200 flex items-center justify-between bg-slate-50">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600">
+            <div className="p-2.5 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800">
               <Server className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Bot Daemon Connection</h2>
-              <p className="text-xs text-slate-500 font-medium">Connect this web dashboard to your persistent bot controller</p>
+              <h2 className="text-base font-black text-slate-900 uppercase tracking-tight">Bot Daemon Connection</h2>
+              <p className="text-xs text-slate-500 font-medium">Connect this web dashboard to your persistent phone or PC controller</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition">
+          <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="p-6 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              WebSocket Daemon URL
-            </label>
-            <input
-              type="text"
-              required
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="ws://localhost:8080 or wss://my-vps.com:8080"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition font-mono"
-            />
-            <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-              • For local browser: Use <code className="text-slate-800 bg-slate-100 px-1 py-0.5 rounded font-mono">ws://localhost:8080</code><br />
-              • For Vercel cloud: Connect to your remote VPS or public tunnel (e.g. ngrok or Cloudflare tunnel).
-            </p>
-          </div>
+        {/* Navigation Tabs */}
+        <div className="flex border-b-2 border-slate-200 bg-slate-100/70 px-6 pt-2 space-x-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('connection')}
+            className={`pb-2.5 px-3 font-bold text-xs flex items-center space-x-1.5 border-b-2 transition ${
+              activeTab === 'connection'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Server className="h-4 w-4" />
+            <span>Connection URL</span>
+          </button>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Secret Token <span className="text-slate-400 font-normal">(optional, if VISTAAFK_SECRET is configured)</span>
-            </label>
-            <div className="relative">
-              <input
-                type="password"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="Leave blank if no secret configured on daemon"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition"
-              />
-              <Key className="h-4 w-4 text-slate-400 absolute right-3 top-3" />
+          <button
+            type="button"
+            onClick={() => setActiveTab('termux')}
+            className={`pb-2.5 px-3 font-bold text-xs flex items-center space-x-1.5 border-b-2 transition ${
+              activeTab === 'termux'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Smartphone className="h-4 w-4 text-emerald-600" />
+            <span>Android / Termux 24/7 Guide</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('pc')}
+            className={`pb-2.5 px-3 font-bold text-xs flex items-center space-x-1.5 border-b-2 transition ${
+              activeTab === 'pc'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Monitor className="h-4 w-4 text-blue-600" />
+            <span>PC / VPS Guide</span>
+          </button>
+        </div>
+
+        {/* Content Body */}
+        <div className="p-6 overflow-y-auto max-h-[65vh] space-y-4">
+          {/* TAB 1: Connection Settings */}
+          {activeTab === 'connection' && (
+            <form onSubmit={handleSave} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                  WebSocket Daemon URL
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="wss://your-cloudflared-link.trycloudflare.com or ws://localhost:8080"
+                  className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-600 focus:bg-white transition font-mono font-bold"
+                />
+                <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                  • <strong>On Online Vercel:</strong> Paste your Cloudflare tunnel link (e.g. <code className="text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded font-mono font-bold">wss://your-name.trycloudflare.com</code>).<br />
+                  • <strong>On Local PC:</strong> Use <code className="text-slate-800 bg-slate-100 px-1 py-0.5 rounded font-mono">ws://localhost:8080</code>.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                  Secret Token <span className="text-slate-400 font-normal">(optional, if VISTAAFK_SECRET is configured)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    placeholder="Leave blank if no secret configured on daemon"
+                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-600 focus:bg-white transition font-mono"
+                  />
+                  <Key className="h-4 w-4 text-slate-400 absolute right-3.5 top-3" />
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('termux')}
+                  className="text-emerald-600 hover:text-emerald-700 text-xs font-bold flex items-center space-x-1"
+                >
+                  <Smartphone className="h-4 w-4" />
+                  <span>How to setup on Phone (Termux)? ➔</span>
+                </button>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/25 transition"
+                  >
+                    Save & Reconnect
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+
+          {/* TAB 2: In-Depth Android / Termux 24/7 Setup Guide */}
+          {activeTab === 'termux' && (
+            <div className="space-y-4 text-xs leading-relaxed text-slate-700">
+              <div className="p-3.5 bg-emerald-50/70 border-2 border-emerald-200 rounded-2xl flex items-start space-x-3">
+                <Zap className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-black text-slate-900 text-xs uppercase tracking-wide">
+                    Android 24/7 Minecraft AFK System
+                  </h3>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    Your phone runs the bot silently in the background while your screen is locked. Follow these steps once:
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 1 */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900 text-xs">Step 1: Install Termux & Packages</span>
+                  <span className="text-[10px] font-mono bg-slate-200 px-2 py-0.5 rounded text-slate-700 font-bold">First time only</span>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  Open <strong>Termux</strong> on your Android phone and install Node.js, Git, and Cloudflared:
+                </p>
+                <div className="flex items-center justify-between bg-slate-900 text-emerald-400 p-2.5 rounded-xl font-mono text-[11px]">
+                  <code>pkg update -y && pkg install -y git nodejs-lts cloudflared</code>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard('pkg update -y && pkg install -y git nodejs-lts cloudflared', 'step1')}
+                    className="p-1 text-slate-400 hover:text-white transition"
+                    title="Copy command"
+                  >
+                    {copiedKey === 'step1' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 2: Critical Battery & Lock Screen */}
+              <div className="p-4 bg-amber-50/70 border-2 border-amber-200 rounded-2xl space-y-2">
+                <div className="flex items-center space-x-2 text-amber-800 font-bold text-xs">
+                  <BatteryCharging className="h-4 w-4 text-amber-600" />
+                  <span>Step 2: Keep Screen Locked & Prevent Phone from Sleeping</span>
+                </div>
+                <p className="text-[11px] text-slate-700 leading-normal">
+                  Android will kill background apps unless you do these two things:
+                </p>
+                <ol className="list-decimal list-inside text-[11px] space-y-1 text-slate-700 font-medium">
+                  <li>
+                    In Termux, run this command to prevent CPU sleep:
+                    <div className="flex items-center justify-between bg-slate-900 text-amber-300 p-2 mt-1 rounded-xl font-mono text-[11px]">
+                      <code>termux-wake-lock</code>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard('termux-wake-lock', 'step2')}
+                        className="p-1 text-slate-400 hover:text-white transition"
+                      >
+                        {copiedKey === 'step2' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                  </li>
+                  <li>
+                    On your phone: Open <strong>Phone Settings ➔ Apps ➔ Termux ➔ Battery</strong> ➔ Select <strong>"Unrestricted"</strong> (No battery optimizations).
+                  </li>
+                </ol>
+              </div>
+
+              {/* Step 3: Download & Build */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900 text-xs">Step 3: Download and Build Daemon</span>
+                  <span className="text-[10px] font-mono bg-slate-200 px-2 py-0.5 rounded text-slate-700 font-bold">First time</span>
+                </div>
+                <div className="flex items-center justify-between bg-slate-900 text-emerald-400 p-2.5 rounded-xl font-mono text-[11px]">
+                  <code>git clone https://github.com/codexvista-debug/VistaAFK.git ~/VistaAFK && cd ~/VistaAFK && npm run build:daemon</code>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard('git clone https://github.com/codexvista-debug/VistaAFK.git ~/VistaAFK && cd ~/VistaAFK && npm run build:daemon', 'step3')}
+                    className="p-1 text-slate-400 hover:text-white transition"
+                  >
+                    {copiedKey === 'step3' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 4: Run Daemon */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                <span className="font-bold text-slate-900 text-xs">Step 4: Launch Daemon</span>
+                <p className="text-[11px] text-slate-600">Start the bot controller daemon:</p>
+                <div className="flex items-center justify-between bg-slate-900 text-emerald-400 p-2.5 rounded-xl font-mono text-[11px]">
+                  <code>node daemon/dist/server.js</code>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard('node daemon/dist/server.js', 'step4')}
+                    className="p-1 text-slate-400 hover:text-white transition"
+                  >
+                    {copiedKey === 'step4' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 italic">
+                  It will display: <code>[VistaAFK Daemon] WebSocket server listening on ws://0.0.0.0:8080</code>
+                </p>
+              </div>
+
+              {/* Step 5: Cloudflare Tunnel */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900 text-xs">Step 5: Connect to Online Vercel Website</span>
+                  <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">Tunnel</span>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  Swipe from the <strong>left edge</strong> of your Termux screen ➔ tap <strong>NEW SESSION</strong> ➔ run:
+                </p>
+                <div className="flex items-center justify-between bg-slate-900 text-cyan-400 p-2.5 rounded-xl font-mono text-[11px]">
+                  <code>cloudflared tunnel --url http://127.0.0.1:8080</code>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard('cloudflared tunnel --url http://127.0.0.1:8080', 'step5')}
+                    className="p-1 text-slate-400 hover:text-white transition"
+                  >
+                    {copiedKey === 'step5' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  Look for the line ending in <code className="font-bold text-slate-900">.trycloudflare.com</code> (e.g. <code className="text-emerald-700 font-mono">https://xxxx.trycloudflare.com</code>).
+                  Copy it, click the <strong>Connection URL</strong> tab at the top of this popup, paste as <code className="text-emerald-700 font-mono">wss://xxxx.trycloudflare.com</code> and click <strong>Save & Reconnect</strong>!
+                </p>
+              </div>
+
+              {/* Quick Daily Cheat Sheet */}
+              <div className="p-4 bg-slate-100 border-2 border-slate-300 rounded-2xl space-y-2">
+                <h4 className="font-black text-slate-900 text-xs uppercase tracking-tight flex items-center space-x-1.5">
+                  <Terminal className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Daily Relaunch Cheat Sheet (Whenever you reboot your phone)</span>
+                </h4>
+                <div className="space-y-1.5 text-[11px] font-mono text-slate-800">
+                  <div>
+                    <span className="text-slate-500">Session 1 (Daemon):</span>
+                    <pre className="bg-white p-2 rounded-lg border border-slate-200 mt-0.5 text-emerald-800 font-bold select-all">
+                      termux-wake-lock && cd ~/VistaAFK && node daemon/dist/server.js
+                    </pre>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Session 2 (Tunnel):</span>
+                    <pre className="bg-white p-2 rounded-lg border border-slate-200 mt-0.5 text-cyan-800 font-bold select-all">
+                      cloudflared tunnel --url http://127.0.0.1:8080
+                    </pre>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-2">
-            <div className="flex items-center space-x-2 text-emerald-700 font-bold">
-              <Terminal className="h-4 w-4" />
-              <span>How to run the Daemon</span>
+          {/* TAB 3: PC / VPS Guide */}
+          {activeTab === 'pc' && (
+            <div className="space-y-4 text-xs leading-relaxed text-slate-700">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                <span className="font-bold text-slate-900 text-xs">Running Locally on Windows / Mac / Linux PC</span>
+                <p className="text-[11px] text-slate-600">
+                  If running on the same PC where you open Chrome:
+                </p>
+                <div className="bg-slate-900 text-emerald-400 p-2.5 rounded-xl font-mono text-[11px] space-y-1">
+                  <div>cd VistaAFK/daemon</div>
+                  <div>npm run build</div>
+                  <div>node dist/server.js</div>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Then in Connection URL tab, simply use: <code className="text-slate-800 bg-slate-200 px-1 py-0.5 rounded font-mono font-bold">ws://localhost:8080</code>
+                </p>
+              </div>
             </div>
-            <p className="text-slate-600 text-[11px]">
-              Open a terminal in the <code className="text-slate-900 font-mono font-semibold">daemon/</code> directory and run:
-            </p>
-            <pre className="bg-slate-900 p-2.5 rounded-xl text-[11px] font-mono text-emerald-400 overflow-x-auto shadow-inner">
-              npm run dev
-            </pre>
-          </div>
-
-          <div className="pt-2 flex items-center justify-end space-x-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition"
-            >
-              Save & Reconnect
-            </button>
-          </div>
-        </form>
+          )}
+        </div>
       </div>
     </div>
   );

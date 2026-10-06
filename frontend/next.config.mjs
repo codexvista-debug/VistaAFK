@@ -13,6 +13,22 @@ const nextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-forwarded-proto',
+            value: 'http',
+          },
+        ],
+        permanent: true,
+        destination: 'https://afkvista.vercel.app/:path*',
+      },
+    ];
+  },
   async headers() {
     return [
       {
