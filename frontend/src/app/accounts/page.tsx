@@ -238,8 +238,8 @@ export default function AccountsPage() {
 
       {/* Add Account Modal */}
       {isAddAccountModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl w-full max-w-md p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl my-auto max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b-2 border-slate-200">
               <div className="flex items-center space-x-2.5">
                 <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800">
@@ -315,8 +315,8 @@ export default function AccountsPage() {
 
       {/* Deploy Account to Server Modal */}
       {isDeployModalOpen && selectedAccountForDeploy && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl w-full max-w-lg p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl w-full max-w-lg p-4 sm:p-6 shadow-2xl my-auto max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b-2 border-slate-200">
               <div className="flex items-center space-x-2.5">
                 <img
@@ -341,7 +341,7 @@ export default function AccountsPage() {
               <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider block mb-2">
                 Quick Server Presets:
               </span>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {serverPresets.map((preset) => (
                   <button
                     key={preset.id}
@@ -352,17 +352,32 @@ export default function AccountsPage() {
                       setTargetServerVersion(preset.version || '');
                     }}
                     className={`p-2 rounded-xl border text-left text-xs transition ${
-                      targetServerHost === preset.host
+                      preset.host ? targetServerHost === preset.host : (!targetServerHost || preset.id === 'custom')
                         ? 'bg-emerald-50 border-emerald-500 font-bold text-emerald-900 shadow-2xs'
                         : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                     }`}
                   >
                     <span className="block truncate font-bold">{preset.name}</span>
-                    <span className="text-[10px] text-slate-500 font-mono block truncate">{preset.host}</span>
+                    <span className="text-[10px] text-slate-500 font-mono block truncate">
+                      {preset.host || 'Any custom IP'}
+                    </span>
                   </button>
                 ))}
               </div>
             </div>
+
+            {/* DonutSMP Safe Mode Notice */}
+            {targetServerHost.toLowerCase().includes('donut') && (
+              <div className="mt-3 p-3 bg-emerald-50 border-2 border-emerald-300 rounded-2xl flex items-start space-x-2 text-xs text-emerald-950">
+                <ShieldCheck className="h-4 w-4 text-emerald-700 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold block text-emerald-900">DonutSMP Safe AFK Mode Active</span>
+                  <span className="text-[11px] text-emerald-800 leading-tight block mt-0.5">
+                    Anti-AFK movements, auto-eat, and auto-totem are <strong>turned OFF by default</strong> for DonutSMP to prevent anti-cheat kicks. You can enable them manually in bot settings if needed.
+                  </span>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleDeploySubmit} className="mt-4 space-y-4">
               <div className="grid grid-cols-3 gap-3">

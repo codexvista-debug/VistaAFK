@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Server, Play, Users, CheckCircle2, Globe } from 'lucide-react';
+import { X, Server, Play, Users, CheckCircle2, Globe, ShieldCheck } from 'lucide-react';
 import { SavedAccount, ServerPreset } from '../types';
 import Link from 'next/link';
 
@@ -56,8 +56,8 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="bg-white border-2 border-slate-300 rounded-3xl w-full max-w-lg flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+      <div className="bg-white border-2 border-slate-300 rounded-3xl w-full max-w-lg flex flex-col shadow-2xl overflow-hidden my-auto max-h-[92vh]">
         {/* Header */}
         <div className="px-6 py-4.5 border-b-2 border-slate-200 flex items-center justify-between bg-slate-100/70">
           <div className="flex items-center space-x-3">
@@ -145,9 +145,9 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
               <Globe className="h-3.5 w-3.5 text-emerald-600" />
               <span>2. Choose Server Target</span>
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {serverPresets.map((preset) => {
-                const isSelected = targetServerHost === preset.host;
+                const isSelected = preset.host ? targetServerHost === preset.host : (!targetServerHost || preset.id === 'custom');
                 return (
                   <button
                     key={preset.id}
@@ -160,22 +160,37 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
                     }`}
                   >
                     <span className="block truncate font-bold text-xs">{preset.name}</span>
-                    <span className="text-[10px] text-slate-500 font-mono block truncate mt-0.5">{preset.host}</span>
+                    <span className="text-[10px] text-slate-500 font-mono block truncate mt-0.5">
+                      {preset.host || 'Any custom IP'}
+                    </span>
                   </button>
                 );
               })}
             </div>
           </div>
 
+          {/* DonutSMP Safe Mode Notice */}
+          {targetServerHost.toLowerCase().includes('donut') && (
+            <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-2xl flex items-start space-x-2.5 text-xs text-emerald-950">
+              <ShieldCheck className="h-4 w-4 text-emerald-700 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block text-emerald-900">DonutSMP Safe AFK Mode Active</span>
+                <span className="text-[11px] text-emerald-800 leading-tight block mt-0.5">
+                  Anti-AFK movements, auto-eat, and auto-totem are <strong>turned OFF by default</strong> for DonutSMP to prevent anti-cheat kicks. You can enable them manually in bot settings if needed.
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Step 3: Server Details (Host, Port, Version) */}
           <div className="p-3.5 bg-slate-50 border-2 border-slate-200 rounded-2xl space-y-3">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-2">
                 <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Server Host / IP</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. play.freshsmp.fun"
+                  placeholder="e.g. donutsmp.net or play.freshsmp.fun"
                   value={targetServerHost}
                   onChange={(e) => setTargetServerHost(e.target.value)}
                   className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-600"

@@ -14,11 +14,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className="overflow-x-hidden">
       <head>
         <meta httpEquiv="Content-Security-Policy" content="upgrade-insecure-requests" />
       </head>
-      <body className="min-h-screen bg-[#f8fafc] text-slate-800 antialiased selection:bg-emerald-500 selection:text-white">
+      <body className="min-h-screen bg-[#f8fafc] text-slate-800 antialiased selection:bg-emerald-500 selection:text-white overflow-x-hidden w-full max-w-[100vw]">
         <PasscodeGate>
           <VistaWebSocketProvider>
             {children}

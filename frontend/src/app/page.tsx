@@ -177,38 +177,55 @@ export default function Dashboard() {
 
                 {/* Quick Server Preset Launch Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 w-full max-w-2xl mt-6">
-                  {serverPresets.map((preset) => (
-                    <div
-                      key={preset.id}
-                      className="p-4 rounded-2xl bg-slate-50 border-2 border-slate-200 text-left hover:border-emerald-500 transition-all flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-sm text-slate-900">{preset.name}</span>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
-                            Auto
+                  {serverPresets.map((preset) => {
+                    const isCustom = !preset.host || preset.id === 'custom';
+                    const isDonut = preset.host.toLowerCase().includes('donut');
+
+                    return (
+                      <div
+                        key={preset.id}
+                        className="p-4 rounded-2xl bg-slate-50 border-2 border-slate-200 text-left hover:border-emerald-500 transition-all flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-sm text-slate-900">{preset.name}</span>
+                            <span
+                              className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold border ${
+                                isDonut
+                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                  : isCustom
+                                  ? 'bg-slate-100 text-slate-700 border-slate-300'
+                                  : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                              }`}
+                            >
+                              {isDonut ? 'Safe AFK' : isCustom ? 'Custom IP' : 'Auto'}
+                            </span>
+                          </div>
+                          <span className="text-xs font-mono text-slate-500 mt-1 block truncate">
+                            {preset.host || 'Any custom IP & port'}
                           </span>
                         </div>
-                        <span className="text-xs font-mono text-slate-500 mt-1 block truncate">{preset.host}</span>
+                        <button
+                          onClick={() => {
+                            if (isCustom) {
+                              setIsDeployModalOpen(true);
+                            } else if (savedAccounts.length > 0) {
+                              deployAccountToServer(savedAccounts[0], {
+                                host: preset.host,
+                                port: preset.port,
+                                version: preset.version || undefined,
+                              });
+                            }
+                          }}
+                          disabled={!isConnected}
+                          className="mt-4 w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center space-x-1.5"
+                        >
+                          <Play className="h-3.5 w-3.5 fill-current" />
+                          <span>{isCustom ? 'Enter IP & Deploy' : `Deploy ${savedAccounts[0]?.name || 'Bot'}`}</span>
+                        </button>
                       </div>
-                      <button
-                        onClick={() => {
-                          if (savedAccounts.length > 0) {
-                            deployAccountToServer(savedAccounts[0], {
-                              host: preset.host,
-                              port: preset.port,
-                              version: preset.version || undefined,
-                            });
-                          }
-                        }}
-                        disabled={!isConnected}
-                        className="mt-4 w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center space-x-1.5"
-                      >
-                        <Play className="h-3.5 w-3.5 fill-current" />
-                        <span>Deploy {savedAccounts[0]?.name || 'Bot'}</span>
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">

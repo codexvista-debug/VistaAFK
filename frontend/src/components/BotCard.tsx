@@ -234,7 +234,7 @@ export const BotCard: React.FC<BotCardProps> = ({
           </div>
 
           {/* Features Active Pills */}
-          <div className="flex items-center space-x-2 text-[10px] pt-1">
+          <div className="flex flex-wrap items-center gap-1.5 text-[10px] pt-1">
             <span
               className={`flex items-center space-x-1 px-2 py-0.5 rounded-full font-medium border ${
                 config.antiAfk.enabled
@@ -269,7 +269,7 @@ export const BotCard: React.FC<BotCardProps> = ({
             </span>
 
             {isOnline && (
-              <span className="ml-auto flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full font-mono font-bold text-[10px] bg-emerald-100 text-emerald-800 border-2 border-emerald-400 shadow-xs">
+              <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full font-mono font-bold text-[10px] bg-emerald-100 text-emerald-800 border-2 border-emerald-400 shadow-xs">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span>UPTIME: {formatUptime(telemetry?.uptimeSeconds || 0)}</span>
               </span>
@@ -331,7 +331,7 @@ export const BotCard: React.FC<BotCardProps> = ({
       </div>
 
       {/* Action Footer */}
-      <div className="bg-slate-50/80 px-5 py-3 border-t border-slate-200/80 flex items-center justify-between">
+      <div className="bg-slate-50/80 px-3.5 sm:px-5 py-2.5 sm:py-3 border-t border-slate-200/80 flex items-center justify-between gap-1.5 sm:gap-2">
         {/* Toggle Connect / Disconnect */}
         {isOnline || isConnecting || isAuthenticating ? (
           <button

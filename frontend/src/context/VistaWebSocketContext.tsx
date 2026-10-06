@@ -4,9 +4,9 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, VistaNotification, SavedAccount, ServerPreset } from '../types';
 
 const DEFAULT_SERVER_PRESETS: ServerPreset[] = [
+  { id: 'donutsmp', name: 'DonutSMP', host: 'donutsmp.net', port: 25565, version: '' },
   { id: 'freshsmp', name: 'FreshSMP', host: 'play.freshsmp.fun', port: 25565, version: '' },
-  { id: 'hypixel', name: 'Hypixel Network', host: 'mc.hypixel.net', port: 25565, version: '' },
-  { id: 'local', name: 'Local Test Server', host: 'localhost', port: 25565, version: '' },
+  { id: 'custom', name: 'Other / Custom Server', host: '', port: 25565, version: '' },
 ];
 
 export function normalizeWsUrl(raw: string): string {
@@ -103,8 +103,39 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       const presetsRaw = localStorage.getItem('vistaafk_server_presets');
       if (presetsRaw) {
         try {
-          setServerPresets(JSON.parse(presetsRaw));
-        } catch (e) {}
+          let parsed: ServerPreset[] = JSON.parse(presetsRaw);
+          let modified = false;
+          // Migrate old hypixel to donutsmp, local to custom
+          parsed = parsed.map((p) => {
+            if (p.id === 'hypixel' || p.name.toLowerCase().includes('hypixel')) {
+              modified = true;
+              return { id: 'donutsmp', name: 'DonutSMP', host: 'donutsmp.net', port: 25565, version: '' };
+            }
+            if (p.id === 'local' || p.name.toLowerCase().includes('local test')) {
+              modified = true;
+              return { id: 'custom', name: 'Other / Custom Server', host: '', port: 25565, version: '' };
+            }
+            return p;
+          });
+
+          if (!parsed.some((p) => p.id === 'donutsmp' || p.host.toLowerCase().includes('donut'))) {
+            parsed.unshift({ id: 'donutsmp', name: 'DonutSMP', host: 'donutsmp.net', port: 25565, version: '' });
+            modified = true;
+          }
+          if (!parsed.some((p) => p.id === 'custom' || p.id === 'other')) {
+            parsed.push({ id: 'custom', name: 'Other / Custom Server', host: '', port: 25565, version: '' });
+            modified = true;
+          }
+
+          if (modified && typeof window !== 'undefined') {
+            localStorage.setItem('vistaafk_server_presets', JSON.stringify(parsed));
+          }
+          setServerPresets(parsed);
+        } catch (e) {
+          setServerPresets(DEFAULT_SERVER_PRESETS);
+        }
+      } else {
+        setServerPresets(DEFAULT_SERVER_PRESETS);
       }
     }
   }, []);
@@ -368,6 +399,9 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     account: SavedAccount,
     server: { host: string; port: number; version?: string }
   ) => {
+    // DonutSMP is strictly sensitive to non-idle actions; default anti-actions to OFF for safety
+    const isDonut = server.host.toLowerCase().includes('donut');
+
     const newBotConfig: BotConfig = {
       id: `${account.id}-${server.host.replace(/[^a-zA-Z0-9]/g, '')}`,
       name: account.name,
@@ -378,17 +412,17 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       autoReconnect: true,
       reconnectDelayMs: 5000,
       antiAfk: {
-        enabled: true,
-        rotateHead: true,
+        enabled: !isDonut, // Disabled by default on DonutSMP
+        rotateHead: !isDonut,
         jump: false,
-        sneak: true,
-        swingArm: true,
+        sneak: !isDonut,
+        swingArm: !isDonut,
         intervalSeconds: 12,
       },
       survival: {
-        autoEat: true,
+        autoEat: !isDonut, // Disabled by default on DonutSMP
         eatThreshold: 14,
-        autoTotem: true,
+        autoTotem: !isDonut, // Disabled by default on DonutSMP
       },
     };
     addBot(newBotConfig);

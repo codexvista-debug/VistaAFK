@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Bot, Server, Zap, Heart, Bell, Terminal } from 'lucide-react';
+import { X, Bot, Server, Zap, Heart, Bell, Terminal, ShieldCheck } from 'lucide-react';
 import { BotConfig } from '../types';
 
 interface AddBotModalProps {
@@ -185,15 +185,28 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">Server Host / IP</label>
                   <input
                     type="text"
                     required
-                    placeholder="play.myserver.com"
+                    placeholder="e.g. donutsmp.net or play.freshsmp.fun"
                     value={formData.host}
-                    onChange={(e) => setFormData({ ...formData, host: e.target.value })}
+                    onChange={(e) => {
+                      const newHost = e.target.value;
+                      const isDonut = newHost.toLowerCase().includes('donut');
+                      if (isDonut && !initialConfig) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          host: newHost,
+                          antiAfk: { ...prev.antiAfk, enabled: false, rotateHead: false, sneak: false, swingArm: false },
+                          survival: { ...prev.survival, autoEat: false, autoTotem: false },
+                        }));
+                      } else {
+                        setFormData((prev) => ({ ...prev, host: newHost }));
+                      }
+                    }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition"
                   />
                 </div>
@@ -207,6 +220,36 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
                   />
                 </div>
               </div>
+
+              {/* DonutSMP Safety Banner */}
+              {formData.host.toLowerCase().includes('donut') && (
+                <div className="p-3.5 bg-emerald-50 border-2 border-emerald-300 rounded-2xl flex flex-col space-y-2 text-xs text-emerald-950">
+                  <div className="flex items-start space-x-2">
+                    <ShieldCheck className="h-4 w-4 text-emerald-700 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-emerald-900 block">DonutSMP Strict Anti-Cheat Detected</span>
+                      <span className="text-[11px] text-emerald-800 leading-tight block mt-0.5">
+                        DonutSMP enforces strict anti-cheat for any bot movements or automated actions. We strongly recommend keeping Anti-AFK, auto-eating, and auto-totem <strong>OFF</strong>.
+                      </span>
+                    </div>
+                  </div>
+                  {(formData.antiAfk.enabled || formData.survival.autoEat || formData.survival.autoTotem) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          antiAfk: { ...prev.antiAfk, enabled: false, rotateHead: false, sneak: false, swingArm: false },
+                          survival: { ...prev.survival, autoEat: false, autoTotem: false },
+                        }));
+                      }}
+                      className="self-start px-3 py-1.5 bg-emerald-700 text-white font-bold text-[11px] rounded-xl hover:bg-emerald-800 transition shadow-xs"
+                    >
+                      Turn Off All Auto-Actions Now (Safe Mode)
+                    </button>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
