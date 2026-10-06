@@ -1,0 +1,33 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js build output
+.next/
+out/
+build/
+dist/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Bot Auth and session data (keep accounts secure)
+tokens/
+*.session.json
+bots.json
+
+# Logs
+*.log
+logs/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

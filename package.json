@@ -1,0 +1,21 @@
+{
+  "name": "vistaafk",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Headless Minecraft Java AFK Manager & Live Dashboard",
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:daemon": "cd daemon && npm run dev",
+    "install:all": "cd daemon && npm install && cd ../frontend && npm install"
+  },
+  "keywords": [
+    "minecraft",
+    "afk",
+    "mineflayer",
+    "nextjs",
+    "tailwind",
+    "dashboard"
+  ],
+  "author": "",
+  "license": "MIT"
+}

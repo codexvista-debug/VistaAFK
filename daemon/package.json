@@ -1,0 +1,34 @@
+{
+  "name": "vistaafk-daemon",
+  "version": "1.0.0",
+  "description": "Headless Minecraft Java AFK Bot Controller Daemon for VistaAFK",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "keywords": [
+    "minecraft",
+    "mineflayer",
+    "afk",
+    "vistaafk",
+    "bot"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "mineflayer": "^4.20.1",
+    "prismarine-auth": "^2.6.0",
+    "socks-proxy-agent": "^8.0.4",
+    "uuid": "^9.0.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/uuid": "^9.0.8",
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.7.1",
+    "typescript": "^5.4.2"
+  }
+}
