@@ -16,12 +16,16 @@ import {
   Shield,
   Zap,
   Compass,
+  Terminal,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
-import { BotConfig, BotTelemetry } from '../types';
+import { BotConfig, BotTelemetry, ChatMessage } from '../types';
 
 interface BotCardProps {
   config: BotConfig;
   telemetry?: BotTelemetry;
+  logs?: ChatMessage[];
   onStart: (id: string) => void;
   onStop: (id: string) => void;
   onDelete: (id: string) => void;
@@ -33,6 +37,7 @@ interface BotCardProps {
 export const BotCard: React.FC<BotCardProps> = ({
   config,
   telemetry,
+  logs = [],
   onStart,
   onStop,
   onDelete,
@@ -41,6 +46,7 @@ export const BotCard: React.FC<BotCardProps> = ({
   onEdit,
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
+  const [isLogsExpanded, setIsLogsExpanded] = useState(true);
 
   const status = telemetry?.status || 'offline';
   const isOnline = status === 'online';
@@ -69,82 +75,75 @@ export const BotCard: React.FC<BotCardProps> = ({
     return `${secs}s`;
   };
 
+  // Recent 4 logs for in-card activity stream
+  const recentLogs = logs.slice(-6);
+
   return (
-    <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between">
-      {/* Top Header */}
+    <div className="bg-white border-2 border-slate-200/90 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
       <div className="p-5">
+        {/* Card Header: Avatar & Server Info */}
         <div className="flex items-start justify-between">
-          <div className="flex items-center space-x-3.5">
-            {/* Minecraft Avatar Face */}
+          <div className="flex items-center space-x-3">
             <div className="relative">
               <img
-                src={`https://mc-heads.net/avatar/${config.name}/64`}
+                src={`https://mc-heads.net/avatar/${config.name}/48`}
                 alt={config.name}
-                className="w-12 h-12 rounded-xl border border-slate-200 bg-slate-100 object-cover shadow-sm"
+                className="h-11 w-11 rounded-xl bg-slate-100 border-2 border-slate-300 shadow-sm"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://mc-heads.net/avatar/MHF_Steve/64';
+                  (e.target as HTMLElement).style.display = 'none';
                 }}
               />
               <span
-                className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white ${
+                className={`absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-white ${
                   isOnline
                     ? 'bg-emerald-500'
-                    : isAuthenticating
-                    ? 'bg-amber-400 animate-pulse'
                     : isConnecting
-                    ? 'bg-blue-400 animate-ping'
-                    : status === 'error'
-                    ? 'bg-rose-500'
+                    ? 'bg-amber-400 animate-ping'
+                    : isAuthenticating
+                    ? 'bg-amber-500 animate-pulse'
                     : 'bg-slate-400'
                 }`}
               />
             </div>
-
-            {/* Name & Target Server */}
             <div>
               <div className="flex items-center space-x-2">
-                <h3 className="font-bold text-slate-900 text-base tracking-tight">{config.name}</h3>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono border border-slate-200">
+                <h3 className="font-black text-sm text-slate-900 tracking-tight">{config.name}</h3>
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 uppercase">
                   {config.authType === 'microsoft' ? 'MS OAuth' : 'Offline'}
                 </span>
-                {config.proxyUrl && (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                    Proxy
-                  </span>
-                )}
               </div>
-              <p className="text-xs text-slate-500 font-mono mt-0.5">
+              <p className="text-xs text-slate-500 font-mono mt-0.5 font-medium">
                 {config.host}:{config.port}
               </p>
             </div>
           </div>
 
           {/* Status Badge */}
-          <div className="flex flex-col items-end">
+          <div className="text-right">
             <span
-              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize border shadow-sm ${
+              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold capitalize ${
                 isOnline
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  : isAuthenticating
-                  ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                   : isConnecting
-                  ? 'bg-blue-50 text-blue-700 border-blue-200'
-                  : status === 'error'
-                  ? 'bg-rose-50 text-rose-700 border-rose-200'
-                  : 'bg-slate-100 text-slate-500 border-slate-200'
+                  ? 'bg-amber-100 text-amber-800 border border-amber-300 animate-pulse'
+                  : isAuthenticating
+                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                  : 'bg-slate-100 text-slate-600 border border-slate-200'
               }`}
             >
               {status}
             </span>
-            {isOnline && ping > 0 && <span className="text-[10px] text-slate-400 font-mono mt-1">{ping}ms</span>}
+            {isOnline && ping > 0 && (
+              <span className="block text-[10px] font-mono text-slate-400 mt-1 font-semibold">{ping}ms</span>
+            )}
           </div>
         </div>
 
-        {/* Microsoft OAuth Prompt Alert */}
+        {/* OAuth Device Code Alert */}
         {isAuthenticating && telemetry?.authCodeInfo && (
-          <div className="mt-4 p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-2">
-            <div className="flex items-center justify-between text-amber-900 font-semibold">
-              <span>Microsoft Login Required</span>
+          <div className="mt-4 p-3 bg-amber-50 border-2 border-amber-200 rounded-2xl text-xs text-amber-900 space-y-2">
+            <div className="flex items-center justify-between font-bold">
+              <span>Microsoft OAuth Code:</span>
               <a
                 href={telemetry.authCodeInfo.verificationUri}
                 target="_blank"
@@ -261,6 +260,69 @@ export const BotCard: React.FC<BotCardProps> = ({
               </span>
             ) : null}
           </div>
+
+          {/* In-Card Live Player Activity Logs */}
+          <div className="mt-3 bg-[#0f172a] border-2 border-slate-800 rounded-2xl p-3 text-xs shadow-inner">
+            <div className="flex items-center justify-between pb-1.5 border-b border-slate-800/80">
+              <div className="flex items-center space-x-1.5">
+                <span className={`h-2 w-2 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+                <span className="text-emerald-400 font-mono font-bold text-[10px] tracking-wider uppercase">
+                  Player Logs & Activity
+                </span>
+                <span className="text-[10px] text-slate-500 font-mono">({logs.length})</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsLogsExpanded(!isLogsExpanded)}
+                  className="text-slate-400 hover:text-white transition p-0.5"
+                  title={isLogsExpanded ? 'Collapse logs' : 'Expand logs'}
+                >
+                  {isLogsExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenChat(config.id)}
+                  className="text-emerald-400 hover:text-emerald-300 transition flex items-center space-x-1 text-[10px] font-semibold"
+                  title="Open Full Console & Send Messages"
+                >
+                  <span>Console</span>
+                  <ExternalLink className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Log Stream Messages */}
+            {isLogsExpanded && (
+              <div className="mt-2 space-y-1.5 max-h-32 overflow-y-auto font-mono text-[11px] leading-tight pr-1 scrollbar-thin">
+                {recentLogs.length === 0 ? (
+                  <div className="text-slate-500 py-2 text-center text-[10px] italic">
+                    {isOnline ? 'Waiting for in-game logs from ' + config.name + '...' : 'Bot is offline. Connect to start streaming logs.'}
+                  </div>
+                ) : (
+                  recentLogs.map((log, idx) => (
+                    <div key={idx} className="flex items-start space-x-1.5 text-slate-300">
+                      <span className="text-slate-500 shrink-0 text-[10px]">
+                        {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                      <span
+                        className={`shrink-0 font-bold text-[10px] ${
+                          log.sender === 'Server'
+                            ? 'text-amber-400'
+                            : log.sender === 'VistaAFK'
+                            ? 'text-emerald-400'
+                            : 'text-cyan-400'
+                        }`}
+                      >
+                        {log.sender === 'Server' || log.sender === 'VistaAFK' ? `[${log.sender}]` : `<${log.sender}>`}
+                      </span>
+                      <span className="break-all text-slate-200">{log.message}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -286,6 +348,24 @@ export const BotCard: React.FC<BotCardProps> = ({
         )}
 
         <div className="flex items-center space-x-1.5">
+          {/* Player Live Logs Button (Located exactly where requested) */}
+          <button
+            onClick={() => setIsLogsExpanded(!isLogsExpanded)}
+            className={`p-1.5 rounded-lg border shadow-sm transition flex items-center space-x-1 ${
+              isLogsExpanded
+                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+            }`}
+            title="Player Activity & Logs (Toggle in-card stream)"
+          >
+            <Terminal className="h-4 w-4 text-emerald-700" />
+            {logs.length > 0 && (
+              <span className="text-[10px] font-mono font-bold text-emerald-800">
+                {logs.length}
+              </span>
+            )}
+          </button>
+
           {/* Tactical Sight & Movement Controls */}
           {onOpenSightModal && (
             <button
@@ -297,11 +377,11 @@ export const BotCard: React.FC<BotCardProps> = ({
             </button>
           )}
 
-          {/* Live Chat */}
+          {/* Live Chat & Full Console */}
           <button
             onClick={() => onOpenChat(config.id)}
             className="p-1.5 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 shadow-sm transition"
-            title="Open in-game live chat"
+            title="Open Full Console & Send Messages"
           >
             <MessageSquare className="h-4 w-4" />
           </button>

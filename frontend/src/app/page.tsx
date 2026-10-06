@@ -254,6 +254,7 @@ export default function Dashboard() {
                   key={cfg.id}
                   config={cfg}
                   telemetry={telemetry[cfg.id]}
+                  logs={chatLogs[cfg.id] || []}
                   onStart={startBot}
                   onStop={stopBot}
                   onDelete={removeBot}

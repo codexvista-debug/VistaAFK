@@ -271,6 +271,9 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         console.error('[VistaAFK WS Provider] Socket error occurred:', err);
         setIsConnected(false);
         setIsConnecting(false);
+        try {
+          ws.close();
+        } catch (e) {}
       };
     } catch (e) {
       console.error('[VistaAFK WS Provider] Connect exception:', e);
@@ -280,7 +283,17 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
 
   useEffect(() => {
     connect();
+
+    // Resilient connection watchdog: automatically reconnects whenever socket drops
+    const watchdog = setInterval(() => {
+      if (typeof window === 'undefined') return;
+      if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
+        connect();
+      }
+    }, 3000);
+
     return () => {
+      clearInterval(watchdog);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
       if (wsRef.current) {

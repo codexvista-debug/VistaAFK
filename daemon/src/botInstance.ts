@@ -178,6 +178,14 @@ export class BotInstance {
       this.setupAntiAfk();
       this.setupTelemetryLoop();
       this.checkSurvivalActions();
+
+      this.callbacks.onChatMessage({
+        botId: this.config.id,
+        timestamp: Date.now(),
+        sender: 'VistaAFK',
+        message: `🟢 Connected & spawned into ${this.config.host} (${this.bot?.game?.dimension || 'Overworld'})`,
+        isSystem: true,
+      });
     });
 
     this.bot.on('chat', (username: string, message: string) => {
@@ -217,6 +225,13 @@ export class BotInstance {
     (this.bot as any).on('resourcePack', (url: string, hash: string) => {
       try {
         this.bot?.acceptResourcePack();
+        this.callbacks.onChatMessage({
+          botId: this.config.id,
+          timestamp: Date.now(),
+          sender: 'VistaAFK',
+          message: '📦 Accepted server custom resource pack',
+          isSystem: true,
+        });
       } catch (e) {
         // ignore
       }
@@ -225,10 +240,24 @@ export class BotInstance {
     this.bot.on('respawn', () => {
       this.setupAntiAfk();
       this.checkSurvivalActions();
+      this.callbacks.onChatMessage({
+        botId: this.config.id,
+        timestamp: Date.now(),
+        sender: 'VistaAFK',
+        message: '♻️ Respawned in world',
+        isSystem: true,
+      });
     });
 
     this.bot.on('death', () => {
       this.callbacks.onNotification('error', `${this.config.name} died in the world!`, this.config.id);
+      this.callbacks.onChatMessage({
+        botId: this.config.id,
+        timestamp: Date.now(),
+        sender: 'VistaAFK',
+        message: `☠️ Died in world at [${this.getCoordinatesString()}]`,
+        isSystem: true,
+      });
       this.sendDiscordAlert(`☠️ **${this.config.name}** died at [${this.getCoordinatesString()}]`);
       setTimeout(() => {
         try {
@@ -243,6 +272,13 @@ export class BotInstance {
       const cleanReason = parseMinecraftChat(reason);
       this.updateStatus('offline', `Kicked: ${cleanReason}`);
       this.callbacks.onNotification('warn', `${this.config.name} was kicked: ${cleanReason}`, this.config.id);
+      this.callbacks.onChatMessage({
+        botId: this.config.id,
+        timestamp: Date.now(),
+        sender: 'Server',
+        message: `❌ Kicked: ${cleanReason}`,
+        isSystem: true,
+      });
       this.sendDiscordAlert(`⚠️ **${this.config.name}** was kicked: \`${cleanReason}\``);
     });
 
