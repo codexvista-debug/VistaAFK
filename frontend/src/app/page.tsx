@@ -6,12 +6,14 @@ import { Navbar } from '../components/Navbar';
 import { StatsOverview } from '../components/StatsOverview';
 import { BotCard } from '../components/BotCard';
 import { AddBotModal } from '../components/AddBotModal';
+import { DeployServerModal } from '../components/DeployServerModal';
 import { LiveChatTerminal } from '../components/LiveChatTerminal';
 import { DaemonSettingsModal } from '../components/DaemonSettingsModal';
 import { NotificationToast } from '../components/NotificationToast';
 import { BotVisualControlModal } from '../components/BotVisualControlModal';
-import { BotConfig } from '../types';
-import { Plus, Bot, AlertTriangle, RefreshCw, Layers } from 'lucide-react';
+import { BotConfig, SavedAccount } from '../types';
+import { Plus, Server, AlertTriangle, RefreshCw, Layers, Users, Play } from 'lucide-react';
+import Link from 'next/link';
 
 export default function Dashboard() {
   const {
@@ -24,6 +26,9 @@ export default function Dashboard() {
     telemetry,
     chatLogs,
     notifications,
+    savedAccounts,
+    serverPresets,
+    deployAccountToServer,
     updateDaemonConfig,
     connect,
     addBot,
@@ -31,15 +36,14 @@ export default function Dashboard() {
     removeBot,
     startBot,
     stopBot,
-    startAll,
-    stopAll,
     sendChat,
     moveBot,
     togglePatrol,
     lookAt,
   } = useVistaWebSocket();
 
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
+  const [isAddBotModalOpen, setIsAddBotModalOpen] = useState(false);
   const [editingBot, setEditingBot] = useState<BotConfig | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [chatBotId, setChatBotId] = useState<string | null>(null);
@@ -59,7 +63,7 @@ export default function Dashboard() {
 
   const handleEditBot = (config: BotConfig) => {
     setEditingBot(config);
-    setIsAddModalOpen(true);
+    setIsAddBotModalOpen(true);
   };
 
   const handleDismissNotification = (id: string) => {
@@ -74,13 +78,8 @@ export default function Dashboard() {
       <Navbar
         isConnected={isConnected}
         isConnecting={isConnecting}
-        onOpenAddModal={() => {
-          setEditingBot(null);
-          setIsAddModalOpen(true);
-        }}
+        onOpenAddModal={() => setIsDeployModalOpen(true)}
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
-        onStartAll={startAll}
-        onStopAll={stopAll}
         botCount={configs.length}
         onlineCount={onlineCount}
       />
@@ -113,7 +112,7 @@ export default function Dashboard() {
               <div>
                 <p className="font-bold text-slate-900">Bot Daemon is currently offline or unreachable.</p>
                 <p className="text-amber-800 text-[11px] mt-0.5">
-                  Start the daemon on your PC or VPS (<code className="bg-amber-100/80 px-1 py-0.5 rounded font-mono font-semibold">npm run dev</code> in <code className="bg-amber-100/80 px-1 py-0.5 rounded font-mono font-semibold">daemon/</code>).
+                  Make sure your tunnel is running on your phone, or click Settings to verify the connection URL.
                 </p>
               </div>
             </div>
@@ -136,42 +135,117 @@ export default function Dashboard() {
         )}
 
         {/* Stats Overview */}
-        <StatsOverview configs={configs} telemetry={telemetry} />
+        <StatsOverview configs={configs} telemetry={telemetry} savedAccountsCount={savedAccounts.length} />
 
-        {/* Bot Accounts Grid */}
+        {/* Server Fleet Deployments Section */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Layers className="h-4 w-4 text-emerald-600" />
-              <h2 className="text-base font-bold text-slate-900 tracking-tight">Active Accounts</h2>
+              <h2 className="text-base font-black text-slate-900 tracking-tight uppercase">Server Fleet Deployments</h2>
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono border border-slate-200">
-                {configs.length}
+                {configs.length} active
               </span>
             </div>
+
+            {configs.length > 0 && (
+              <button
+                onClick={() => setIsDeployModalOpen(true)}
+                disabled={!isConnected}
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition"
+              >
+                <Plus className="h-3.5 w-3.5 stroke-[3]" />
+                <span>Deploy Another Server</span>
+              </button>
+            )}
           </div>
 
           {configs.length === 0 ? (
-            /* Empty State */
-            <div className="p-12 border-2 border-dashed border-slate-300 rounded-3xl flex flex-col items-center justify-center text-center bg-white shadow-sm">
-              <div className="h-16 w-16 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 mb-4 shadow-sm">
-                <Bot className="h-8 w-8" />
+            /* Contextual Empty State */
+            savedAccounts.length > 0 ? (
+              /* User HAS accounts in Vault - Offer Quick Server Connect */
+              <div className="p-8 sm:p-10 border-2 border-slate-300 rounded-3xl bg-white shadow-sm flex flex-col items-center text-center">
+                <div className="h-16 w-16 rounded-2xl bg-emerald-100 border-2 border-emerald-300 flex items-center justify-center text-emerald-800 mb-4 shadow-sm">
+                  <Server className="h-8 w-8 stroke-[2.2]" />
+                </div>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">No Active Server Connections</h3>
+                <p className="text-xs text-slate-600 max-w-lg mt-2 font-medium leading-relaxed">
+                  You have <span className="font-bold text-emerald-700">{savedAccounts.length} Minecraft account{savedAccounts.length > 1 ? 's' : ''}</span> saved in your Accounts Vault ({savedAccounts.map((a) => a.name).join(', ')}). Choose which server you want to deploy to:
+                </p>
+
+                {/* Quick Server Preset Launch Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 w-full max-w-2xl mt-6">
+                  {serverPresets.map((preset) => (
+                    <div
+                      key={preset.id}
+                      className="p-4 rounded-2xl bg-slate-50 border-2 border-slate-200 text-left hover:border-emerald-500 transition-all flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-sm text-slate-900">{preset.name}</span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
+                            1.20.4
+                          </span>
+                        </div>
+                        <span className="text-xs font-mono text-slate-500 mt-1 block truncate">{preset.host}</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (savedAccounts.length > 0) {
+                            deployAccountToServer(savedAccounts[0], {
+                              host: preset.host,
+                              port: preset.port,
+                              version: preset.version || '1.20.4',
+                            });
+                          }
+                        }}
+                        disabled={!isConnected}
+                        className="mt-4 w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center space-x-1.5"
+                      >
+                        <Play className="h-3.5 w-3.5 fill-current" />
+                        <span>Deploy {savedAccounts[0]?.name || 'Bot'}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    onClick={() => setIsDeployModalOpen(true)}
+                    disabled={!isConnected}
+                    className="px-5 py-2.5 bg-[#1b2637] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center space-x-2"
+                  >
+                    <Plus className="h-4 w-4 stroke-[3]" />
+                    <span>Deploy Custom Server</span>
+                  </button>
+                  <Link
+                    href="/accounts"
+                    className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border-2 border-slate-300 transition flex items-center space-x-1.5"
+                  >
+                    <Users className="h-4 w-4" />
+                    <span>Manage Accounts Vault</span>
+                  </Link>
+                </div>
               </div>
-              <h3 className="text-lg font-bold text-slate-900">No Minecraft Accounts Configured</h3>
-              <p className="text-xs text-slate-500 max-w-md mt-1.5 leading-relaxed font-medium">
-                Add your first Minecraft Java account to start chunk-loading your mob farms, monitoring health/inventory, and bypassing AFK kicks.
-              </p>
-              <button
-                onClick={() => {
-                  setEditingBot(null);
-                  setIsAddModalOpen(true);
-                }}
-                disabled={!isConnected}
-                className="mt-6 flex items-center space-x-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-600/25 transition"
-              >
-                <Plus className="h-4 w-4 stroke-[2.5]" />
-                <span>Add Your First Account</span>
-              </button>
-            </div>
+            ) : (
+              /* User has NO accounts in Vault */
+              <div className="p-10 border-2 border-dashed border-slate-300 rounded-3xl flex flex-col items-center justify-center text-center bg-white shadow-sm">
+                <div className="h-16 w-16 rounded-2xl bg-slate-100 border-2 border-slate-300 flex items-center justify-center text-slate-600 mb-4 shadow-sm">
+                  <Users className="h-8 w-8 stroke-[2.2]" />
+                </div>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">No Accounts Saved in Vault</h3>
+                <p className="text-xs text-slate-500 max-w-md mt-2 font-medium leading-relaxed">
+                  Save your Minecraft Java account once in the Accounts Vault, then deploy it across any server fleet with one click.
+                </p>
+                <Link
+                  href="/accounts"
+                  className="mt-6 flex items-center space-x-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition"
+                >
+                  <Plus className="h-4 w-4 stroke-[3]" />
+                  <span>Go to Accounts Vault (+ Add Account)</span>
+                </Link>
+              </div>
+            )
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {configs.map((cfg) => (
@@ -192,11 +266,21 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* Add / Edit Bot Modal */}
-      {isAddModalOpen && (
+      {/* Deploy Server Bot Modal (Vault-aware) */}
+      {isDeployModalOpen && (
+        <DeployServerModal
+          onClose={() => setIsDeployModalOpen(false)}
+          savedAccounts={savedAccounts}
+          serverPresets={serverPresets}
+          onDeploy={deployAccountToServer}
+        />
+      )}
+
+      {/* Edit Bot Modal */}
+      {isAddBotModalOpen && (
         <AddBotModal
           onClose={() => {
-            setIsAddModalOpen(false);
+            setIsAddBotModalOpen(false);
             setEditingBot(null);
           }}
           onSave={handleSaveBot}

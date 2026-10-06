@@ -10,8 +10,8 @@ interface NavbarProps {
   isConnecting: boolean;
   onOpenAddModal: () => void;
   onOpenSettingsModal: () => void;
-  onStartAll: () => void;
-  onStopAll: () => void;
+  onStartAll?: () => void;
+  onStopAll?: () => void;
   botCount: number;
   onlineCount: number;
 }
@@ -21,8 +21,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   isConnecting,
   onOpenAddModal,
   onOpenSettingsModal,
-  onStartAll,
-  onStopAll,
   botCount,
   onlineCount,
 }) => {
@@ -132,26 +130,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center space-x-2 sm:space-x-3">
-          <button
-            onClick={onStartAll}
-            disabled={!isConnected || botCount === 0}
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#1b2637] hover:bg-emerald-600 hover:text-white disabled:opacity-40 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 shadow-sm transition"
-            title="Connect all accounts"
-          >
-            <Play className="h-3.5 w-3.5 fill-current" />
-            <span className="hidden md:inline">Start All</span>
-          </button>
-
-          <button
-            onClick={onStopAll}
-            disabled={!isConnected || onlineCount === 0}
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#1b2637] hover:bg-rose-600 hover:text-white disabled:opacity-40 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 shadow-sm transition"
-            title="Disconnect all accounts"
-          >
-            <Square className="h-3.5 w-3.5 fill-current" />
-            <span className="hidden md:inline">Stop All</span>
-          </button>
-
           <button
             onClick={onOpenAddModal}
             disabled={!isConnected}

@@ -101,8 +101,6 @@ export default function AccountsPage() {
         isConnecting={isConnecting}
         onOpenAddModal={() => setIsAddAccountModalOpen(true)}
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
-        onStartAll={startAll}
-        onStopAll={stopAll}
         botCount={configs.length}
         onlineCount={onlineCount}
       />
