@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Play, Square, Plus, Settings, Wifi, WifiOff, Box, Server, Users, User, LogOut, ShieldCheck, ChevronDown, Lock } from 'lucide-react';
+import { Play, Square, Plus, Settings, Wifi, WifiOff, Box, Server, Users, User, LogOut, ShieldCheck, ChevronDown, Lock, Menu } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/VistaAuthContext';
@@ -61,10 +61,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Primary Page Navigation */}
-        <nav className="flex items-center space-x-1 sm:space-x-2 shrink-0">
+        <nav className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
           <Link
             href="/"
-            className={`flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+            className={`flex items-center space-x-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
               pathname === '/'
                 ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30'
                 : 'bg-[#1b2637]/70 text-slate-300 hover:text-white hover:bg-[#1b2637] border-slate-700'
@@ -72,9 +72,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             title="Server Fleet"
           >
             <Server className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[2.5]" />
-            <span className="hidden md:inline">Fleet</span>
+            <span>Fleet</span>
             {botCount > 0 && (
-              <span className={`px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-mono font-bold ${
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
                 pathname === '/' ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-800 text-slate-300'
               }`}>
                 {botCount}
@@ -84,7 +84,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <Link
             href="/accounts"
-            className={`flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+            className={`flex items-center space-x-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
               pathname === '/accounts'
                 ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30'
                 : 'bg-[#1b2637]/70 text-slate-300 hover:text-white hover:bg-[#1b2637] border-slate-700'
@@ -92,100 +92,134 @@ export const Navbar: React.FC<NavbarProps> = ({
             title="Accounts Vault"
           >
             <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[2.5]" />
-            <span className="hidden md:inline">Vault</span>
+            <span>Vault</span>
             {typeof savedAccountCount === 'number' && savedAccountCount > 0 && (
-              <span className={`px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-mono font-bold ${
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
                 pathname === '/accounts' ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-800 text-slate-300'
               }`}>
                 {savedAccountCount}
               </span>
             )}
           </Link>
-
-          {isVista && (
-            <Link
-              href="/control-panel"
-              className={`flex items-center space-x-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
-                pathname === '/control-panel'
-                  ? 'bg-amber-600 text-white border-amber-400 shadow-md shadow-amber-600/30'
-                  : 'bg-amber-500/15 text-amber-300 hover:text-white hover:bg-amber-600/30 border-amber-500/40 shadow-sm'
-              }`}
-              title="Admin Control Panel"
-            >
-              <ShieldCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[2.5]" />
-              <span className="text-[10px] sm:text-xs">CP</span>
-            </Link>
-          )}
         </nav>
 
-        {/* Right Section: User Login & Daemon Status */}
-        <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
-          {/* User Account Pill / Login Trigger */}
-          {user ? (
-            <div className="relative">
-              <button
-                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center space-x-1 sm:space-x-1.5 p-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 hover:border-emerald-500 text-xs text-slate-200 font-bold transition shadow-sm active:scale-95"
-                title={`Signed in as ${user.username}`}
-              >
-                <div className="w-5 h-5 sm:w-5 sm:h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black uppercase">
-                  {user.username.charAt(0)}
-                </div>
-                <span className="hidden md:inline max-w-[90px] truncate">{user.username}</span>
-                <ChevronDown className="h-3 w-3 text-slate-400 hidden sm:inline" />
-              </button>
-
-              {/* User Dropdown */}
-              {isUserMenuOpen && (
+        {/* Right Section: Single Unified Dropdown Menu */}
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+            className="flex items-center space-x-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-[#1b2637]/90 hover:bg-[#253449] border border-slate-700 hover:border-emerald-500/80 text-xs font-bold transition shadow-sm active:scale-95 text-slate-200"
+            title="Menu & Controls"
+          >
+            {/* Live Indicator Dot for Daemon Status */}
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              {isConnected ? (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsUserMenuOpen(false)} />
-                  <div className="absolute right-0 mt-2 w-64 bg-slate-900 border-2 border-slate-700 rounded-2xl shadow-2xl p-3 z-50 text-xs space-y-2.5 animate-in fade-in duration-150">
-                    <div className="pb-2 border-b border-slate-800 flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Signed In As</span>
-                        <div className="flex items-center space-x-1.5">
-                          <span className="font-extrabold text-sm text-white">{user.username}</span>
-                          {isVista && (
-                            <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                              ADMIN
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
-                        Active
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                </>
+              ) : isConnecting ? (
+                <span className="inline-flex rounded-full h-2.5 w-2.5 bg-amber-400 animate-pulse" />
+              ) : (
+                <span className="inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
+              )}
+            </span>
+
+            {user ? (
+              <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black uppercase shrink-0">
+                {user.username.charAt(0)}
+              </div>
+            ) : null}
+
+            <Menu className="h-4 w-4 text-slate-300 shrink-0" />
+          </button>
+
+          {/* Unified Dropdown Panel */}
+          {isUserMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs" onClick={() => setIsUserMenuOpen(false)} />
+              <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-slate-900 border-2 border-slate-700 rounded-3xl shadow-2xl p-4 z-50 text-xs space-y-3.5 animate-in fade-in duration-150">
+                {/* 1. Daemon Status Card */}
+                <div className="p-3 rounded-2xl bg-slate-800/90 border border-slate-700/80 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bot Daemon</span>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="relative flex h-2 w-2">
+                        {isConnected ? (
+                          <>
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                          </>
+                        ) : isConnecting ? (
+                          <span className="inline-flex rounded-full h-2 w-2 bg-amber-400 animate-pulse" />
+                        ) : (
+                          <span className="inline-flex rounded-full h-2 w-2 bg-rose-500" />
+                        )}
+                      </span>
+                      <span className={`text-[11px] font-bold ${
+                        isConnected ? 'text-emerald-400' : isConnecting ? 'text-amber-400' : 'text-rose-400'
+                      }`}>
+                        {isConnected ? 'Connected (24/7)' : isConnecting ? 'Connecting...' : 'Disconnected'}
                       </span>
                     </div>
+                  </div>
 
-                    <div className="space-y-1.5 text-[11px] text-slate-300 font-medium">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Daemon Link:</span>
-                        <span className="font-mono text-emerald-400 truncate max-w-[130px]">
-                          {user.daemonUrl ? 'Cloud Connected' : 'Not linked yet'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Saved Accounts:</span>
-                        <span className="font-bold">{user.savedAccounts?.length || 0}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Server Presets:</span>
-                        <span className="font-bold">{user.serverPresets?.length || 0}</span>
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      onOpenSettingsModal();
+                    }}
+                    className="w-full py-2 px-3 bg-slate-700/60 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1.5 border border-slate-600/50"
+                  >
+                    <Settings className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>Connection Settings &amp; Termux</span>
+                  </button>
+                </div>
+
+                {/* 2. Admin Control Panel (for user vista) */}
+                {isVista && (
+                  <Link
+                    href="/control-panel"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className={`flex items-center justify-between p-3 rounded-2xl border transition ${
+                      pathname === '/control-panel'
+                        ? 'bg-amber-600 text-white border-amber-400 shadow-md shadow-amber-600/30'
+                        : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/40'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <ShieldCheck className="h-4 w-4 text-amber-400 shrink-0" />
+                      <div>
+                        <div className="font-extrabold text-xs">Admin Control Panel</div>
+                        <div className="text-[10px] text-amber-200/70">Manage users, passwords &amp; settings</div>
                       </div>
                     </div>
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-mono">
+                      CP
+                    </span>
+                  </Link>
+                )}
 
-                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => {
-                            setIsUserMenuOpen(false);
-                            onOpenSettingsModal();
-                          }}
-                          className="text-slate-300 hover:text-white flex items-center space-x-1 text-[11px] font-bold"
-                        >
-                          <Settings className="h-3.5 w-3.5" />
-                          <span>Settings</span>
-                        </button>
+                {/* 3. User Session / Auth Section */}
+                <div className="pt-2 border-t border-slate-800 space-y-2.5">
+                  {user ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-black uppercase ring-2 ring-emerald-500/40">
+                          {user.username.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-1.5">
+                            <span className="font-black text-white text-xs">@{user.username}</span>
+                            {isVista && (
+                              <span className="text-[8px] font-black px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                ADMIN
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            {user.savedAccounts?.length || 0} accounts &bull; {user.serverPresets?.length || 0} presets
+                          </div>
+                        </div>
                       </div>
 
                       <button
@@ -193,61 +227,34 @@ export const Navbar: React.FC<NavbarProps> = ({
                           setIsUserMenuOpen(false);
                           logout();
                         }}
-                        className="text-rose-400 hover:text-rose-300 flex items-center space-x-1 text-[11px] font-bold"
+                        className="px-2.5 py-1.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 hover:text-rose-300 rounded-xl transition flex items-center space-x-1 text-[11px] font-bold border border-rose-500/30"
+                        title="Sign Out"
                       >
                         <LogOut className="h-3.5 w-3.5" />
-                        <span>Sign Out</span>
+                        <span>Logout</span>
                       </button>
                     </div>
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <button
-              onClick={openAuthModal}
-              className="flex items-center space-x-1 sm:space-x-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black uppercase tracking-wider transition shadow-md shadow-emerald-600/30 active:scale-95"
-            >
-              <Lock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-              <span className="hidden sm:inline">Sign In</span>
-              <span className="inline sm:hidden text-[10px]">Login</span>
-            </button>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="text-[11px] text-slate-400">
+                        You are in <strong>Guest Mode</strong>. Sign in to save accounts across devices.
+                      </div>
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          openAuthModal();
+                        }}
+                        className="w-full py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl transition shadow-md shadow-emerald-600/25 flex items-center justify-center space-x-1.5"
+                      >
+                        <Lock className="h-3.5 w-3.5" />
+                        <span>Sign In / Create Account</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
           )}
-
-          {/* Daemon Connection Pill */}
-          <button
-            onClick={onOpenSettingsModal}
-            className={`flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-all shadow-md shrink-0 active:scale-95 ${
-              isConnected
-                ? 'bg-[#0f291e] text-emerald-400 border-emerald-600/80 hover:bg-[#143527]'
-                : isConnecting
-                ? 'bg-[#291e0f] text-amber-400 border-amber-600/80 hover:bg-[#352714]'
-                : 'bg-[#290f14] text-rose-400 border-rose-600/80 hover:bg-[#351419]'
-            }`}
-            title="Configure Daemon connection"
-          >
-            {isConnected ? (
-              <>
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <Wifi className="h-3.5 w-3.5" />
-                <span className="hidden lg:inline text-[11px]">Online</span>
-              </>
-            ) : isConnecting ? (
-              <>
-                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-                <span className="hidden lg:inline text-[11px]">Connecting</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-3.5 w-3.5" />
-                <span className="hidden lg:inline text-[11px]">Offline</span>
-              </>
-            )}
-            <Settings className="h-3 w-3 text-slate-400 hover:text-white hidden sm:inline" />
-          </button>
         </div>
       </div>
     </header>
