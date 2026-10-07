@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
-import { Play, Square, Plus, Settings, Wifi, WifiOff, Box, Server, Users } from 'lucide-react';
+import React, { useState } from 'react';
+import { Play, Square, Plus, Settings, Wifi, WifiOff, Box, Server, Users, User, LogOut, ShieldCheck, ChevronDown, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useAuth } from '../context/VistaAuthContext';
 
 interface NavbarProps {
   isConnected: boolean;
@@ -27,6 +28,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   savedAccountCount,
 }) => {
   const pathname = usePathname();
+  const { user, openAuthModal, logout } = useAuth();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b-2 border-[#2b3a4f] bg-[#121a27]/95 backdrop-blur-md shadow-lg">
@@ -99,43 +102,127 @@ export const Navbar: React.FC<NavbarProps> = ({
           </Link>
         </nav>
 
-        {/* Daemon Connection Pill */}
-        <button
-          onClick={onOpenSettingsModal}
-          className={`flex items-center space-x-1.5 sm:space-x-2 px-2 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold border-2 transition-all shadow-md shrink-0 ${
-            isConnected
-              ? 'bg-[#0f291e] text-emerald-400 border-emerald-600/80 hover:bg-[#143527]'
-              : isConnecting
-              ? 'bg-[#291e0f] text-amber-400 border-amber-600/80 hover:bg-[#352714]'
-              : 'bg-[#290f14] text-rose-400 border-rose-600/80 hover:bg-[#351419]'
-          }`}
-          title="Configure Daemon connection"
-        >
-          {isConnected ? (
-            <>
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <Wifi className="h-3.5 w-3.5 hidden sm:inline" />
-              <span className="hidden sm:inline">Daemon Connected</span>
-              <span className="inline sm:hidden text-[11px]">Online</span>
-            </>
-          ) : isConnecting ? (
-            <>
-              <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-              <span className="hidden sm:inline">Connecting...</span>
-              <span className="inline sm:hidden text-[11px]">Connecting</span>
-            </>
+        {/* Right Section: User Login & Daemon Status */}
+        <div className="flex items-center space-x-2 shrink-0">
+          {/* User Account Pill / Login Trigger */}
+          {user ? (
+            <div className="relative">
+              <button
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 hover:border-emerald-500 text-xs text-slate-200 font-bold transition shadow-sm"
+              >
+                <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">
+                  {user.username.charAt(0).toUpperCase()}
+                </div>
+                <span className="max-w-[80px] sm:max-w-[120px] truncate">{user.username}</span>
+                <ChevronDown className="h-3 w-3 text-slate-400" />
+              </button>
+
+              {/* User Dropdown */}
+              {isUserMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsUserMenuOpen(false)} />
+                  <div className="absolute right-0 mt-2 w-64 bg-slate-900 border-2 border-slate-700 rounded-2xl shadow-2xl p-3 z-50 text-xs space-y-2.5 animate-in fade-in duration-150">
+                    <div className="pb-2 border-b border-slate-800 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Signed In As</span>
+                        <span className="font-extrabold text-sm text-white">{user.username}</span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
+                        Active
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 text-[11px] text-slate-300 font-medium">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Daemon Link:</span>
+                        <span className="font-mono text-emerald-400 truncate max-w-[130px]">
+                          {user.daemonUrl ? 'Cloud Connected' : 'Not linked yet'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Saved Accounts:</span>
+                        <span className="font-bold">{user.savedAccounts?.length || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Server Presets:</span>
+                        <span className="font-bold">{user.serverPresets?.length || 0}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          onOpenSettingsModal();
+                        }}
+                        className="text-slate-300 hover:text-white flex items-center space-x-1 text-[11px] font-bold"
+                      >
+                        <Settings className="h-3.5 w-3.5" />
+                        <span>Settings</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          logout();
+                        }}
+                        className="text-rose-400 hover:text-rose-300 flex items-center space-x-1 text-[11px] font-bold"
+                      >
+                        <LogOut className="h-3.5 w-3.5" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           ) : (
-            <>
-              <WifiOff className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Daemon Disconnected</span>
-              <span className="inline sm:hidden text-[11px]">Offline</span>
-            </>
+            <button
+              onClick={openAuthModal}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black uppercase tracking-wider transition shadow-md shadow-emerald-600/30 active:scale-95"
+            >
+              <Lock className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Sign In / Sync</span>
+              <span className="inline sm:hidden text-[11px]">Sign In</span>
+            </button>
           )}
-          <Settings className="h-3 w-3 text-slate-400 hover:text-white" />
-        </button>
+
+          {/* Daemon Connection Pill */}
+          <button
+            onClick={onOpenSettingsModal}
+            className={`flex items-center space-x-1.5 sm:space-x-2 px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-all shadow-md shrink-0 ${
+              isConnected
+                ? 'bg-[#0f291e] text-emerald-400 border-emerald-600/80 hover:bg-[#143527]'
+                : isConnecting
+                ? 'bg-[#291e0f] text-amber-400 border-amber-600/80 hover:bg-[#352714]'
+                : 'bg-[#290f14] text-rose-400 border-rose-600/80 hover:bg-[#351419]'
+            }`}
+            title="Configure Daemon connection"
+          >
+            {isConnected ? (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <Wifi className="h-3.5 w-3.5 hidden sm:inline" />
+                <span className="hidden sm:inline">Online</span>
+              </>
+            ) : isConnecting ? (
+              <>
+                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                <span className="hidden sm:inline">Connecting...</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Offline</span>
+              </>
+            )}
+            <Settings className="h-3 w-3 text-slate-400 hover:text-white" />
+          </button>
+        </div>
       </div>
     </header>
   );

@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { PasscodeGate } from '../components/PasscodeGate';
+import { VistaAuthProvider } from '../context/VistaAuthContext';
 import { VistaWebSocketProvider } from '../context/VistaWebSocketContext';
+import { AuthModal } from '../components/AuthModal';
 
 export const metadata: Metadata = {
   title: 'VistaAFK | Minecraft Java Headless AFK Dashboard',
@@ -20,9 +22,12 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-[#f8fafc] text-slate-800 antialiased selection:bg-emerald-500 selection:text-white overflow-x-hidden w-full max-w-[100vw]">
         <PasscodeGate>
-          <VistaWebSocketProvider>
-            {children}
-          </VistaWebSocketProvider>
+          <VistaAuthProvider>
+            <VistaWebSocketProvider>
+              {children}
+              <AuthModal />
+            </VistaWebSocketProvider>
+          </VistaAuthProvider>
         </PasscodeGate>
       </body>
     </html>

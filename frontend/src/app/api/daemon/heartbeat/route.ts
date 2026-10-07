@@ -1,0 +1,102 @@
+import { NextResponse } from 'next/server';
+import crypto from 'crypto';
+import {
+  getUser,
+  saveUser,
+  verifyPassword,
+  validateUsername,
+  validatePassword,
+  hashPassword,
+  UserRecord,
+} from '../../../../lib/userStore';
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { username, password, daemonUrl, secretToken, accounts, bots } = body;
+
+    const uVal = validateUsername(username);
+    if (!uVal.valid) {
+      return NextResponse.json({ error: uVal.error }, { status: 400 });
+    }
+
+    const pVal = validatePassword(password);
+    if (!pVal.valid) {
+      return NextResponse.json({ error: pVal.error }, { status: 400 });
+    }
+
+    const cleanUsername = username.trim().toLowerCase();
+    let user = await getUser(cleanUsername);
+
+    // If user doesn't exist yet and daemon connects, auto-register them
+    if (!user) {
+      const { hash, salt } = hashPassword(password);
+      user = {
+        id: crypto.randomUUID(),
+        username: cleanUsername,
+        passwordHash: hash,
+        salt,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        daemonUrl,
+        secretToken,
+        lastHeartbeat: Date.now(),
+        savedAccounts: Array.isArray(accounts) ? accounts : [],
+        botConfigs: Array.isArray(bots) ? bots : [],
+      };
+      await saveUser(user);
+
+      return NextResponse.json({
+        success: true,
+        message: `Daemon auto-registered and linked to new account "${cleanUsername}"`,
+        daemonUrl,
+      });
+    }
+
+    // Verify existing password
+    const isMatch = verifyPassword(password, user.passwordHash, user.salt);
+    if (!isMatch) {
+      return NextResponse.json(
+        { error: 'Invalid password for this VistaAFK account' },
+        { status: 401 }
+      );
+    }
+
+    // Update daemon connection & heartbeat
+    if (daemonUrl) {
+      user.daemonUrl = daemonUrl;
+    }
+    if (secretToken !== undefined) {
+      user.secretToken = secretToken;
+    }
+    user.lastHeartbeat = Date.now();
+
+    // Sync accounts from daemon if provided
+    if (Array.isArray(accounts) && accounts.length > 0) {
+      const existingAccounts = user.savedAccounts || [];
+      const accountMap = new Map(existingAccounts.map((a) => [a.id, a]));
+      for (const acc of accounts) {
+        if (acc && acc.id) {
+          accountMap.set(acc.id, acc);
+        }
+      }
+      user.savedAccounts = Array.from(accountMap.values());
+    }
+
+    // Sync bots from daemon if provided
+    if (Array.isArray(bots) && bots.length > 0) {
+      user.botConfigs = bots;
+    }
+
+    await saveUser(user);
+
+    return NextResponse.json({
+      success: true,
+      message: `Heartbeat acknowledged. Linked to "${cleanUsername}"`,
+      daemonUrl: user.daemonUrl,
+      savedAccountsCount: user.savedAccounts?.length || 0,
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Heartbeat failed' }, { status: 500 });
+  }
+}

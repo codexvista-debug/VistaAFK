@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, VistaNotification, SavedAccount, ServerPreset, MinecraftEdition } from '../types';
+import { useAuth } from './VistaAuthContext';
 
 const DEFAULT_SERVER_PRESETS: ServerPreset[] = [
   { id: 'donutsmp', name: 'DonutSMP', host: 'donutsmp.net', port: 25565, version: '' },
@@ -74,6 +75,7 @@ export interface VistaWebSocketContextType {
 const VistaWebSocketContext = createContext<VistaWebSocketContextType | null>(null);
 
 export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, syncToCloud } = useAuth();
   const [daemonUrl, setDaemonUrl] = useState<string>('ws://localhost:8080');
   const [secretToken, setSecretToken] = useState<string>('');
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -99,6 +101,50 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const keepAliveIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync with logged-in user cloud setup
+  useEffect(() => {
+    if (user) {
+      if (user.daemonUrl) {
+        const norm = normalizeWsUrl(user.daemonUrl);
+        if (norm !== daemonUrl) {
+          setDaemonUrl(norm);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('vistaafk_daemon_url', norm);
+          }
+          if (wsRef.current) wsRef.current.close();
+        }
+      }
+      if (user.secretToken !== undefined && user.secretToken !== secretToken) {
+        setSecretToken(user.secretToken);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('vistaafk_secret_token', user.secretToken);
+        }
+      }
+      if (Array.isArray(user.savedAccounts) && user.savedAccounts.length > 0) {
+        setSavedAccounts((prev) => {
+          const map = new Map(prev.map((a) => [a.id, a]));
+          user.savedAccounts!.forEach((a) => map.set(a.id, a));
+          const merged = Array.from(map.values());
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('vistaafk_saved_accounts', JSON.stringify(merged));
+          }
+          return merged;
+        });
+      }
+      if (Array.isArray(user.serverPresets) && user.serverPresets.length > 0) {
+        setServerPresets((prev) => {
+          const map = new Map(prev.map((p) => [p.id, p]));
+          user.serverPresets!.forEach((p) => map.set(p.id, p));
+          const merged = Array.from(map.values());
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('vistaafk_server_presets', JSON.stringify(merged));
+          }
+          return merged;
+        });
+      }
+    }
+  }, [user]);
 
   // Load saved daemon URL, token, accounts, and server presets from localStorage once
   useEffect(() => {
@@ -170,6 +216,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       if (typeof window !== 'undefined') {
         localStorage.setItem('vistaafk_saved_accounts', JSON.stringify(updated));
       }
+      syncToCloud({ savedAccounts: updated });
       return updated;
     });
   };
@@ -180,6 +227,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       if (typeof window !== 'undefined') {
         localStorage.setItem('vistaafk_saved_accounts', JSON.stringify(updated));
       }
+      syncToCloud({ savedAccounts: updated });
       return updated;
     });
   };
@@ -190,6 +238,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       if (typeof window !== 'undefined') {
         localStorage.setItem('vistaafk_server_presets', JSON.stringify(updated));
       }
+      syncToCloud({ serverPresets: updated });
       return updated;
     });
   };
@@ -200,6 +249,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       if (typeof window !== 'undefined') {
         localStorage.setItem('vistaafk_server_presets', JSON.stringify(updated));
       }
+      syncToCloud({ serverPresets: updated });
       return updated;
     });
   };
@@ -490,6 +540,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       localStorage.setItem('vistaafk_daemon_url', url);
       localStorage.setItem('vistaafk_secret_token', token);
     }
+    syncToCloud({ daemonUrl: url, secretToken: token });
     if (wsRef.current) {
       wsRef.current.close();
     }

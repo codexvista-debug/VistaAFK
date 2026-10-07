@@ -4,14 +4,56 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DAEMON_VERSION = void 0;
+const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const ws_1 = require("ws");
 const botManager_js_1 = require("./botManager.js");
 const accountDiscovery_js_1 = require("./accountDiscovery.js");
-exports.DAEMON_VERSION = 'v1.2.2';
+exports.DAEMON_VERSION = 'v1.2.3';
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const SECRET = process.env.VISTAAFK_SECRET || '';
 const HOST = process.env.HOST || '0.0.0.0';
+// Cloud Account Linking & Tunnel Auto-discovery
+function getAuthCredentials() {
+    const paths = [
+        path_1.default.resolve(process.cwd(), 'user_auth.json'),
+        path_1.default.resolve(process.cwd(), '..', 'user_auth.json'),
+    ];
+    for (const p of paths) {
+        if (fs_1.default.existsSync(p)) {
+            try {
+                const raw = fs_1.default.readFileSync(p, 'utf8');
+                const parsed = JSON.parse(raw);
+                if (parsed.username && parsed.password) {
+                    return parsed;
+                }
+            }
+            catch (e) { }
+        }
+    }
+    return null;
+}
+function getDetectedTunnelUrl() {
+    const logPaths = [
+        path_1.default.resolve(process.cwd(), 'cloudflared.log'),
+        path_1.default.resolve(process.cwd(), '..', 'cloudflared.log'),
+        path_1.default.resolve(process.env.HOME || '', 'cloudflared.log'),
+    ];
+    for (const lp of logPaths) {
+        if (fs_1.default.existsSync(lp)) {
+            try {
+                const content = fs_1.default.readFileSync(lp, 'utf8');
+                const matches = content.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/g);
+                if (matches && matches.length > 0) {
+                    const last = matches[matches.length - 1];
+                    return 'wss://' + last.replace('https://', '');
+                }
+            }
+            catch (e) { }
+        }
+    }
+    return null;
+}
 const wss = new ws_1.WebSocketServer({ port: PORT, host: HOST });
 console.log(`\n=============================================`);
 console.log(`   🟢 VistaAFK Daemon ${exports.DAEMON_VERSION}`);
@@ -145,6 +187,20 @@ wss.on('connection', (ws) => {
                     });
                     break;
                 }
+                case 'LINK_ACCOUNT': {
+                    const { username, password, cloudUrl } = msg.payload || {};
+                    if (username && password) {
+                        const authPath = path_1.default.resolve(process.cwd(), 'user_auth.json');
+                        fs_1.default.writeFileSync(authPath, JSON.stringify({ username, password, cloudUrl: cloudUrl || 'https://vista-afk.vercel.app' }, null, 2), 'utf8');
+                        console.log(`[Cloud Sync] 🔐 Linked daemon to VistaAFK user "${username}"`);
+                        sendCloudHeartbeat();
+                        ws.send(JSON.stringify({
+                            type: 'NOTIFICATION',
+                            payload: { level: 'success', message: `Daemon successfully linked to user "${username}"` },
+                        }));
+                    }
+                    break;
+                }
             }
         }
         catch (err) {
@@ -173,6 +229,40 @@ function sendInitialState(ws) {
         ws.send(JSON.stringify({ type: 'INIT_STATE', payload }));
     }
 }
+async function sendCloudHeartbeat() {
+    const creds = getAuthCredentials();
+    if (!creds || !creds.username || !creds.password)
+        return;
+    const detectedTunnel = getDetectedTunnelUrl();
+    const tunnelUrl = process.env.DAEMON_PUBLIC_URL || detectedTunnel || `ws://localhost:${PORT}`;
+    const cloudUrl = creds.cloudUrl || process.env.VISTAAFK_CLOUD_URL || 'https://vista-afk.vercel.app';
+    try {
+        const res = await fetch(`${cloudUrl}/api/daemon/heartbeat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: creds.username,
+                password: creds.password,
+                daemonUrl: tunnelUrl,
+                secretToken: SECRET,
+                bots: botManager.getAllConfigs(),
+            }),
+        });
+        if (res.ok) {
+            console.log(`[Cloud Sync] ☁️ Heartbeat synced with VistaAFK user "${creds.username}" (URL: ${tunnelUrl})`);
+        }
+        else {
+            const err = await res.json().catch(() => ({}));
+            console.warn(`[Cloud Sync] ⚠️ Cloud heartbeat warning: ${err.error || res.statusText}`);
+        }
+    }
+    catch (err) {
+        // Retry quietly on network blips
+    }
+}
+// Start cloud heartbeat routine
+setTimeout(sendCloudHeartbeat, 2500);
+setInterval(sendCloudHeartbeat, 25000);
 process.on('SIGINT', () => {
     console.log('\n[VistaAFK Daemon] Stopping all bots and shutting down gracefully...');
     botManager.stopAll();
