@@ -61,9 +61,17 @@ export const BotCard: React.FC<BotCardProps> = ({
   const isConnecting = status === 'connecting' || status === 'reconnecting';
 
   const health = telemetry?.health ?? 0;
-  const maxHealth = telemetry?.maxHealth || 20;
-  const hearts = telemetry?.hearts ?? Math.round((health / 2) * 10) / 10;
-  const maxHearts = telemetry?.maxHearts ?? Math.round((maxHealth / 2) * 10) / 10;
+  const rawHearts = telemetry?.hearts !== undefined ? telemetry.hearts : Math.round((health / 2) * 10) / 10;
+  let rawMaxHearts = telemetry?.maxHearts !== undefined ? telemetry.maxHearts : Math.round(((telemetry?.maxHealth || 20) / 2) * 10) / 10;
+
+  // On custom servers (like Lifesteal SMP) where default max was 10 hearts (20 HP)
+  // but bot has full hunger (food >= 18) and hearts is stable (e.g. 8 hearts),
+  // adapt maxHearts to match actual hearts so it displays 8 / 8 at 100% full bar
+  if (isOnline && (telemetry?.food ?? 0) >= 18 && rawHearts > 0 && rawHearts < 10 && rawMaxHearts === 10) {
+    rawMaxHearts = rawHearts;
+  }
+  const displayHearts = rawHearts;
+  const displayMaxHearts = Math.max(rawHearts, rawMaxHearts || 10);
   const food = telemetry?.food ?? 0;
   const coords = telemetry?.coordinates ?? { x: 0, y: 0, z: 0 };
   const dimension = telemetry?.dimension || 'overworld';
@@ -204,22 +212,17 @@ export const BotCard: React.FC<BotCardProps> = ({
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-500 font-medium flex items-center space-x-1">
-                  <Heart className="h-3 w-3 text-rose-500 fill-rose-500" />
-                  <span>HP</span>
-                  {isOnline && (
-                    <span className="text-[10px] text-rose-600 font-mono font-bold bg-rose-50 px-1 py-0.2 rounded border border-rose-200">
-                      {hearts}/{maxHearts}❤
-                    </span>
-                  )}
+                  <Heart className="h-3.5 w-3.5 text-rose-500 fill-rose-500" />
+                  <span className="font-semibold text-slate-700">HP</span>
                 </span>
-                <span className="font-mono text-slate-800 font-semibold">
-                  {isOnline ? `${Math.round(health)} / ${Math.round(maxHealth)}` : '--'}
+                <span className="font-mono text-slate-800 font-bold text-xs">
+                  {isOnline ? `${displayHearts} / ${displayMaxHearts}` : '--'}
                 </span>
               </div>
               <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                 <div
                   className="bg-rose-500 h-full transition-all duration-300 rounded-full"
-                  style={{ width: `${isOnline ? Math.min(100, (health / maxHealth) * 100) : 0}%` }}
+                  style={{ width: `${isOnline && displayMaxHearts > 0 ? Math.min(100, (displayHearts / displayMaxHearts) * 100) : 0}%` }}
                 />
               </div>
             </div>

@@ -140,6 +140,8 @@ export class BotInstance {
   private lastChatTimestamp: number = 0;
   private lastAntiAfkLogTime: number = 0;
   private isEatingFood: boolean = false;
+  private customMaxHealth: number = 0;
+  private recordedMaxHealth: number = 0;
 
   constructor(config: BotConfig, callbacks: BotInstanceCallbacks) {
     this.config = config;
@@ -362,14 +364,36 @@ export class BotInstance {
       }
     });
 
-    (this.bot as any)._client?.on('entity_update_attributes', (packet: any) => {
-      if (this.bot && packet.entityId === this.bot.entity?.id) {
-        setTimeout(() => {
-          this.emitTelemetry();
-          this.checkSurvivalActions();
-        }, 150);
+    const handleAttrPacket = (packet: any) => {
+      if (!this.bot) return;
+      const myId = this.bot.entity?.id;
+      if (myId === undefined || packet?.entityId === myId) {
+        if (Array.isArray(packet?.properties)) {
+          for (const prop of packet.properties) {
+            const attrKey = prop?.key || prop?.name || '';
+            if (attrKey.includes('max_health')) {
+              let val = typeof prop.value === 'number' ? prop.value : 20;
+              if (Array.isArray(prop.modifiers) && prop.modifiers.length > 0) {
+                let op0 = 0, op1 = 0, op2 = 1;
+                for (const mod of prop.modifiers) {
+                  if (mod.operation === 0) op0 += (mod.amount || 0);
+                  else if (mod.operation === 1) op1 += (mod.amount || 0);
+                  else if (mod.operation === 2) op2 *= (1 + (mod.amount || 0));
+                }
+                val = Math.max(1, (val + op0) * (1 + op1) * op2);
+              }
+              this.customMaxHealth = Math.round(val * 10) / 10;
+              this.recordedMaxHealth = Math.max(this.recordedMaxHealth, this.customMaxHealth);
+              this.emitTelemetry();
+              this.checkSurvivalActions();
+            }
+          }
+        }
       }
-    });
+    };
+
+    (this.bot as any)._client?.on('entity_update_attributes', handleAttrPacket);
+    (this.bot as any)._client?.on('update_attributes', handleAttrPacket);
 
     // Auto accept resource packs (critical for SMP sub-servers like Lifesteal with custom packs)
     (this.bot as any).on('resourcePack', (url: string, hash: string) => {
@@ -523,6 +547,11 @@ export class BotInstance {
   public getMaxHealth(): number {
     if (!this.bot) return 20;
 
+    // 0. Use explicitly captured customMaxHealth from packets
+    if (this.customMaxHealth && this.customMaxHealth > 0) {
+      return this.customMaxHealth;
+    }
+
     // 1. Check entity attributes (minecraft:generic.max_health)
     const entityAny = this.bot.entity as any;
     if (entityAny?.attributes) {
@@ -543,7 +572,9 @@ export class BotInstance {
           }
           finalVal = Math.max(1, (attr.value + op0) * (1 + op1) * op2);
         }
-        return Math.round(finalVal * 10) / 10;
+        const calculated = Math.round(finalVal * 10) / 10;
+        this.recordedMaxHealth = Math.max(this.recordedMaxHealth, calculated);
+        return calculated;
       }
     }
 
@@ -560,7 +591,9 @@ export class BotInstance {
             if (match) {
               const hearts = parseInt(match[1], 10);
               if (hearts > 0 && hearts <= 100) {
-                return hearts * 2;
+                const calculated = hearts * 2;
+                this.recordedMaxHealth = Math.max(this.recordedMaxHealth, calculated);
+                return calculated;
               }
             }
           }
@@ -568,9 +601,38 @@ export class BotInstance {
       } catch (e) {}
     }
 
-    // 3. Fallback: if bot.health is higher than 20
+    // 3. Check tablist / player displayName for hearts (e.g. FreshSMP tab list)
+    try {
+      const p = (this.bot as any).players?.[this.bot.username];
+      const name = p?.displayName ? cleanMinecraftJsonText(p.displayName) : '';
+      const match = name.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:❤|hearts?)/i);
+      if (match) {
+        const parsedHearts = parseFloat(match[1]);
+        if (parsedHearts > 0 && parsedHearts <= 100) {
+          const calculated = Math.round(parsedHearts * 2);
+          this.recordedMaxHealth = Math.max(this.recordedMaxHealth, calculated);
+          return calculated;
+        }
+      }
+    } catch (e) {}
+
+    // 4. Remember previously observed peak max health (e.g. before taking damage)
+    if (this.recordedMaxHealth > 0) {
+      return this.recordedMaxHealth;
+    }
+
+    // 5. If bot is at full hunger (food >= 18) and health is stable, that is their max health (e.g. 16 HP = 8 hearts)
+    if (this.bot.health && (this.bot.food ?? 0) >= 18 && this.bot.health > 0) {
+      const current = Math.round(this.bot.health * 10) / 10;
+      this.recordedMaxHealth = Math.max(this.recordedMaxHealth, current);
+      return current;
+    }
+
+    // 6. Fallback: if bot.health is higher than 20
     if (this.bot.health && this.bot.health > 20) {
-      return Math.round(this.bot.health);
+      const current = Math.round(this.bot.health);
+      this.recordedMaxHealth = Math.max(this.recordedMaxHealth, current);
+      return current;
     }
 
     return 20;

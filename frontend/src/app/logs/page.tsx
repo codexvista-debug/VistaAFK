@@ -118,6 +118,15 @@ function PlayerLogsContent() {
     return 'bg-slate-100 text-slate-700 border-slate-300';
   };
 
+  const currentHealth = currentTelemetry?.health ?? 0;
+  const rawHearts = currentTelemetry?.hearts !== undefined ? currentTelemetry.hearts : Math.round((currentHealth / 2) * 10) / 10;
+  let rawMaxHearts = currentTelemetry?.maxHearts !== undefined ? currentTelemetry.maxHearts : Math.round(((currentTelemetry?.maxHealth || 20) / 2) * 10) / 10;
+  if (isOnline && (currentTelemetry?.food ?? 0) >= 18 && rawHearts > 0 && rawHearts < 10 && rawMaxHearts === 10) {
+    rawMaxHearts = rawHearts;
+  }
+  const displayHearts = rawHearts;
+  const displayMaxHearts = Math.max(rawHearts, rawMaxHearts || 10);
+
   return (
     <div className="h-screen flex flex-col bg-[#f1f5f9] text-slate-800 font-sans">
       {/* Top Header Bar */}
@@ -155,11 +164,7 @@ function PlayerLogsContent() {
           <div className="flex items-center space-x-2 sm:space-x-4 text-xs font-mono">
             <div className="flex items-center space-x-1.5 text-rose-600 font-bold">
               <Heart className="h-4 w-4 fill-current" />
-              <span>
-                {isOnline
-                  ? `${Math.round(currentTelemetry?.health || 0)}/${Math.round(currentTelemetry?.maxHealth || 20)} HP (${currentTelemetry?.hearts ?? Math.round(((currentTelemetry?.health || 0) / 2) * 10) / 10}/${currentTelemetry?.maxHearts ?? Math.round(((currentTelemetry?.maxHealth || 20) / 2) * 10) / 10}❤)`
-                  : '--'}
-              </span>
+              <span>{isOnline ? `${displayHearts} / ${displayMaxHearts} HP` : '--'}</span>
             </div>
             <div className="flex items-center space-x-1.5 text-amber-600 font-bold">
               <Utensils className="h-4 w-4" />
