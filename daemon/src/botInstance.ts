@@ -257,13 +257,28 @@ export class BotInstance {
     const tokenFolder = path.resolve(process.cwd(), 'tokens');
 
     try {
-      const bedrock = await import('bedrock-protocol');
+      let bedrock: any = null;
+      try {
+        // @ts-ignore
+        bedrock = await import('bedrock-protocol');
+      } catch (err: any) {
+        try {
+          bedrock = (eval('require'))('bedrock-protocol');
+        } catch (e) {}
+      }
+
+      if (!bedrock) {
+        this.updateStatus('error', 'Bedrock module not installed');
+        this.emitActivity('status', '⚠️ Bedrock package missing. In Termux, run: npm install --no-optional');
+        this.callbacks.onNotification('error', `[${this.config.name}] Bedrock package missing. Run: npm install --no-optional`, this.config.id);
+        return;
+      }
 
       // Patch Geyser 26.x protocol aliases so servers reporting 26.30-26.60 map to protocol 2193
       try {
         // @ts-ignore
-        const Options: any = (bedrock as any).Options || (await import('bedrock-protocol/src/options.js'));
-        if (Options.Versions) {
+        const Options: any = bedrock.Options || (await import('bedrock-protocol/src/options.js'));
+        if (Options?.Versions) {
           for (let i = 20; i <= 60; i++) {
             Options.Versions[`26.${i}`] = 2193;
             Options.Versions[`1.26.${i}`] = 2193;
