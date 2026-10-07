@@ -42,7 +42,11 @@ if ! command -v cloudflared &>/dev/null; then
   pkg install cloudflared -y 2>/dev/null || true
 fi
 
-# 7. Check for user account credentials to link phone daemon to web dashboard
+# 7. Check for user account credentials or reset flag
+if [ "$1" == "--login" ] || [ "$1" == "-l" ] || [ "$1" == "--reset" ]; then
+  rm -f user_auth.json ../user_auth.json 2>/dev/null
+fi
+
 if [ ! -f "user_auth.json" ] && [ ! -f "../user_auth.json" ]; then
   echo ""
   echo "============================================="
@@ -52,15 +56,21 @@ if [ ! -f "user_auth.json" ] && [ ! -f "../user_auth.json" ]; then
   echo "can access it from your PC or anywhere!"
   echo ""
   read -p "Enter username (min 4 letters): " AUTH_USER
-  read -s -p "Enter password (min 6 characters): " AUTH_PASS
+  read -p "Enter password (min 6 characters): " AUTH_PASS
   echo ""
   if [ ${#AUTH_USER} -ge 4 ] && [ ${#AUTH_PASS} -ge 6 ]; then
     echo "{\"username\":\"$AUTH_USER\",\"password\":\"$AUTH_PASS\",\"cloudUrl\":\"https://afkvista.vercel.app\"}" > user_auth.json
-    echo "✅ Account credentials saved! Your PC will now connect automatically."
+    echo "✅ Account credentials saved for '$AUTH_USER'! Your PC will now connect automatically."
   else
     echo "⚠️ Skipping setup (username < 4 or password < 6). You can link anytime in the web dashboard."
   fi
   echo ""
+else
+  CURRENT_USER=$(grep -o '"username":"[^"]*' user_auth.json 2>/dev/null | cut -d'"' -f4)
+  if [ -z "$CURRENT_USER" ]; then
+    CURRENT_USER=$(grep -o '"username":"[^"]*' ../user_auth.json 2>/dev/null | cut -d'"' -f4)
+  fi
+  echo "👤 Linked to account: ${CURRENT_USER:-saved user} (run 'bash start.sh --login' to switch accounts)"
 fi
 
 # 8. Start Cloudflare Tunnel in background if installed
