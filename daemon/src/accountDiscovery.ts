@@ -54,6 +54,7 @@ export async function discoverMicrosoftProfiles(
     tokenFolder,
     {
       authTitle: Titles.MinecraftNintendoSwitch,
+      deviceType: 'Nintendo',
       flow: 'live',
       forceRefresh: true,
     },
@@ -99,17 +100,21 @@ export async function discoverMicrosoftProfiles(
   if (editionFilter === 'both' || editionFilter === 'bedrock') {
     try {
       const xsts: any = await flow.getXboxToken('http://xboxlive.com');
-      let gamertag = '';
-      let xuid = xsts?.userXUID || '';
+      let gamertag = (xsts as any)?.DisplayClaims?.xui?.[0]?.gtg || (xsts as any)?.gamertag || '';
+      let xuid = xsts?.userXUID || (xsts as any)?.DisplayClaims?.xui?.[0]?.xid || '';
 
-      if (xsts?.userHash && xsts?.XSTSToken) {
+      if (!gamertag && xsts?.userHash && xsts?.XSTSToken) {
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
           const resp = await fetch('https://profile.xboxlive.com/users/me/profile/settings?settings=Gamertag', {
+            signal: controller.signal,
             headers: {
               'x-xbl-contract-version': '2',
               'Authorization': `XBL3.0 x=${xsts.userHash};${xsts.XSTSToken}`,
             },
           });
+          clearTimeout(timeoutId);
           if (resp.ok) {
             const json: any = await resp.json();
             const gtgSetting = json?.profileUsers?.[0]?.settings?.find((s: any) => s.id === 'Gamertag');

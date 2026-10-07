@@ -508,28 +508,50 @@ export default function AccountsPage() {
 
             {/* Waiting for popup confirmation (MinecraftAFK Screenshot 3) */}
             {(discoveryStatus === 'waiting_code' || discoveryStatus === 'waiting_approval') ? (
-              <div className="py-8 px-4 flex flex-col items-center justify-center text-center space-y-4">
+              <div className="py-6 px-3 flex flex-col items-center justify-center text-center space-y-4">
                 <div className="w-12 h-12 rounded-full border-4 border-slate-200 border-t-emerald-500 animate-spin" />
                 <div className="space-y-1">
-                  <h3 className="text-base font-black text-slate-900">Complete your login in the popup</h3>
-                  <p className="text-xs text-slate-500 font-medium">We're waiting for Microsoft to confirm...</p>
+                  <h3 className="text-base font-black text-slate-900">Authorize Microsoft Account</h3>
+                  <p className="text-xs text-slate-500 font-medium">Follow the link below to enter your device code on Microsoft.</p>
                 </div>
 
                 {discoveryDeviceCode && (
-                  <div className="w-full max-w-xs pt-2">
-                    <div className="p-3 bg-slate-900 border border-slate-700 rounded-xl text-center">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Authorization Code (Auto-copied)</span>
-                      <span className="font-mono text-xl font-black text-emerald-400 tracking-wider">
-                        {discoveryDeviceCode.userCode}
-                      </span>
+                  <div className="w-full max-w-sm space-y-3 pt-1">
+                    <div className="p-3.5 bg-slate-900 border border-slate-700 rounded-xl text-center flex items-center justify-between">
+                      <div className="text-left">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Authorization Code</span>
+                        <span className="font-mono text-2xl font-black text-emerald-400 tracking-widest">
+                          {discoveryDeviceCode.userCode}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try {
+                            navigator.clipboard.writeText(discoveryDeviceCode.userCode);
+                            setCopiedCode(true);
+                            setTimeout(() => setCopiedCode(false), 2500);
+                          } catch (e) {}
+                        }}
+                        className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 rounded-lg border border-slate-600 flex items-center space-x-1.5 transition active:scale-95"
+                      >
+                        {copiedCode ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                        <span>{copiedCode ? 'Copied!' : 'Copy'}</span>
+                      </button>
                     </div>
+
                     <button
                       type="button"
                       onClick={() => copyAndOpenMicrosoft(discoveryDeviceCode.userCode, discoveryDeviceCode.verificationUri)}
-                      className="mt-2 text-xs text-emerald-600 hover:text-emerald-700 font-bold underline inline-block"
+                      className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center space-x-2"
                     >
-                      Re-open Microsoft sign-in popup ↗
+                      <ExternalLink className="h-4 w-4 shrink-0" />
+                      <span>Open Microsoft Sign-In Page ↗</span>
                     </button>
+
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      💡 Paste the code on Microsoft, approve access, then come back here. Your verified Minecraft gamertag will appear automatically!
+                    </p>
                   </div>
                 )}
 
@@ -540,7 +562,7 @@ export default function AccountsPage() {
                       if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
                       resetDiscovery();
                     }}
-                    className="px-6 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition"
+                    className="px-6 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition"
                   >
                     Cancel
                   </button>

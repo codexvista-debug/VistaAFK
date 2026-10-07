@@ -147,9 +147,11 @@ class BotInstance {
     customMaxHealth = 0;
     recordedMaxHealth = 0;
     bedrockClient = null;
-    constructor(config, callbacks) {
+    tokenFolder;
+    constructor(config, callbacks, tokenFolder) {
         this.config = config;
         this.callbacks = callbacks;
+        this.tokenFolder = tokenFolder || path_1.default.resolve(process.cwd(), 'tokens');
     }
     lastActivityMsg = '';
     lastActivityTime = 0;
@@ -211,7 +213,7 @@ class BotInstance {
         this.clearTimers();
         this.updateStatus('connecting', 'Connecting to Minecraft server...');
         this.emitActivity('connect', `Connecting to ${this.config.host}:${this.config.port || 25565}...`);
-        const tokenFolder = path_1.default.resolve(process.cwd(), 'tokens');
+        const tokenFolder = this.tokenFolder;
         const options = {
             host: this.config.host,
             port: this.config.port || 25565,
@@ -256,7 +258,7 @@ class BotInstance {
         this.updateStatus('connecting', 'Connecting to Bedrock server...');
         const port = this.config.port || 19132;
         this.emitActivity('connect', `Connecting to Bedrock server ${this.config.host}:${port}...`);
-        const tokenFolder = path_1.default.resolve(process.cwd(), 'tokens');
+        const tokenFolder = this.tokenFolder;
         try {
             let bedrock = null;
             let importErr = null;
@@ -324,6 +326,11 @@ class BotInstance {
             });
             this.bedrockClient = client;
             client.on('join', () => {
+                if (client.username && client.username !== this.config.name) {
+                    console.log(`[VistaAFK Bedrock] In-game gamertag updated: ${this.config.name} -> ${client.username}`);
+                    this.config.name = client.username;
+                    this.callbacks.onConfigUpdated?.(this.config);
+                }
                 this.reconnectAttempts = 0;
                 this.connectStartTime = Date.now();
                 this.updateStatus('online', 'Connected (Bedrock)');
@@ -331,6 +338,10 @@ class BotInstance {
                 this.emitTelemetry();
             });
             client.on('spawn', () => {
+                if (client.username && client.username !== this.config.name) {
+                    this.config.name = client.username;
+                    this.callbacks.onConfigUpdated?.(this.config);
+                }
                 this.updateStatus('online', 'Spawned in world (Bedrock)');
                 this.emitActivity('spawn', '🌍 Spawned into Bedrock world');
                 this.setupTelemetryLoop();
@@ -445,6 +456,11 @@ class BotInstance {
         if (!this.bot)
             return;
         this.bot.once('spawn', () => {
+            if (this.bot?.username && this.bot.username !== this.config.name) {
+                console.log(`[VistaAFK Java] Verified player username updated: ${this.config.name} -> ${this.bot.username}`);
+                this.config.name = this.bot.username;
+                this.callbacks.onConfigUpdated?.(this.config);
+            }
             this.connectStartTime = Date.now();
             this.reconnectAttempts = 0;
             this.authCodeInfo = undefined;

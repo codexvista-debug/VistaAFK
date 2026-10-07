@@ -39,6 +39,7 @@ async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email, editi
     console.log(`[VistaAFK Discovery] Initiating Microsoft OAuth device code flow for ${email || 'new account'} (filter: ${editionFilter})...`);
     const flow = new prismarine_auth_1.Authflow(accountId, tokenFolder, {
         authTitle: prismarine_auth_1.Titles.MinecraftNintendoSwitch,
+        deviceType: 'Nintendo',
         flow: 'live',
         forceRefresh: true,
     }, (codeData) => {
@@ -80,16 +81,20 @@ async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email, editi
     if (editionFilter === 'both' || editionFilter === 'bedrock') {
         try {
             const xsts = await flow.getXboxToken('http://xboxlive.com');
-            let gamertag = '';
-            let xuid = xsts?.userXUID || '';
-            if (xsts?.userHash && xsts?.XSTSToken) {
+            let gamertag = xsts?.DisplayClaims?.xui?.[0]?.gtg || xsts?.gamertag || '';
+            let xuid = xsts?.userXUID || xsts?.DisplayClaims?.xui?.[0]?.xid || '';
+            if (!gamertag && xsts?.userHash && xsts?.XSTSToken) {
                 try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 6000);
                     const resp = await fetch('https://profile.xboxlive.com/users/me/profile/settings?settings=Gamertag', {
+                        signal: controller.signal,
                         headers: {
                             'x-xbl-contract-version': '2',
                             'Authorization': `XBL3.0 x=${xsts.userHash};${xsts.XSTSToken}`,
                         },
                     });
+                    clearTimeout(timeoutId);
                     if (resp.ok) {
                         const json = await resp.json();
                         const gtgSetting = json?.profileUsers?.[0]?.settings?.find((s) => s.id === 'Gamertag');

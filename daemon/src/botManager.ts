@@ -17,12 +17,53 @@ export class BotManager {
   private bots: Map<string, BotInstance> = new Map();
   private configs: Map<string, BotConfig> = new Map();
   private activityLogs: Map<string, ActivityLog[]> = new Map();
-  private storageFile: string;
+  private storageFile: string = '';
+  private tokenFolder: string = '';
+  private currentUser: string = '';
   private callbacks: BotManagerCallbacks;
 
-  constructor(callbacks: BotManagerCallbacks) {
+  constructor(callbacks: BotManagerCallbacks, initialUser?: string) {
     this.callbacks = callbacks;
-    this.storageFile = path.resolve(process.cwd(), 'bots.json');
+    this.currentUser = (initialUser || '').trim().toLowerCase();
+    this.initPaths();
+    this.loadConfigs();
+  }
+
+  private initPaths() {
+    const cleanUser = this.currentUser.replace(/[^a-z0-9_-]/g, '_');
+    if (cleanUser) {
+      this.storageFile = path.resolve(process.cwd(), `bots_${cleanUser}.json`);
+      this.tokenFolder = path.resolve(process.cwd(), 'tokens', cleanUser);
+    } else {
+      this.storageFile = path.resolve(process.cwd(), 'bots.json');
+      this.tokenFolder = path.resolve(process.cwd(), 'tokens');
+    }
+    if (!fs.existsSync(this.tokenFolder)) {
+      try {
+        fs.mkdirSync(this.tokenFolder, { recursive: true });
+      } catch (e) {}
+    }
+  }
+
+  public getTokenFolder(): string {
+    return this.tokenFolder;
+  }
+
+  public getCurrentUser(): string {
+    return this.currentUser;
+  }
+
+  public setUser(newUser: string) {
+    const clean = (newUser || '').trim().toLowerCase();
+    if (clean === this.currentUser) return;
+    console.log(`[VistaAFK Daemon] Switching user context: "${this.currentUser}" -> "${clean}"`);
+    this.stopAll();
+    this.bots.clear();
+    this.configs.clear();
+    this.activityLogs.clear();
+
+    this.currentUser = clean;
+    this.initPaths();
     this.loadConfigs();
   }
 
@@ -38,10 +79,10 @@ export class BotManager {
           this.configs.set(cfg.id, cfg);
           this.createBotInstance(cfg);
         }
-        console.log(`[VistaAFK Daemon] Loaded ${this.configs.size} bot configurations.`);
+        console.log(`[VistaAFK Daemon] Loaded ${this.configs.size} bot configurations (${this.storageFile}).`);
       }
     } catch (err: any) {
-      console.error('[VistaAFK Daemon] Failed to load bots.json:', err.message);
+      console.error('[VistaAFK Daemon] Failed to load bots storage:', err.message);
     }
   }
 
@@ -50,7 +91,7 @@ export class BotManager {
       const data = Array.from(this.configs.values());
       fs.writeFileSync(this.storageFile, JSON.stringify(data, null, 2), 'utf8');
     } catch (err: any) {
-      console.error('[VistaAFK Daemon] Failed to save bots.json:', err.message);
+      console.error('[VistaAFK Daemon] Failed to save bots storage:', err.message);
     }
   }
 
@@ -76,7 +117,12 @@ export class BotManager {
         this.callbacks.onActivityLog(log);
       },
       onNotification: (lvl, msg, id) => this.callbacks.onNotification(lvl, msg, id),
-    });
+      onConfigUpdated: (updatedCfg) => {
+        this.configs.set(updatedCfg.id, updatedCfg);
+        this.saveConfigs();
+        this.callbacks.onConfigUpdated(updatedCfg);
+      },
+    }, this.tokenFolder);
     this.bots.set(config.id, instance);
     return instance;
   }

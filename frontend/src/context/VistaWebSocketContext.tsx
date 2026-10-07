@@ -327,7 +327,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         setAuthError(null);
 
         // Authenticate immediately upon connection
-        ws.send(JSON.stringify({ type: 'AUTH', payload: { token: secretToken || undefined } }));
+        ws.send(JSON.stringify({ type: 'AUTH', payload: { token: secretToken || undefined, username: user?.username } }));
 
         // Start client keepalive ping every 10 seconds to keep connection rock solid
         if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);

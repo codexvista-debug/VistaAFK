@@ -81,6 +81,7 @@ setInterval(() => {
   }
 }, 15000);
 
+const initialCreds = getAuthCredentials();
 const botManager = new BotManager({
   onTelemetryUpdate: (telemetry) => {
     broadcast({ type: 'TELEMETRY_UPDATE', payload: telemetry });
@@ -103,7 +104,11 @@ const botManager = new BotManager({
   onConfigRemoved: (botId) => {
     broadcast({ type: 'BOT_CONFIG_REMOVED', payload: { botId } });
   },
-});
+}, initialCreds?.username);
+
+let activeDiscoveryCode: { userCode: string; verificationUri: string; expiresIn: number } | null = null;
+let lastDiscoveredProfiles: any = null;
+let lastDiscoveryTimestamp = 0;
 
 wss.on('connection', (ws) => {
   clients.add(ws);
@@ -116,6 +121,9 @@ wss.on('connection', (ws) => {
       if (msg.type === 'AUTH') {
         if (!SECRET || msg.payload.token === SECRET) {
           authenticated = true;
+          if ((msg.payload as any).username && !getAuthCredentials()?.username) {
+            botManager.setUser((msg.payload as any).username);
+          }
           ws.send(JSON.stringify({ type: 'AUTH_SUCCESS' } as ServerMessage));
           sendInitialState(ws);
         } else {
@@ -175,40 +183,66 @@ wss.on('connection', (ws) => {
         case 'DISCOVER_MICROSOFT_ACCOUNT': {
           const reqEmail = (msg as any).payload?.email;
           const reqEdition = (msg as any).payload?.editionFilter || 'both';
+          const tokenFolder = botManager.getTokenFolder();
+          console.log(`[VistaAFK Discovery] Initiating discovery with tokenFolder: ${tokenFolder} (for user: ${botManager.getCurrentUser() || 'default'})`);
+
           discoverMicrosoftProfiles(
-            path.resolve(process.cwd(), 'tokens'),
+            tokenFolder,
             (codeData) => {
-              ws.send(JSON.stringify({
+              activeDiscoveryCode = codeData;
+              broadcast({
                 type: 'MICROSOFT_DEVICE_CODE',
                 payload: codeData,
-              } as ServerMessage));
+              });
             },
             reqEmail,
             reqEdition
           ).then((profiles) => {
-            ws.send(JSON.stringify({
-              type: 'MICROSOFT_PROFILES_DISCOVERED',
-              payload: profiles,
-            } as ServerMessage));
+            activeDiscoveryCode = null;
+            if (!profiles.java && !profiles.bedrock) {
+              const errMsg = `No Minecraft profile found on Microsoft account ${reqEmail || ''}. Please ensure Minecraft is purchased or set up on this account.`;
+              console.warn(`[VistaAFK Discovery] ${errMsg}`);
+              broadcast({
+                type: 'MICROSOFT_DISCOVERY_ERROR',
+                payload: { message: errMsg },
+              });
+            } else {
+              lastDiscoveredProfiles = profiles;
+              lastDiscoveryTimestamp = Date.now();
+              console.log(`[VistaAFK Discovery] Profiles discovered:`, JSON.stringify(profiles));
+              broadcast({
+                type: 'MICROSOFT_PROFILES_DISCOVERED',
+                payload: profiles,
+              });
+            }
           }).catch((err) => {
-            ws.send(JSON.stringify({
+            activeDiscoveryCode = null;
+            const errMsg = err?.message || 'Failed to authenticate Microsoft account';
+            console.error(`[VistaAFK Discovery] Error:`, errMsg);
+            broadcast({
               type: 'MICROSOFT_DISCOVERY_ERROR',
-              payload: { message: err?.message || 'Failed to authenticate Microsoft account' },
-            } as ServerMessage));
+              payload: { message: errMsg },
+            });
           });
           break;
         }
         case 'LINK_ACCOUNT': {
-          const { username, password, cloudUrl } = (msg as any).payload || {};
-          if (username && password) {
+          const { username, password, token, cloudUrl } = (msg as any).payload || {};
+          if (username && (password || token)) {
             const authPath = path.resolve(process.cwd(), 'user_auth.json');
-            fs.writeFileSync(authPath, JSON.stringify({ username, password, cloudUrl: cloudUrl || 'https://vista-afk.vercel.app' }, null, 2), 'utf8');
+            fs.writeFileSync(authPath, JSON.stringify({
+              username,
+              password,
+              token: token || password,
+              cloudUrl: cloudUrl || 'https://afkvista.vercel.app'
+            }, null, 2), 'utf8');
             console.log(`[Cloud Sync] 🔐 Linked daemon to VistaAFK user "${username}"`);
+            botManager.setUser(username);
             sendCloudHeartbeat();
-            ws.send(JSON.stringify({
+            broadcast({
               type: 'NOTIFICATION',
               payload: { level: 'success', message: `Daemon successfully linked to user "${username}"` },
-            } as ServerMessage));
+            });
           }
           break;
         }
@@ -242,6 +276,19 @@ function sendInitialState(ws: WebSocket) {
       activityLogs: botManager.getAllActivityLogs(),
     };
     ws.send(JSON.stringify({ type: 'INIT_STATE', payload } as ServerMessage));
+
+    // Deliver active device code or freshly discovered profile to reconnected clients
+    if (activeDiscoveryCode) {
+      ws.send(JSON.stringify({
+        type: 'MICROSOFT_DEVICE_CODE',
+        payload: activeDiscoveryCode,
+      } as ServerMessage));
+    } else if (lastDiscoveredProfiles && (Date.now() - lastDiscoveryTimestamp < 120000)) {
+      ws.send(JSON.stringify({
+        type: 'MICROSOFT_PROFILES_DISCOVERED',
+        payload: lastDiscoveredProfiles,
+      } as ServerMessage));
+    }
   }
 }
 
@@ -251,7 +298,7 @@ async function sendCloudHeartbeat() {
 
   const detectedTunnel = getDetectedTunnelUrl();
   const tunnelUrl = process.env.DAEMON_PUBLIC_URL || detectedTunnel || `ws://localhost:${PORT}`;
-  const cloudUrl = creds.cloudUrl || process.env.VISTAAFK_CLOUD_URL || 'https://vista-afk.vercel.app';
+  const cloudUrl = creds.cloudUrl || process.env.VISTAAFK_CLOUD_URL || 'https://afkvista.vercel.app';
 
   try {
     const res = await fetch(`${cloudUrl}/api/daemon/heartbeat`, {
