@@ -311,9 +311,10 @@ export class BotInstance {
         profilesFolder: tokenFolder,
         version: targetVersion,
         raknetBackend: 'jsp-raknet',
+        connectTimeout: 45000,
         onMsaCode: (data: any) => {
           const userCode = data.user_code || data.userCode;
-          const verificationUri = userCode ? `https://www.microsoft.com/link?otc=${encodeURIComponent(userCode)}` : (data.verification_uri || 'https://microsoft.com/link');
+          const verificationUri = userCode ? `https://www.microsoft.com/link?otc=${encodeURIComponent(userCode)}&prompt=select_account` : (data.verification_uri || 'https://microsoft.com/link');
           this.authCodeInfo = {
             userCode,
             verificationUri,

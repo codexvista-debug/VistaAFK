@@ -67,7 +67,7 @@ export interface VistaWebSocketContextType {
   discoveryStatus: 'idle' | 'waiting_code' | 'waiting_approval' | 'success' | 'error';
   discoveryProfiles: { java?: { name: string; uuid: string }; bedrock?: { gamertag: string; xuid?: string } } | null;
   discoveryError: string | null;
-  discoverMicrosoftAccount: (email?: string) => void;
+  discoverMicrosoftAccount: (email?: string, editionFilter?: 'both' | 'java' | 'bedrock') => void;
   resetDiscovery: () => void;
 }
 
@@ -94,6 +94,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const [discoveryStatus, setDiscoveryStatus] = useState<'idle' | 'waiting_code' | 'waiting_approval' | 'success' | 'error'>('idle');
   const [discoveryProfiles, setDiscoveryProfiles] = useState<{ java?: { name: string; uuid: string }; bedrock?: { gamertag: string; xuid?: string } } | null>(null);
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const discoveryFilterRef = useRef<'both' | 'java' | 'bedrock'>('both');
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -371,8 +372,9 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
               setDiscoveryProfiles(profiles);
               setDiscoveryStatus('success');
 
+              const filter = discoveryFilterRef.current;
               const newlyAdded: string[] = [];
-              if (profiles.java?.name) {
+              if ((filter === 'both' || filter === 'java') && profiles.java?.name) {
                 const javaAccount: SavedAccount = {
                   id: `msa-java-${profiles.java.name.toLowerCase()}`,
                   name: profiles.java.name,
@@ -385,7 +387,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
                 newlyAdded.push(`${profiles.java.name} (Java)`);
               }
 
-              if (profiles.bedrock?.gamertag) {
+              if ((filter === 'both' || filter === 'bedrock') && profiles.bedrock?.gamertag) {
                 const bedrockAccount: SavedAccount = {
                   id: `msa-bedrock-${profiles.bedrock.gamertag.toLowerCase()}`,
                   name: profiles.bedrock.gamertag,
@@ -510,7 +512,8 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const dismissNotification = (id: string) =>
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   const clearNotifications = () => setNotifications([]);
-  const discoverMicrosoftAccount = (email?: string) => {
+  const discoverMicrosoftAccount = (email?: string, editionFilter: 'both' | 'java' | 'bedrock' = 'both') => {
+    discoveryFilterRef.current = editionFilter;
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       setDiscoveryError('VistaAFK daemon is not connected. Please ensure your local daemon terminal is running.');
       setDiscoveryStatus('error');
@@ -520,7 +523,13 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     setDiscoveryDeviceCode(null);
     setDiscoveryProfiles(null);
     setDiscoveryError(null);
-    send({ type: 'DISCOVER_MICROSOFT_ACCOUNT', payload: email ? { email } : undefined });
+    send({
+      type: 'DISCOVER_MICROSOFT_ACCOUNT',
+      payload: {
+        email: email ? email.trim() : undefined,
+        editionFilter,
+      },
+    });
   };
 
   const resetDiscovery = () => {

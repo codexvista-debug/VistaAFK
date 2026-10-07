@@ -4,7 +4,7 @@ import { BotManager } from './botManager.js';
 import { ClientMessage, ServerMessage } from './types.js';
 import { discoverMicrosoftProfiles } from './accountDiscovery.js';
 
-export const DAEMON_VERSION = 'v1.2.1';
+export const DAEMON_VERSION = 'v1.2.2';
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const SECRET = process.env.VISTAAFK_SECRET || '';
@@ -132,6 +132,7 @@ wss.on('connection', (ws) => {
           break;
         case 'DISCOVER_MICROSOFT_ACCOUNT': {
           const reqEmail = (msg as any).payload?.email;
+          const reqEdition = (msg as any).payload?.editionFilter || 'both';
           discoverMicrosoftProfiles(
             path.resolve(process.cwd(), 'tokens'),
             (codeData) => {
@@ -140,7 +141,8 @@ wss.on('connection', (ws) => {
                 payload: codeData,
               } as ServerMessage));
             },
-            reqEmail
+            reqEmail,
+            reqEdition
           ).then((profiles) => {
             ws.send(JSON.stringify({
               type: 'MICROSOFT_PROFILES_DISCOVERED',

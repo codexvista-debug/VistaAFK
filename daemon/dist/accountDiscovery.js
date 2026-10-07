@@ -33,12 +33,14 @@ function syncTokenCaches(tokenFolder, sourceId, targetNames) {
         console.warn('[VistaAFK Discovery] Warning syncing token caches:', err.message);
     }
 }
-async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email) {
-    const accountId = (email && email.trim()) ? email.trim() : ('msa_discovery_' + Date.now());
-    console.log(`[VistaAFK Discovery] Initiating Microsoft OAuth device code flow for ${email || 'account'}...`);
+async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email, editionFilter = 'both') {
+    // Always use a unique session ID for discovery so it never re-uses an old cached token
+    const accountId = 'msa_discovery_' + (email ? email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : 'acc') + '_' + Date.now();
+    console.log(`[VistaAFK Discovery] Initiating Microsoft OAuth device code flow for ${email || 'new account'} (filter: ${editionFilter})...`);
     const flow = new prismarine_auth_1.Authflow(accountId, tokenFolder, {
         authTitle: prismarine_auth_1.Titles.MinecraftNintendoSwitch,
         flow: 'live',
+        forceRefresh: true,
     }, (codeData) => {
         const userCode = codeData.user_code || codeData.userCode;
         const baseUri = codeData.verification_uri || codeData.verificationUri || 'https://www.microsoft.com/link';
@@ -46,6 +48,7 @@ async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email) {
         if (email && email.trim()) {
             directUri += `&login_hint=${encodeURIComponent(email.trim())}`;
         }
+        directUri += `&prompt=select_account`;
         console.log(`[VistaAFK Discovery] Received Device Code: ${userCode} (Link: ${directUri})`);
         onDeviceCode({
             userCode,
@@ -54,69 +57,64 @@ async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email) {
         });
     });
     const result = {};
-    // 1. Discover Minecraft: Java Edition Profile
-    try {
-        const javaRes = await flow.getMinecraftJavaToken({ fetchProfile: true, fetchEntitlements: true });
-        if (javaRes?.profile?.name) {
-            result.java = {
-                name: javaRes.profile.name,
-                uuid: javaRes.profile.id,
-            };
-            console.log(`[VistaAFK Discovery] ✅ Discovered Java Profile: ${result.java.name} (${result.java.uuid})`);
+    // 1. Discover Minecraft: Java Edition Profile (if requested)
+    if (editionFilter === 'both' || editionFilter === 'java') {
+        try {
+            const javaRes = await flow.getMinecraftJavaToken({ fetchProfile: true, fetchEntitlements: true });
+            if (javaRes?.profile?.name) {
+                result.java = {
+                    name: javaRes.profile.name,
+                    uuid: javaRes.profile.id,
+                };
+                console.log(`[VistaAFK Discovery] ✅ Discovered Java Profile: ${result.java.name} (${result.java.uuid})`);
+            }
+            else {
+                console.log('[VistaAFK Discovery] Account has no active Minecraft Java profile');
+            }
         }
-        else {
-            console.log('[VistaAFK Discovery] Account has no active Minecraft Java profile');
+        catch (err) {
+            console.warn('[VistaAFK Discovery] Java profile fetch error:', err.message);
         }
     }
-    catch (err) {
-        console.warn('[VistaAFK Discovery] Java profile fetch error:', err.message);
-    }
-    // 2. Discover Minecraft: Bedrock Edition / Xbox Live Gamertag
-    try {
-        const xsts = await flow.getXboxToken('http://xboxlive.com');
-        let gamertag = '';
-        let xuid = xsts?.userXUID || '';
-        if (xsts?.userHash && xsts?.XSTSToken) {
-            try {
-                const resp = await fetch('https://profile.xboxlive.com/users/me/profile/settings?settings=Gamertag', {
-                    headers: {
-                        'x-xbl-contract-version': '2',
-                        'Authorization': `XBL3.0 x=${xsts.userHash};${xsts.XSTSToken}`,
-                    },
-                });
-                if (resp.ok) {
-                    const json = await resp.json();
-                    const gtgSetting = json?.profileUsers?.[0]?.settings?.find((s) => s.id === 'Gamertag');
-                    if (gtgSetting?.value) {
-                        gamertag = gtgSetting.value;
-                    }
-                    if (!xuid && json?.profileUsers?.[0]?.id) {
-                        xuid = json.profileUsers[0].id;
+    // 2. Discover Minecraft: Bedrock Edition / Xbox Live Gamertag (if requested)
+    if (editionFilter === 'both' || editionFilter === 'bedrock') {
+        try {
+            const xsts = await flow.getXboxToken('http://xboxlive.com');
+            let gamertag = '';
+            let xuid = xsts?.userXUID || '';
+            if (xsts?.userHash && xsts?.XSTSToken) {
+                try {
+                    const resp = await fetch('https://profile.xboxlive.com/users/me/profile/settings?settings=Gamertag', {
+                        headers: {
+                            'x-xbl-contract-version': '2',
+                            'Authorization': `XBL3.0 x=${xsts.userHash};${xsts.XSTSToken}`,
+                        },
+                    });
+                    if (resp.ok) {
+                        const json = await resp.json();
+                        const gtgSetting = json?.profileUsers?.[0]?.settings?.find((s) => s.id === 'Gamertag');
+                        if (gtgSetting?.value) {
+                            gamertag = gtgSetting.value;
+                        }
+                        if (!xuid && json?.profileUsers?.[0]?.id) {
+                            xuid = json.profileUsers[0].id;
+                        }
                     }
                 }
+                catch (e) {
+                    console.warn('[VistaAFK Discovery] Xbox profile settings endpoint lookup failed:', e.message);
+                }
             }
-            catch (e) {
-                console.warn('[VistaAFK Discovery] Xbox profile settings endpoint lookup failed:', e.message);
+            if (gamertag) {
+                result.bedrock = {
+                    gamertag,
+                    xuid,
+                };
+                console.log(`[VistaAFK Discovery] ✅ Discovered Bedrock Gamertag: ${gamertag}`);
             }
         }
-        if (!gamertag && result.java?.name) {
-            // If Xbox profile API didn't return a custom tag, default to Java username
-            gamertag = result.java.name;
-        }
-        if (gamertag) {
-            result.bedrock = {
-                gamertag,
-                xuid,
-            };
-            console.log(`[VistaAFK Discovery] ✅ Discovered Bedrock Gamertag: ${gamertag}`);
-        }
-    }
-    catch (err) {
-        console.warn('[VistaAFK Discovery] Bedrock Xbox discovery error:', err.message);
-        if (result.java?.name) {
-            result.bedrock = {
-                gamertag: result.java.name,
-            };
+        catch (err) {
+            console.warn('[VistaAFK Discovery] Bedrock Xbox discovery error:', err.message);
         }
     }
     // Sync token caches so future bot instances can instantly connect without re-auth

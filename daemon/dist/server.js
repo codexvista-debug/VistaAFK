@@ -8,7 +8,7 @@ const path_1 = __importDefault(require("path"));
 const ws_1 = require("ws");
 const botManager_js_1 = require("./botManager.js");
 const accountDiscovery_js_1 = require("./accountDiscovery.js");
-exports.DAEMON_VERSION = 'v1.2.1';
+exports.DAEMON_VERSION = 'v1.2.2';
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const SECRET = process.env.VISTAAFK_SECRET || '';
 const HOST = process.env.HOST || '0.0.0.0';
@@ -126,12 +126,13 @@ wss.on('connection', (ws) => {
                     break;
                 case 'DISCOVER_MICROSOFT_ACCOUNT': {
                     const reqEmail = msg.payload?.email;
+                    const reqEdition = msg.payload?.editionFilter || 'both';
                     (0, accountDiscovery_js_1.discoverMicrosoftProfiles)(path_1.default.resolve(process.cwd(), 'tokens'), (codeData) => {
                         ws.send(JSON.stringify({
                             type: 'MICROSOFT_DEVICE_CODE',
                             payload: codeData,
                         }));
-                    }, reqEmail).then((profiles) => {
+                    }, reqEmail, reqEdition).then((profiles) => {
                         ws.send(JSON.stringify({
                             type: 'MICROSOFT_PROFILES_DISCOVERED',
                             payload: profiles,

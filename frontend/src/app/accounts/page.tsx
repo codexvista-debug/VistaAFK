@@ -194,7 +194,7 @@ export default function AccountsPage() {
       popupRef.current = popup;
     }
 
-    discoverMicrosoftAccount(val);
+    discoverMicrosoftAccount(val, accountType);
   };
 
   const handleOpenDeploy = (account: SavedAccount) => {
