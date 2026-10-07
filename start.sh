@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "============================================="
-echo "        🚀 Starting VistaAFK Daemon          "
+echo "      🚀 Starting VistaAFK Daemon v1.2.0      "
 echo "============================================="
 
 # 1. Kill any existing zombie node process holding port 8080

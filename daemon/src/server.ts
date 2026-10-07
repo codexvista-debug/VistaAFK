@@ -4,13 +4,18 @@ import { BotManager } from './botManager.js';
 import { ClientMessage, ServerMessage } from './types.js';
 import { discoverMicrosoftProfiles } from './accountDiscovery.js';
 
+export const DAEMON_VERSION = 'v1.2.0';
+
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const SECRET = process.env.VISTAAFK_SECRET || '';
 
 const HOST = process.env.HOST || '0.0.0.0';
 
 const wss = new WebSocketServer({ port: PORT, host: HOST });
-console.log(`[VistaAFK Daemon] WebSocket server listening on ws://${HOST}:${PORT}`);
+console.log(`\n=============================================`);
+console.log(`   🟢 VistaAFK Daemon ${DAEMON_VERSION}`);
+console.log(`   🚀 WebSocket: ws://${HOST}:${PORT}`);
+console.log(`=============================================\n`);
 
 const clients = new Set<WebSocket>();
 

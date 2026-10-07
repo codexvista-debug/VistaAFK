@@ -3,15 +3,20 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.DAEMON_VERSION = void 0;
 const path_1 = __importDefault(require("path"));
 const ws_1 = require("ws");
 const botManager_js_1 = require("./botManager.js");
 const accountDiscovery_js_1 = require("./accountDiscovery.js");
+exports.DAEMON_VERSION = 'v1.2.0';
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const SECRET = process.env.VISTAAFK_SECRET || '';
 const HOST = process.env.HOST || '0.0.0.0';
 const wss = new ws_1.WebSocketServer({ port: PORT, host: HOST });
-console.log(`[VistaAFK Daemon] WebSocket server listening on ws://${HOST}:${PORT}`);
+console.log(`\n=============================================`);
+console.log(`   🟢 VistaAFK Daemon ${exports.DAEMON_VERSION}`);
+console.log(`   🚀 WebSocket: ws://${HOST}:${PORT}`);
+console.log(`=============================================\n`);
 const clients = new Set();
 function broadcast(msg) {
     const data = JSON.stringify(msg);
