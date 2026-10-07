@@ -49,7 +49,7 @@ if [ "$1" == "--login" ] || [ "$1" == "-l" ] || [ "$1" == "--reset" ]; then
 elif [ -n "$1" ] && [ -n "$2" ]; then
   AUTH_USER="$1"
   AUTH_SECRET="$2"
-  echo "{\"username\":\"$AUTH_USER\",\"token\":\"$AUTH_SECRET\",\"password\":\"$AUTH_SECRET\",\"cloudUrl\":\"https://vista-afk.vercel.app\"}" > user_auth.json
+  echo "{\"username\":\"$AUTH_USER\",\"token\":\"$AUTH_SECRET\",\"password\":\"$AUTH_SECRET\",\"cloudUrl\":\"https://afkvista.vercel.app\"}" > user_auth.json
   cp user_auth.json ../user_auth.json 2>/dev/null
   echo "✅ Credentials auto-configured for '$AUTH_USER'!"
 fi
@@ -80,7 +80,7 @@ if command -v cloudflared &>/dev/null; then
 
   if [ -n "$TUNNEL_URL" ]; then
     WSS_URL=$(echo "$TUNNEL_URL" | sed 's/https:\/\//wss:\/\//')
-    ONE_CLICK_URL="https://vista-afk.vercel.app/?connect=$WSS_URL"
+    ONE_CLICK_URL="https://afkvista.vercel.app/?connect=$WSS_URL"
     echo ""
     echo "============================================================="
     echo "  🟢 VistaAFK Bot Daemon is RUNNING 24/7!"

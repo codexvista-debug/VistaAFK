@@ -27,6 +27,8 @@ import {
   Box,
   Mail,
   User,
+  Terminal,
+  Smartphone,
 } from 'lucide-react';
 import { BotInventoryModal } from '../../components/BotInventoryModal';
 import { BotConfig } from '../../types';
@@ -34,7 +36,7 @@ import Link from 'next/link';
 import { useAuth } from '../../context/VistaAuthContext';
 
 export default function AccountsPage() {
-  const { user, openAuthModal, isLoading: isAuthLoading } = useAuth();
+  const { user, token: authToken, openAuthModal, isLoading: isAuthLoading } = useAuth();
   const {
     savedAccounts,
     saveAccount,
@@ -66,6 +68,11 @@ export default function AccountsPage() {
   const [selectedAccountForDeploy, setSelectedAccountForDeploy] = useState<SavedAccount | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [inventoryModalBot, setInventoryModalBot] = useState<BotConfig | null>(null);
+  const [copiedTermux, setCopiedTermux] = useState(false);
+
+  const termuxCommand = user?.username
+    ? `pkg update -y && pkg install -y git nodejs cloudflared && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh ${user.username} ${authToken || ''}`
+    : '';
 
   // New Account Form State (MinecraftAFK style)
   const [accountType, setAccountType] = useState<'both' | 'java' | 'bedrock' | 'offline'>('both');
@@ -145,29 +152,9 @@ export default function AccountsPage() {
       return;
     }
 
-    // If daemon is not connected, save directly to Vault with email so user can proceed
+    // Microsoft authentication strictly requires the daemon to be running
     if (!isConnected) {
-      if (accountType === 'both' || accountType === 'java') {
-        saveAccount({
-          id: `msa-java-${val.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-          name: val,
-          authType: 'microsoft',
-          edition: 'java',
-          createdAt: Date.now(),
-        });
-      }
-      if (accountType === 'both' || accountType === 'bedrock') {
-        saveAccount({
-          id: `msa-bedrock-${val.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-          name: val,
-          gamertag: val,
-          authType: 'microsoft',
-          edition: 'bedrock',
-          createdAt: Date.now(),
-        });
-      }
-      setIsAddAccountModalOpen(false);
-      setAccountInput('');
+      discoverMicrosoftAccount(val, accountType);
       return;
     }
 
@@ -263,6 +250,76 @@ export default function AccountsPage() {
             >
               Sign In / Register
             </button>
+          </div>
+        )}
+
+        {/* Termux Daemon Quick Start Banner for Logged-In User with Offline Daemon */}
+        {user && !isConnected && !isConnecting && (
+          <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white border-2 border-emerald-500/40 shadow-xl space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30 shrink-0">
+                  <Smartphone className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm sm:text-base tracking-tight text-white flex items-center space-x-2">
+                    <span>Step 1: Start your 24/7 Bot Daemon</span>
+                    <span className="text-[10px] font-mono uppercase bg-emerald-400/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-400/30">Termux</span>
+                  </h3>
+                  <p className="text-xs text-slate-300 font-medium mt-0.5">
+                    Paste this command into Termux on your phone to connect your 24/7 bots and authenticate Minecraft accounts.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 shrink-0">
+                <a
+                  href="https://play.google.com/store/apps/details?id=com.termux"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 rounded-xl text-xs font-bold transition flex items-center space-x-1"
+                >
+                  <span>Google Play</span>
+                  <ExternalLink className="h-3 w-3 text-slate-400" />
+                </a>
+                <a
+                  href="https://f-droid.org/en/packages/com.termux/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1"
+                >
+                  <span>F-Droid APK</span>
+                  <ExternalLink className="h-3 w-3 text-emerald-200" />
+                </a>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between bg-black/60 border border-slate-700 p-2.5 sm:p-3 rounded-xl font-mono text-[11px] gap-2">
+              <code className="text-emerald-400 break-all select-all line-clamp-2">
+                {termuxCommand}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(termuxCommand);
+                  setCopiedTermux(true);
+                  setTimeout(() => setCopiedTermux(false), 2500);
+                }}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shrink-0 transition flex items-center space-x-1.5 shadow-sm active:scale-95"
+              >
+                {copiedTermux ? (
+                  <>
+                    <Check className="h-4 w-4 text-white" />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 text-white" />
+                    <span>Copy Command</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         )}
         {/* Page Title & Action Bar */}
@@ -641,9 +698,25 @@ export default function AccountsPage() {
                 )}
 
                 {!isConnected && accountType !== 'offline' && (
-                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center space-x-2 text-amber-800 text-[11px] font-medium">
-                    <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
-                    <span>Daemon offline: Saving now will store your account in Vault so you can connect when daemon is active.</span>
+                  <div className="p-3.5 bg-amber-50 border-2 border-amber-200 rounded-2xl space-y-2 text-xs">
+                    <div className="flex items-start space-x-2 text-amber-900 font-bold">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                      <span>Bot Daemon Required for Microsoft Login</span>
+                    </div>
+                    <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
+                      Microsoft accounts require your 24/7 Bot Daemon to be active on your phone (Termux) or PC to generate the secure verification code and store your Minecraft session tokens.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddAccountModalOpen(false);
+                        setIsSettingsModalOpen(true);
+                      }}
+                      className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] rounded-xl transition flex items-center space-x-1.5 shadow-sm active:scale-95"
+                    >
+                      <Terminal className="h-3.5 w-3.5" />
+                      <span>View 1-Click Termux Command</span>
+                    </button>
                   </div>
                 )}
 
@@ -661,9 +734,10 @@ export default function AccountsPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center space-x-1.5"
+                    disabled={!isConnected && accountType !== 'offline'}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center space-x-1.5"
                   >
-                    <span>Add Account</span>
+                    <span>{!isConnected && accountType !== 'offline' ? 'Daemon Offline' : 'Add Account'}</span>
                   </button>
                 </div>
               </form>
