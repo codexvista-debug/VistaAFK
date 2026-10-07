@@ -200,7 +200,7 @@ export default function AccountsPage() {
   const handleOpenDeploy = (account: SavedAccount) => {
     setSelectedAccountForDeploy(account);
     if (account.edition === 'bedrock') {
-      setTargetServerHost('geo.freshsmp.fun');
+      setTargetServerHost('play.freshsmp.fun');
       setTargetServerPort(19132);
     } else {
       setTargetServerHost('donutsmp.net');
@@ -218,6 +218,7 @@ export default function AccountsPage() {
       host: targetServerHost.trim(),
       port: targetServerPort,
       version: targetServerVersion.trim() || undefined,
+      edition: selectedAccountForDeploy.edition || (targetServerPort === 19132 ? 'bedrock' : 'java'),
     });
 
     setIsDeployModalOpen(false);
@@ -308,9 +309,24 @@ export default function AccountsPage() {
                           />
                           <div>
                             <h3 className="font-black text-slate-900 text-base">{acc.name}</h3>
-                            <div className="flex items-center space-x-1.5 mt-0.5">
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newEdition = acc.edition === 'bedrock' ? 'java' : 'bedrock';
+                                  saveAccount({ ...acc, edition: newEdition });
+                                }}
+                                title="Click to toggle between Java and Bedrock"
+                                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border uppercase transition hover:scale-105 cursor-pointer ${
+                                  acc.edition === 'bedrock'
+                                    ? 'bg-sky-50 text-sky-700 border-sky-300 hover:bg-sky-100'
+                                    : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                                }`}
+                              >
+                                {acc.edition === 'bedrock' ? '🧱 Bedrock' : '☕ Java'}
+                              </button>
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                                {acc.authType === 'microsoft' ? 'Microsoft OAuth' : 'Offline'}
+                                {acc.authType === 'microsoft' ? 'MS OAuth' : 'Offline'}
                               </span>
                               <span className="text-[10px] text-slate-500 font-medium">
                                 Saved {new Date(acc.createdAt).toLocaleDateString()}
@@ -643,13 +659,23 @@ export default function AccountsPage() {
                     <h3 className="font-black text-slate-900 text-base">
                       Deploy <span className="text-emerald-700">{selectedAccountForDeploy.name}</span>
                     </h3>
-                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${
-                      selectedAccountForDeploy.edition === 'bedrock'
-                        ? 'bg-sky-50 text-sky-700 border-sky-300'
-                        : 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                    }`}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newEd = selectedAccountForDeploy.edition === 'bedrock' ? 'java' : 'bedrock';
+                        setSelectedAccountForDeploy({ ...selectedAccountForDeploy, edition: newEd });
+                        if (newEd === 'bedrock' && targetServerPort === 25565) setTargetServerPort(19132);
+                        if (newEd === 'java' && targetServerPort === 19132) setTargetServerPort(25565);
+                      }}
+                      title="Click to toggle between Bedrock and Java"
+                      className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border transition hover:scale-105 cursor-pointer ${
+                        selectedAccountForDeploy.edition === 'bedrock'
+                          ? 'bg-sky-50 text-sky-700 border-sky-300 hover:bg-sky-100'
+                          : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                      }`}
+                    >
                       {selectedAccountForDeploy.edition === 'bedrock' ? '🧱 Bedrock' : '☕ Java'}
-                    </span>
+                    </button>
                   </div>
                   <p className="text-[11px] text-slate-500 font-medium">Select a server to launch this bot instance</p>
                 </div>

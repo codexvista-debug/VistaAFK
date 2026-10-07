@@ -145,13 +145,23 @@ export const BotCard: React.FC<BotCardProps> = ({
             <div>
               <div className="flex items-center space-x-2">
                 <h3 className="font-black text-sm text-slate-900 tracking-tight">{config.name}</h3>
-                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border uppercase ${
-                  config.edition === 'bedrock'
-                    ? 'bg-sky-50 text-sky-700 border-sky-300'
-                    : 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                }`}>
-                  {config.edition === 'bedrock' ? '🧱 Bedrock' : '☕ Java'}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const isCurrentBedrock = config.edition === 'bedrock' || config.port === 19132 || config.id.includes('bedrock');
+                    const nextEdition = isCurrentBedrock ? 'java' : 'bedrock';
+                    const nextPort = nextEdition === 'bedrock' ? 19132 : 25565;
+                    onEdit({ ...config, edition: nextEdition, port: nextPort });
+                  }}
+                  title={`Currently ${config.edition === 'bedrock' || config.port === 19132 ? 'Bedrock' : 'Java'}. Click to switch to ${config.edition === 'bedrock' || config.port === 19132 ? 'Java' : 'Bedrock'}`}
+                  className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border uppercase transition hover:scale-105 cursor-pointer ${
+                    (config.edition === 'bedrock' || config.port === 19132 || config.id.includes('bedrock'))
+                      ? 'bg-sky-50 text-sky-700 border-sky-300 hover:bg-sky-100'
+                      : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                  }`}
+                >
+                  {(config.edition === 'bedrock' || config.port === 19132 || config.id.includes('bedrock')) ? '🧱 Bedrock' : '☕ Java'}
+                </button>
                 <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 uppercase">
                   {config.authType === 'microsoft' ? 'MS OAuth' : 'Offline'}
                 </span>

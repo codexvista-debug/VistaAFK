@@ -15,6 +15,7 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
     id: initialConfig?.id || Math.random().toString(36).substring(2, 9),
     name: initialConfig?.name || '',
     authType: initialConfig?.authType || 'microsoft',
+    edition: initialConfig?.edition || (initialConfig?.port === 19132 ? 'bedrock' : 'java'),
     host: initialConfig?.host || 'localhost',
     port: initialConfig?.port || 25565,
     version: initialConfig?.version || '',
@@ -168,6 +169,37 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Minecraft Edition</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, edition: 'java', port: formData.port === 19132 ? 25565 : formData.port })}
+                    className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition ${
+                      formData.edition !== 'bedrock'
+                        ? 'bg-emerald-50/70 border-emerald-500 text-emerald-900 shadow-sm'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <span className="font-bold text-xs text-slate-900">☕ Java Edition</span>
+                    <span className="text-[10px] text-slate-500 mt-1">Standard PC / Mac server protocol (Port 25565).</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, edition: 'bedrock', port: formData.port === 25565 ? 19132 : formData.port })}
+                    className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition ${
+                      formData.edition === 'bedrock'
+                        ? 'bg-sky-50/70 border-sky-500 text-sky-900 shadow-sm'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <span className="font-bold text-xs text-slate-900">🧱 Bedrock Edition</span>
+                    <span className="text-[10px] text-slate-500 mt-1">Mobile / Console / Geyser RakNet (Port 19132).</span>
+                  </button>
+                </div>
               </div>
 
               <div>

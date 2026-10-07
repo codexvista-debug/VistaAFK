@@ -192,7 +192,11 @@ export class BotInstance {
       return;
     }
 
-    if (this.config.edition === 'bedrock') {
+    const isBedrock = this.config.edition === 'bedrock' || this.config.port === 19132;
+    if (isBedrock) {
+      if (this.config.edition !== 'bedrock') {
+        this.config.edition = 'bedrock';
+      }
       this.startBedrock();
       return;
     }
@@ -274,7 +278,7 @@ export class BotInstance {
         return;
       }
 
-      // Patch Geyser 26.x protocol aliases so servers reporting 26.30-26.60 map to protocol 2193
+      // Patch Geyser 26.x protocol aliases so servers reporting 26.30-26.60 map to protocol 2193, and 2193 maps to 1.26.51
       try {
         // @ts-ignore
         const Options: any = bedrock.Options || (await import('bedrock-protocol/src/options.js'));
@@ -283,6 +287,8 @@ export class BotInstance {
             Options.Versions[`26.${i}`] = 2193;
             Options.Versions[`1.26.${i}`] = 2193;
           }
+          Options.Versions['2193'] = '1.26.51';
+          Options.Versions[2193] = '1.26.51';
         }
       } catch (e) {}
 
@@ -299,6 +305,7 @@ export class BotInstance {
         offline: this.config.authType === 'offline',
         profilesFolder: tokenFolder,
         version: targetVersion,
+        raknetBackend: 'jsp-raknet',
         onMsaCode: (data: any) => {
           const userCode = data.user_code || data.userCode;
           const verificationUri = userCode ? `https://www.microsoft.com/link?otc=${encodeURIComponent(userCode)}` : (data.verification_uri || 'https://microsoft.com/link');

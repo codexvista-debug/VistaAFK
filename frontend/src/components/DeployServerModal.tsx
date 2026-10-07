@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Server, Play, Users, CheckCircle2, Globe, ShieldCheck } from 'lucide-react';
-import { SavedAccount, ServerPreset } from '../types';
+import { X, Server, Play, Users, CheckCircle2, Globe, ShieldCheck, Box } from 'lucide-react';
+import { SavedAccount, ServerPreset, MinecraftEdition } from '../types';
 import Link from 'next/link';
 
 interface DeployServerModalProps {
@@ -10,7 +10,7 @@ interface DeployServerModalProps {
   savedAccounts: SavedAccount[];
   serverPresets: ServerPreset[];
   initialAccount?: SavedAccount | null;
-  onDeploy: (account: SavedAccount, server: { host: string; port: number; version?: string }) => void;
+  onDeploy: (account: SavedAccount, server: { host: string; port: number; version?: string; edition?: MinecraftEdition }) => void;
 }
 
 export const DeployServerModal: React.FC<DeployServerModalProps> = ({
@@ -24,17 +24,38 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
     initialAccount?.id || (savedAccounts.length > 0 ? savedAccounts[0].id : '')
   );
 
+  const initialAcc = savedAccounts.find((a) => a.id === (initialAccount?.id || (savedAccounts.length > 0 ? savedAccounts[0].id : '')));
+  const [edition, setEdition] = useState<MinecraftEdition>(
+    initialAcc?.edition || (initialAcc?.id.includes('bedrock') ? 'bedrock' : 'java')
+  );
+
   const [targetServerHost, setTargetServerHost] = useState(
-    serverPresets.length > 0 ? serverPresets[0].host : 'play.freshsmp.fun'
+    initialAcc?.edition === 'bedrock' ? 'play.freshsmp.fun' : (serverPresets.length > 0 ? serverPresets[0].host : 'donutsmp.net')
   );
   const [targetServerPort, setTargetServerPort] = useState(
-    serverPresets.length > 0 ? serverPresets[0].port : 25565
+    initialAcc?.edition === 'bedrock' ? 19132 : (serverPresets.length > 0 ? serverPresets[0].port : 25565)
   );
   const [targetServerVersion, setTargetServerVersion] = useState(
     serverPresets.length > 0 ? (serverPresets[0].version || '') : ''
   );
 
   const selectedAccount = savedAccounts.find((a) => a.id === selectedAccountId);
+
+  const handleSelectAccount = (acc: SavedAccount) => {
+    setSelectedAccountId(acc.id);
+    const ed: MinecraftEdition = acc.edition || (acc.id.includes('bedrock') ? 'bedrock' : 'java');
+    setEdition(ed);
+    if (ed === 'bedrock') {
+      setTargetServerPort(19132);
+      if (targetServerHost === 'donutsmp.net') {
+        setTargetServerHost('play.freshsmp.fun');
+      }
+    } else {
+      if (targetServerPort === 19132) {
+        setTargetServerPort(25565);
+      }
+    }
+  };
 
   const handlePresetSelect = (preset: ServerPreset) => {
     setTargetServerHost(preset.host);
@@ -50,6 +71,7 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
       host: targetServerHost.trim(),
       port: targetServerPort,
       version: targetServerVersion.trim() || undefined,
+      edition,
     });
 
     onClose();
@@ -104,11 +126,12 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-36 overflow-y-auto pr-1">
                 {savedAccounts.map((acc) => {
                   const isSelected = acc.id === selectedAccountId;
+                  const isBedrock = acc.edition === 'bedrock' || acc.id.includes('bedrock');
                   return (
                     <button
                       key={acc.id}
                       type="button"
-                      onClick={() => setSelectedAccountId(acc.id)}
+                      onClick={() => handleSelectAccount(acc)}
                       className={`p-3 rounded-2xl border-2 text-left flex items-center justify-between transition-all ${
                         isSelected
                           ? 'bg-emerald-50 border-emerald-500 shadow-sm'
@@ -125,9 +148,18 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
                           }}
                         />
                         <div className="truncate">
-                          <span className="block font-bold text-xs text-slate-900 truncate">{acc.name}</span>
+                          <div className="flex items-center space-x-1.5">
+                            <span className="font-bold text-xs text-slate-900 truncate">{acc.name}</span>
+                            <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border uppercase ${
+                              isBedrock
+                                ? 'bg-sky-50 text-sky-700 border-sky-300'
+                                : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                            }`}>
+                              {isBedrock ? '🧱' : '☕'}
+                            </span>
+                          </div>
                           <span className="block text-[10px] text-slate-500 uppercase font-semibold">
-                            {acc.authType === 'microsoft' ? 'Microsoft OAuth' : 'Offline'}
+                            {acc.authType === 'microsoft' ? 'MS OAuth' : 'Offline'}
                           </span>
                         </div>
                       </div>
@@ -139,11 +171,59 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
             )}
           </div>
 
-          {/* Step 2: Select Server Preset */}
+          {/* Step 2: Minecraft Edition Selection */}
+          <div>
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2 flex items-center space-x-1.5">
+              <Box className="h-3.5 w-3.5 text-emerald-600" />
+              <span>2. Minecraft Protocol Edition</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setEdition('java');
+                  if (targetServerPort === 19132) setTargetServerPort(25565);
+                }}
+                className={`p-3 rounded-2xl border-2 text-left flex items-center justify-between transition-all ${
+                  edition === 'java'
+                    ? 'bg-emerald-50 border-emerald-500 shadow-sm text-emerald-950 font-bold'
+                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
+                }`}
+              >
+                <div>
+                  <span className="block text-xs font-bold">☕ Java Edition</span>
+                  <span className="block text-[10px] text-slate-500 font-normal mt-0.5">PC / Mac &bull; Port 25565</span>
+                </div>
+                {edition === 'java' && <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEdition('bedrock');
+                  if (targetServerPort === 25565) setTargetServerPort(19132);
+                  if (targetServerHost === 'donutsmp.net') setTargetServerHost('play.freshsmp.fun');
+                }}
+                className={`p-3 rounded-2xl border-2 text-left flex items-center justify-between transition-all ${
+                  edition === 'bedrock'
+                    ? 'bg-sky-50 border-sky-500 shadow-sm text-sky-950 font-bold'
+                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
+                }`}
+              >
+                <div>
+                  <span className="block text-xs font-bold">🧱 Bedrock Edition</span>
+                  <span className="block text-[10px] text-slate-500 font-normal mt-0.5">Mobile / Geyser &bull; Port 19132</span>
+                </div>
+                {edition === 'bedrock' && <CheckCircle2 className="h-4 w-4 text-sky-600 shrink-0" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Step 3: Select Server Preset */}
           <div>
             <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2 flex items-center space-x-1.5">
               <Globe className="h-3.5 w-3.5 text-emerald-600" />
-              <span>2. Choose Server Target</span>
+              <span>3. Choose Server Target</span>
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {serverPresets.map((preset) => {

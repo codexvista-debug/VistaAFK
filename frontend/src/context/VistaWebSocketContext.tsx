@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, VistaNotification, SavedAccount, ServerPreset } from '../types';
+import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, VistaNotification, SavedAccount, ServerPreset, MinecraftEdition } from '../types';
 
 const DEFAULT_SERVER_PRESETS: ServerPreset[] = [
   { id: 'donutsmp', name: 'DonutSMP', host: 'donutsmp.net', port: 25565, version: '' },
@@ -45,7 +45,7 @@ export interface VistaWebSocketContextType {
   deleteSavedAccount: (id: string) => void;
   saveServerPreset: (preset: ServerPreset) => void;
   deleteServerPreset: (id: string) => void;
-  deployAccountToServer: (account: SavedAccount, server: { host: string; port: number; version?: string }) => void;
+  deployAccountToServer: (account: SavedAccount, server: { host: string; port: number; version?: string; edition?: MinecraftEdition }) => void;
   updateDaemonConfig: (url: string, token: string) => void;
   connect: () => void;
   addBot: (config: BotConfig) => void;
@@ -110,7 +110,16 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       const accountsRaw = localStorage.getItem('vistaafk_saved_accounts');
       if (accountsRaw) {
         try {
-          setSavedAccounts(JSON.parse(accountsRaw));
+          const list: SavedAccount[] = JSON.parse(accountsRaw);
+          const migrated = list.map((a) => {
+            if (!a.edition) {
+              if (a.id.includes('bedrock') || a.gamertag || a.name.toLowerCase().includes('bedrock') || a.name.toLowerCase() === 'kjchris' || a.name.toLowerCase() === 'kjchris7') {
+                return { ...a, edition: 'bedrock' as const };
+              }
+            }
+            return a;
+          });
+          setSavedAccounts(migrated);
         } catch (e) {}
       }
 
@@ -240,21 +249,35 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
               setAuthError(msg.payload?.reason || 'Authentication failed');
               break;
 
-            case 'INIT_STATE':
-              setConfigs(msg.payload.configs || []);
+            case 'INIT_STATE': {
+              const rawConfigs: BotConfig[] = msg.payload.configs || [];
+              const sanitizedConfigs = rawConfigs.map((c) => {
+                if ((c.port === 19132 || c.id.includes('bedrock')) && c.edition !== 'bedrock') {
+                  return { ...c, edition: 'bedrock' as const };
+                }
+                return c;
+              });
+              setConfigs(sanitizedConfigs);
               setTelemetry(msg.payload.telemetry || {});
               if (msg.payload.activityLogs) {
                 setActivityLogs(msg.payload.activityLogs);
               }
               break;
+            }
 
-            case 'BOT_CONFIG_ADDED':
-              setConfigs((prev) => [...prev.filter((c) => c.id !== msg.payload.id), msg.payload]);
+            case 'BOT_CONFIG_ADDED': {
+              const c = msg.payload;
+              const sanitized = ((c.port === 19132 || c.id.includes('bedrock')) && c.edition !== 'bedrock') ? { ...c, edition: 'bedrock' as const } : c;
+              setConfigs((prev) => [...prev.filter((item) => item.id !== sanitized.id), sanitized]);
               break;
+            }
 
-            case 'BOT_CONFIG_UPDATED':
-              setConfigs((prev) => prev.map((c) => (c.id === msg.payload.id ? msg.payload : c)));
+            case 'BOT_CONFIG_UPDATED': {
+              const c = msg.payload;
+              const sanitized = ((c.port === 19132 || c.id.includes('bedrock')) && c.edition !== 'bedrock') ? { ...c, edition: 'bedrock' as const } : c;
+              setConfigs((prev) => prev.map((item) => (item.id === sanitized.id ? sanitized : item)));
               break;
+            }
 
             case 'BOT_CONFIG_REMOVED':
               setConfigs((prev) => prev.filter((c) => c.id !== msg.payload.botId));
@@ -510,11 +533,11 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   // Deploy a saved account to a specific server instance
   const deployAccountToServer = (
     account: SavedAccount,
-    server: { host: string; port: number; version?: string }
+    server: { host: string; port: number; version?: string; edition?: MinecraftEdition }
   ) => {
     // DonutSMP is strictly sensitive to non-idle actions; default anti-actions to OFF for safety
     const isDonut = server.host.toLowerCase().includes('donut');
-    const edition = account.edition || 'java';
+    const edition = server.edition || account.edition || (server.port === 19132 ? 'bedrock' : 'java');
     const port = edition === 'bedrock' && server.port === 25565 ? 19132 : server.port;
 
     const newBotConfig: BotConfig = {

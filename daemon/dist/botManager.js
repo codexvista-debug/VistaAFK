@@ -24,6 +24,9 @@ class BotManager {
                 const raw = fs_1.default.readFileSync(this.storageFile, 'utf8');
                 const data = JSON.parse(raw);
                 for (const cfg of data) {
+                    if ((cfg.port === 19132 || cfg.id.includes('bedrock')) && cfg.edition !== 'bedrock') {
+                        cfg.edition = 'bedrock';
+                    }
                     this.configs.set(cfg.id, cfg);
                     this.createBotInstance(cfg);
                 }
@@ -44,6 +47,9 @@ class BotManager {
         }
     }
     createBotInstance(config) {
+        if ((config.port === 19132 || config.id.includes('bedrock')) && config.edition !== 'bedrock') {
+            config.edition = 'bedrock';
+        }
         const instance = new botInstance_js_1.BotInstance(config, {
             onTelemetryUpdate: (t) => this.callbacks.onTelemetryUpdate(t),
             onChatMessage: (m) => this.callbacks.onChatMessage(m),
@@ -58,6 +64,9 @@ class BotManager {
         return instance;
     }
     addBot(config) {
+        if ((config.port === 19132 || config.id.includes('bedrock')) && config.edition !== 'bedrock') {
+            config.edition = 'bedrock';
+        }
         this.configs.set(config.id, config);
         this.createBotInstance(config);
         this.saveConfigs();
@@ -65,6 +74,9 @@ class BotManager {
         this.callbacks.onNotification('info', `Added account ${config.name}`);
     }
     updateBot(config) {
+        if ((config.port === 19132 || config.id.includes('bedrock')) && config.edition !== 'bedrock') {
+            config.edition = 'bedrock';
+        }
         this.configs.set(config.id, config);
         const existing = this.bots.get(config.id);
         if (existing) {

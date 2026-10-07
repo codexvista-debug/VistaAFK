@@ -4,7 +4,7 @@ import { BotManager } from './botManager.js';
 import { ClientMessage, ServerMessage } from './types.js';
 import { discoverMicrosoftProfiles } from './accountDiscovery.js';
 
-export const DAEMON_VERSION = 'v1.2.0';
+export const DAEMON_VERSION = 'v1.2.1';
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const SECRET = process.env.VISTAAFK_SECRET || '';
