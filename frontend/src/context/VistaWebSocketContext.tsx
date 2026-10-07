@@ -149,41 +149,12 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     if (typeof window === 'undefined') return;
 
     if (!user) {
-      // Guest mode: load guest / local storage and allow connection
-      const guestDaemon = localStorage.getItem('vistaafk_guest_daemon_url');
-      if (guestDaemon) {
-        const norm = normalizeWsUrl(guestDaemon);
-        if (norm !== daemonUrl) {
-          setDaemonUrl(norm);
-        }
-      }
-
-      const guestToken = localStorage.getItem('vistaafk_guest_secret_token');
-      if (guestToken !== null && guestToken !== secretToken) {
-        setSecretToken(guestToken);
-      }
-
-      const guestAccounts = localStorage.getItem('vistaafk_guest_saved_accounts') || localStorage.getItem('vistaafk_saved_accounts');
-      if (guestAccounts) {
-        try {
-          setSavedAccounts(JSON.parse(guestAccounts));
-        } catch (e) {
-          setSavedAccounts([]);
-        }
-      } else {
-        setSavedAccounts([]);
-      }
-
-      const guestPresets = localStorage.getItem('vistaafk_guest_server_presets');
-      if (guestPresets) {
-        try {
-          setServerPresets(JSON.parse(guestPresets));
-        } catch (e) {
-          setServerPresets(DEFAULT_SERVER_PRESETS);
-        }
-      } else {
-        setServerPresets(DEFAULT_SERVER_PRESETS);
-      }
+      // Logged out: reset state cleanly and do not connect to any daemon
+      setSavedAccounts([]);
+      setConfigs([]);
+      setTelemetry({});
+      setIsConnected(false);
+      setIsConnecting(false);
       return;
     }
 
@@ -327,6 +298,15 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
 
   const connect = useCallback(() => {
     if (typeof window === 'undefined') return;
+    if (!user) {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      setIsConnected(false);
+      setIsConnecting(false);
+      return;
+    }
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -555,11 +535,13 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         wsRef.current = null;
         if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
 
-        // Auto reconnect every 3 seconds
+        // Auto reconnect every 3 seconds only if user is logged in
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = setTimeout(() => {
-          connect();
-        }, 3000);
+        if (user) {
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connect();
+          }, 3000);
+        }
       };
 
       ws.onerror = (err) => {
@@ -574,14 +556,25 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       console.error('[VistaAFK WS Provider] Connect exception:', e);
       setIsConnecting(false);
     }
-  }, [daemonUrl, secretToken]);
+  }, [user, daemonUrl, secretToken]);
 
   useEffect(() => {
+    if (!user) {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      setIsConnected(false);
+      setIsConnecting(false);
+      return;
+    }
+
     connect();
 
-    // Resilient connection watchdog: automatically reconnects whenever socket drops
+    // Resilient connection watchdog: automatically reconnects whenever socket drops (only for logged-in user)
     const watchdog = setInterval(() => {
       if (typeof window === 'undefined') return;
+      if (!user) return;
       if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
         connect();
       }
@@ -595,7 +588,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         wsRef.current.close();
       }
     };
-  }, [connect]);
+  }, [user, connect]);
 
   const send = (msg: any) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {

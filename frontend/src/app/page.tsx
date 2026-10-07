@@ -15,8 +15,10 @@ import { BotInventoryModal } from '../components/BotInventoryModal';
 import { BotConfig, SavedAccount } from '../types';
 import { Plus, Server, AlertTriangle, RefreshCw, Layers, Users, Play } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '../context/VistaAuthContext';
 
 export default function Dashboard() {
+  const { user, openAuthModal } = useAuth();
   const {
     daemonUrl,
     secretToken,
@@ -107,8 +109,35 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Daemon Disconnected Notice */}
-        {!isConnected && !isConnecting && (
+        {/* Sign In Required / Sync Notice when logged out */}
+        {!user && (
+          <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-white border-2 border-emerald-300 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center space-x-3.5">
+              <div className="p-2.5 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl shrink-0">
+                <Users className="h-5 w-5 stroke-[2.2]" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 text-sm tracking-tight">
+                  Sign In to Access Your Fleet &amp; Sync Across Devices
+                </h3>
+                <p className="text-xs text-slate-600 mt-0.5 leading-relaxed font-medium">
+                  Log in to your VistaAFK account to link your 24/7 mobile daemon, deploy Minecraft accounts, and sync your bot fleet across all your devices.
+                </p>
+              </div>
+            </div>
+            <div className="shrink-0">
+              <button
+                onClick={openAuthModal}
+                className="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-sm transition active:scale-95 text-center"
+              >
+                Sign In / Register
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Daemon Disconnected Notice - Only shown when user is logged in */}
+        {user && !isConnected && !isConnecting && (
           <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-sm">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-amber-100 rounded-xl text-amber-700 shrink-0">
@@ -255,17 +284,31 @@ export default function Dashboard() {
                 <div className="h-16 w-16 rounded-2xl bg-slate-100 border-2 border-slate-300 flex items-center justify-center text-slate-600 mb-4 shadow-sm">
                   <Users className="h-8 w-8 stroke-[2.2]" />
                 </div>
-                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">No Accounts Saved in Vault</h3>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                  {!user ? 'Sign In to Deploy Server Bots' : 'No Accounts Saved in Vault'}
+                </h3>
                 <p className="text-xs text-slate-500 max-w-md mt-2 font-medium leading-relaxed">
-                  Save your Minecraft Java account once in the Accounts Vault, then deploy it across any server fleet with one click.
+                  {!user
+                    ? 'Log in to connect your phone daemon, add your Minecraft accounts, and sync your bot fleet seamlessly across all devices.'
+                    : 'Save your Minecraft Java account once in the Accounts Vault, then deploy it across any server fleet with one click.'}
                 </p>
-                <Link
-                  href="/accounts"
-                  className="mt-6 flex items-center space-x-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition"
-                >
-                  <Plus className="h-4 w-4 stroke-[3]" />
-                  <span>Go to Accounts Vault (+ Add Account)</span>
-                </Link>
+                {!user ? (
+                  <button
+                    onClick={openAuthModal}
+                    className="mt-6 flex items-center space-x-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition"
+                  >
+                    <Users className="h-4 w-4 stroke-[2.5]" />
+                    <span>Sign In / Create Account</span>
+                  </button>
+                ) : (
+                  <Link
+                    href="/accounts"
+                    className="mt-6 flex items-center space-x-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition"
+                  >
+                    <Plus className="h-4 w-4 stroke-[3]" />
+                    <span>Go to Accounts Vault (+ Add Account)</span>
+                  </Link>
+                )}
               </div>
             )
           ) : (

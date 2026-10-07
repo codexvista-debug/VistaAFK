@@ -108,19 +108,21 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center space-x-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-[#1b2637]/90 hover:bg-[#253449] border border-slate-700 hover:border-emerald-500/80 text-xs font-bold transition shadow-sm active:scale-95 text-slate-200"
             title="Menu & Controls"
           >
-            {/* Live Indicator Dot for Daemon Status */}
-            <span className="relative flex h-2.5 w-2.5 shrink-0">
-              {isConnected ? (
-                <>
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-                </>
-              ) : isConnecting ? (
-                <span className="inline-flex rounded-full h-2.5 w-2.5 bg-amber-400 animate-pulse" />
-              ) : (
-                <span className="inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
-              )}
-            </span>
+            {/* Live Indicator Dot for Daemon Status (only when logged in) */}
+            {user && (
+              <span className="relative flex h-2.5 w-2.5 shrink-0">
+                {isConnected ? (
+                  <>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                  </>
+                ) : isConnecting ? (
+                  <span className="inline-flex rounded-full h-2.5 w-2.5 bg-amber-400 animate-pulse" />
+                ) : (
+                  <span className="inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
+                )}
+              </span>
+            )}
 
             {user ? (
               <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black uppercase shrink-0">
@@ -136,42 +138,59 @@ export const Navbar: React.FC<NavbarProps> = ({
             <>
               <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs" onClick={() => setIsUserMenuOpen(false)} />
               <div className="fixed sm:absolute top-16 sm:top-auto sm:mt-2 right-2 sm:right-0 w-[calc(100vw-16px)] sm:w-80 max-w-sm bg-slate-900 border-2 border-slate-700 rounded-3xl shadow-2xl p-4 z-50 text-xs space-y-3.5 animate-in fade-in duration-150">
-                {/* 1. Daemon Status Card */}
-                <div className="p-3 rounded-2xl bg-slate-800/90 border border-slate-700/80 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bot Daemon</span>
-                    <div className="flex items-center space-x-1.5">
-                      <span className="relative flex h-2 w-2">
-                        {isConnected ? (
-                          <>
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                          </>
-                        ) : isConnecting ? (
-                          <span className="inline-flex rounded-full h-2 w-2 bg-amber-400 animate-pulse" />
-                        ) : (
-                          <span className="inline-flex rounded-full h-2 w-2 bg-rose-500" />
-                        )}
-                      </span>
-                      <span className={`text-[11px] font-bold ${
-                        isConnected ? 'text-emerald-400' : isConnecting ? 'text-amber-400' : 'text-rose-400'
-                      }`}>
-                        {isConnected ? 'Connected (24/7)' : isConnecting ? 'Connecting...' : 'Disconnected'}
-                      </span>
+                {/* 1. Daemon Status Card (When Logged In) */}
+                {user ? (
+                  <div className="p-3 rounded-2xl bg-slate-800/90 border border-slate-700/80 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bot Daemon</span>
+                      <div className="flex items-center space-x-1.5">
+                        <span className="relative flex h-2 w-2">
+                          {isConnected ? (
+                            <>
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                            </>
+                          ) : isConnecting ? (
+                            <span className="inline-flex rounded-full h-2 w-2 bg-amber-400 animate-pulse" />
+                          ) : (
+                            <span className="inline-flex rounded-full h-2 w-2 bg-rose-500" />
+                          )}
+                        </span>
+                        <span className={`text-[11px] font-bold ${
+                          isConnected ? 'text-emerald-400' : isConnecting ? 'text-amber-400' : 'text-rose-400'
+                        }`}>
+                          {isConnected ? 'Connected (24/7)' : isConnecting ? 'Connecting...' : 'Disconnected'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
 
-                  <button
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      onOpenSettingsModal();
-                    }}
-                    className="w-full py-2 px-3 bg-slate-700/60 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1.5 border border-slate-600/50"
-                  >
-                    <Settings className="h-3.5 w-3.5 text-emerald-400" />
-                    <span>Connection Settings &amp; Termux</span>
-                  </button>
-                </div>
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        onOpenSettingsModal();
+                      }}
+                      className="w-full py-2 px-3 bg-slate-700/60 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1.5 border border-slate-600/50"
+                    >
+                      <Settings className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>Connection Settings &amp; Termux</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-3.5 rounded-2xl bg-slate-800/90 border border-slate-700/80 space-y-2 text-center">
+                    <p className="text-slate-300 text-xs font-semibold">
+                      Sign in to connect your 24/7 daemon and sync across devices.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        openAuthModal();
+                      }}
+                      className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-sm"
+                    >
+                      Sign In / Register
+                    </button>
+                  </div>
+                )}
 
                 {/* 2. Admin Control Panel (for user vista) */}
                 {isVista && (

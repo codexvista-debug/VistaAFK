@@ -117,6 +117,10 @@ export default function AccountsPage() {
   };
 
   const handleOpenAddModal = () => {
+    if (!user) {
+      openAuthModal();
+      return;
+    }
     resetDiscovery();
     setAccountInput('');
     setIsAddAccountModalOpen(true);
@@ -244,20 +248,20 @@ export default function AccountsPage() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Guest Mode Notice */}
+        {/* Sign In Required Notice */}
         {!user && (
-          <div className="mb-6 p-4 rounded-2xl bg-white border border-slate-300 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+          <div className="mb-6 p-4 rounded-2xl bg-white border-2 border-emerald-300 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
             <div className="flex items-center space-x-2.5 text-slate-700">
               <Users className="h-4 w-4 text-emerald-600 shrink-0" />
               <span>
-                <strong>Guest Mode:</strong> Accounts are stored in this browser. You can sign in anytime to sync across PC &amp; phone.
+                <strong>Sign In Required:</strong> Please sign in to save your Minecraft accounts and sync them across all your devices.
               </span>
             </div>
             <button
               onClick={openAuthModal}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm text-center shrink-0 transition"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm text-center shrink-0 transition"
             >
-              Sign In / Sync
+              Sign In / Register
             </button>
           </div>
         )}
@@ -279,7 +283,7 @@ export default function AccountsPage() {
 
           <div className="flex items-center space-x-3">
             <button
-              onClick={() => setIsAddAccountModalOpen(true)}
+              onClick={handleOpenAddModal}
               className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center space-x-2"
             >
               <Plus className="h-4 w-4 stroke-[3]" />
@@ -295,15 +299,19 @@ export default function AccountsPage() {
               <div className="h-16 w-16 rounded-2xl bg-slate-100 border-2 border-slate-300 flex items-center justify-center text-slate-500 mb-4">
                 <Users className="h-8 w-8 stroke-[1.5]" />
               </div>
-              <h3 className="text-lg font-black text-slate-900">Your Account Vault is Empty</h3>
+              <h3 className="text-lg font-black text-slate-900">
+                {!user ? 'Sign In to Access Accounts Vault' : 'Your Account Vault is Empty'}
+              </h3>
               <p className="text-xs text-slate-600 max-w-md mt-1 leading-relaxed font-medium">
-                Add your Minecraft Gamertags here once. They will stay saved permanently, so you can connect them to FreshSMP, Hypixel, or any server with one click!
+                {!user
+                  ? 'Sign in to save your Minecraft gamertags securely and sync them across all your phones and computers.'
+                  : 'Add your Minecraft Gamertags here once. They will stay saved permanently, so you can connect them to FreshSMP, Hypixel, or any server with one click!'}
               </p>
               <button
-                onClick={() => setIsAddAccountModalOpen(true)}
+                onClick={handleOpenAddModal}
                 className="mt-6 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition"
               >
-                + Save Your First Account
+                {!user ? 'Sign In / Register' : '+ Save Your First Account'}
               </button>
             </div>
           ) : (
