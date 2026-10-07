@@ -174,16 +174,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                     <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        {isVista && (
-                          <Link
-                            href="/control-panel"
-                            onClick={() => setIsUserMenuOpen(false)}
-                            className="text-amber-400 hover:text-amber-300 flex items-center space-x-1 text-[11px] font-bold"
-                          >
-                            <ShieldCheck className="h-3.5 w-3.5" />
-                            <span>CP</span>
-                          </Link>
-                        )}
                         <button
                           onClick={() => {
                             setIsUserMenuOpen(false);

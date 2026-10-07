@@ -55,7 +55,7 @@ if [ ! -f "user_auth.json" ] && [ ! -f "../user_auth.json" ]; then
   read -s -p "Enter password (min 6 characters): " AUTH_PASS
   echo ""
   if [ ${#AUTH_USER} -ge 4 ] && [ ${#AUTH_PASS} -ge 6 ]; then
-    echo "{\"username\":\"$AUTH_USER\",\"password\":\"$AUTH_PASS\",\"cloudUrl\":\"https://vista-afk.vercel.app\"}" > user_auth.json
+    echo "{\"username\":\"$AUTH_USER\",\"password\":\"$AUTH_PASS\",\"cloudUrl\":\"https://afkvista.vercel.app\"}" > user_auth.json
     echo "✅ Account credentials saved! Your PC will now connect automatically."
   else
     echo "⚠️ Skipping setup (username < 4 or password < 6). You can link anytime in the web dashboard."

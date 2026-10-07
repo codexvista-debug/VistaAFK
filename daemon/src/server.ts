@@ -251,7 +251,7 @@ async function sendCloudHeartbeat() {
 
   const detectedTunnel = getDetectedTunnelUrl();
   const tunnelUrl = process.env.DAEMON_PUBLIC_URL || detectedTunnel || `ws://localhost:${PORT}`;
-  const cloudUrl = creds.cloudUrl || process.env.VISTAAFK_CLOUD_URL || 'https://vista-afk.vercel.app';
+  const cloudUrl = creds.cloudUrl || process.env.VISTAAFK_CLOUD_URL || 'https://afkvista.vercel.app';
 
   try {
     const res = await fetch(`${cloudUrl}/api/daemon/heartbeat`, {
