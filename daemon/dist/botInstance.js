@@ -250,20 +250,25 @@ class BotInstance {
         const tokenFolder = path_1.default.resolve(process.cwd(), 'tokens');
         try {
             let bedrock = null;
+            let importErr = null;
             try {
                 // @ts-ignore
                 bedrock = await import('bedrock-protocol');
             }
             catch (err) {
+                importErr = err;
                 try {
                     bedrock = (eval('require'))('bedrock-protocol');
                 }
-                catch (e) { }
+                catch (e) {
+                    importErr = e;
+                }
             }
             if (!bedrock) {
+                const reason = importErr?.message || String(importErr || 'Not found');
                 this.updateStatus('error', 'Bedrock module not installed');
-                this.emitActivity('status', '⚠️ Bedrock package missing. In Termux, run: npm install --no-optional');
-                this.callbacks.onNotification('error', `[${this.config.name}] Bedrock package missing. Run: npm install --no-optional`, this.config.id);
+                this.emitActivity('status', `⚠️ Bedrock package missing (${reason}). Run: cd ~/VistaAFK/daemon && npm install bedrock-protocol --no-optional`);
+                this.callbacks.onNotification('error', `[${this.config.name}] Bedrock package missing: ${reason}`, this.config.id);
                 return;
             }
             // Patch Geyser 26.x protocol aliases so servers reporting 26.30-26.60 map to protocol 2193, and 2193 maps to 1.26.51

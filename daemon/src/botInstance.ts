@@ -262,19 +262,24 @@ export class BotInstance {
 
     try {
       let bedrock: any = null;
+      let importErr: any = null;
       try {
         // @ts-ignore
         bedrock = await import('bedrock-protocol');
       } catch (err: any) {
+        importErr = err;
         try {
           bedrock = (eval('require'))('bedrock-protocol');
-        } catch (e) {}
+        } catch (e: any) {
+          importErr = e;
+        }
       }
 
       if (!bedrock) {
+        const reason = importErr?.message || String(importErr || 'Not found');
         this.updateStatus('error', 'Bedrock module not installed');
-        this.emitActivity('status', '⚠️ Bedrock package missing. In Termux, run: npm install --no-optional');
-        this.callbacks.onNotification('error', `[${this.config.name}] Bedrock package missing. Run: npm install --no-optional`, this.config.id);
+        this.emitActivity('status', `⚠️ Bedrock package missing (${reason}). Run: cd ~/VistaAFK/daemon && npm install bedrock-protocol --no-optional`);
+        this.callbacks.onNotification('error', `[${this.config.name}] Bedrock package missing: ${reason}`, this.config.id);
         return;
       }
 
