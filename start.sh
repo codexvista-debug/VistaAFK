@@ -45,6 +45,7 @@ fi
 # 7. Check for user account credentials, CLI arguments, or reset flag
 if [ "$1" == "--login" ] || [ "$1" == "-l" ] || [ "$1" == "--reset" ]; then
   rm -f user_auth.json ../user_auth.json 2>/dev/null
+  echo "🧹 Reset account credentials."
 elif [ -n "$1" ] && [ -n "$2" ]; then
   AUTH_USER="$1"
   AUTH_PASS="$2"
@@ -53,48 +54,45 @@ elif [ -n "$1" ] && [ -n "$2" ]; then
   echo "✅ Credentials auto-configured for '$AUTH_USER'!"
 fi
 
-if [ ! -f "user_auth.json" ] && [ ! -f "../user_auth.json" ]; then
-  echo ""
-  echo "============================================="
-  echo "  🔐 VistaAFK Account Setup (Connect Anywhere)"
-  echo "============================================="
-  echo "Link this phone daemon to your account so you"
-  echo "can access it from your PC or anywhere!"
-  echo ""
-  echo -n "Enter username (min 4 letters): "
-  read -r AUTH_USER < /dev/tty
-  echo -n "Enter password (min 4 characters): "
-  read -r AUTH_PASS < /dev/tty
-  echo ""
-  if [ ${#AUTH_USER} -ge 4 ] && [ ${#AUTH_PASS} -ge 4 ]; then
-    echo "{\"username\":\"$AUTH_USER\",\"password\":\"$AUTH_PASS\",\"cloudUrl\":\"https://vista-afk.vercel.app\"}" > user_auth.json
-    cp user_auth.json ../user_auth.json 2>/dev/null
-    echo "✅ Account credentials saved for '$AUTH_USER'! Your PC will now connect automatically."
-  else
-    echo "⚠️ Skipping setup (username < 4 or password < 4). You can link anytime in the web dashboard."
-  fi
-  echo ""
-else
-  CURRENT_USER=$(grep -o '"username":"[^"]*' user_auth.json 2>/dev/null | cut -d'"' -f4)
-  if [ -z "$CURRENT_USER" ]; then
-    CURRENT_USER=$(grep -o '"username":"[^"]*' ../user_auth.json 2>/dev/null | cut -d'"' -f4)
-  fi
-  echo "👤 Linked to account: ${CURRENT_USER:-saved user} (run 'bash start.sh --login' to switch accounts)"
+CURRENT_USER=$(grep -o '"username":"[^"]*' user_auth.json 2>/dev/null | cut -d'"' -f4)
+if [ -z "$CURRENT_USER" ]; then
+  CURRENT_USER=$(grep -o '"username":"[^"]*' ../user_auth.json 2>/dev/null | cut -d'"' -f4)
+fi
+if [ -n "$CURRENT_USER" ]; then
+  echo "👤 Linked to account: $CURRENT_USER"
 fi
 
-# 8. Start Cloudflare Tunnel in background if installed
+# 8. Start Cloudflare Tunnel in background for instant 1-click remote access
 if command -v cloudflared &>/dev/null; then
   echo "🌐 Starting secure Cloudflare tunnel..."
   rm -f cloudflared.log 2>/dev/null
   cloudflared tunnel --url http://localhost:8080 > cloudflared.log 2>&1 &
-  sleep 3
-  TUNNEL_URL=$(grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare\.com' cloudflared.log 2>/dev/null | tail -n 1)
+  
+  # Wait up to 6 seconds for the tunnel to establish
+  TUNNEL_URL=""
+  for i in 1 2 3 4 5 6; do
+    sleep 1
+    TUNNEL_URL=$(grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare\.com' cloudflared.log 2>/dev/null | tail -n 1)
+    if [ -n "$TUNNEL_URL" ]; then
+      break
+    fi
+  done
+
   if [ -n "$TUNNEL_URL" ]; then
     WSS_URL=$(echo "$TUNNEL_URL" | sed 's/https:\/\//wss:\/\//')
-    echo "============================================="
-    echo "  🌐 Remote Access Link for PC:"
-    echo "     $WSS_URL"
-    echo "============================================="
+    ONE_CLICK_URL="https://vista-afk.vercel.app/?connect=$WSS_URL"
+    echo ""
+    echo "============================================================="
+    echo "  🟢 VistaAFK Bot Daemon is RUNNING 24/7!"
+    echo "============================================================="
+    echo ""
+    echo "👉 Click or copy this 1-CLICK LINK into your browser:"
+    echo ""
+    echo "   $ONE_CLICK_URL"
+    echo ""
+    echo "(Open on your PC or phone - connects instantly, NO setup needed!)"
+    echo "============================================================="
+    echo ""
   fi
 fi
 

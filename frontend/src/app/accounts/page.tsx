@@ -228,40 +228,7 @@ export default function AccountsPage() {
 
   const onlineCount = Object.values(telemetry).filter((t) => t.status === 'online').length;
 
-  if (!user && !isAuthLoading) {
-    return (
-      <div className="min-h-screen flex flex-col bg-[#f8fafc] text-slate-800 font-sans">
-        <Navbar
-          isConnected={false}
-          isConnecting={false}
-          onOpenAddModal={openAuthModal}
-          onOpenSettingsModal={() => {}}
-          botCount={0}
-          onlineCount={0}
-          savedAccountCount={0}
-        />
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-16 flex flex-col items-center justify-center">
-          <div className="max-w-md w-full bg-white border-2 border-slate-200 rounded-3xl p-8 text-center shadow-lg space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-50 border-2 border-emerald-200 mx-auto flex items-center justify-center text-emerald-600 shadow-sm">
-              <Users className="h-8 w-8 stroke-[2]" />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-slate-900">Sign In to Access Your Vault</h2>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Your Minecraft Java and Bedrock accounts are linked to your VistaAFK account. Sign in to view and deploy your accounts.
-              </p>
-            </div>
-            <button
-              onClick={openAuthModal}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center justify-center space-x-2"
-            >
-              <span>Sign In / Create Account</span>
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  }
+
 
   return (
     <div className="min-h-screen flex flex-col bg-[#e2e8f0] text-slate-800 font-sans">
@@ -277,6 +244,23 @@ export default function AccountsPage() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Guest Mode Notice */}
+        {!user && (
+          <div className="mb-6 p-4 rounded-2xl bg-white border border-slate-300 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+            <div className="flex items-center space-x-2.5 text-slate-700">
+              <Users className="h-4 w-4 text-emerald-600 shrink-0" />
+              <span>
+                <strong>Guest Mode:</strong> Accounts are stored in this browser. You can sign in anytime to sync across PC &amp; phone.
+              </span>
+            </div>
+            <button
+              onClick={openAuthModal}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm text-center shrink-0 transition"
+            >
+              Sign In / Sync
+            </button>
+          </div>
+        )}
         {/* Page Title & Action Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b-2 border-slate-300 gap-4">
           <div className="flex items-center space-x-3">
