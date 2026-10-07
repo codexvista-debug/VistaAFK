@@ -48,7 +48,7 @@ if [ "$1" == "--login" ] || [ "$1" == "-l" ] || [ "$1" == "--reset" ]; then
 elif [ -n "$1" ] && [ -n "$2" ]; then
   AUTH_USER="$1"
   AUTH_PASS="$2"
-  echo "{\"username\":\"$AUTH_USER\",\"password\":\"$AUTH_PASS\",\"cloudUrl\":\"https://afkvista.vercel.app\"}" > user_auth.json
+  echo "{\"username\":\"$AUTH_USER\",\"password\":\"$AUTH_PASS\",\"cloudUrl\":\"https://vista-afk.vercel.app\"}" > user_auth.json
   cp user_auth.json ../user_auth.json 2>/dev/null
   echo "✅ Credentials auto-configured for '$AUTH_USER'!"
 fi
@@ -63,15 +63,15 @@ if [ ! -f "user_auth.json" ] && [ ! -f "../user_auth.json" ]; then
   echo ""
   echo -n "Enter username (min 4 letters): "
   read -r AUTH_USER < /dev/tty
-  echo -n "Enter password (min 6 characters): "
+  echo -n "Enter password (min 4 characters): "
   read -r AUTH_PASS < /dev/tty
   echo ""
-  if [ ${#AUTH_USER} -ge 4 ] && [ ${#AUTH_PASS} -ge 6 ]; then
-    echo "{\"username\":\"$AUTH_USER\",\"password\":\"$AUTH_PASS\",\"cloudUrl\":\"https://afkvista.vercel.app\"}" > user_auth.json
+  if [ ${#AUTH_USER} -ge 4 ] && [ ${#AUTH_PASS} -ge 4 ]; then
+    echo "{\"username\":\"$AUTH_USER\",\"password\":\"$AUTH_PASS\",\"cloudUrl\":\"https://vista-afk.vercel.app\"}" > user_auth.json
     cp user_auth.json ../user_auth.json 2>/dev/null
     echo "✅ Account credentials saved for '$AUTH_USER'! Your PC will now connect automatically."
   else
-    echo "⚠️ Skipping setup (username < 4 or password < 6). You can link anytime in the web dashboard."
+    echo "⚠️ Skipping setup (username < 4 or password < 4). You can link anytime in the web dashboard."
   fi
   echo ""
 else

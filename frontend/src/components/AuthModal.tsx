@@ -17,7 +17,7 @@ export const AuthModal: React.FC = () => {
 
   const cleanUsername = username.trim();
   const isUsernameValid = cleanUsername.length >= 4 && /^[a-zA-Z0-9_-]+$/.test(cleanUsername);
-  const isPasswordValid = password.length >= 6;
+  const isPasswordValid = password.length >= 4;
   const canSubmit = isUsernameValid && isPasswordValid && !loading;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -29,7 +29,7 @@ export const AuthModal: React.FC = () => {
       return;
     }
     if (!isPasswordValid) {
-      setError('Password must be at least 6 characters long.');
+      setError('Password must be at least 4 characters long.');
       return;
     }
 
@@ -158,7 +158,7 @@ export const AuthModal: React.FC = () => {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-800">Password</label>
-              <span className="text-[10px] text-slate-500 font-medium">Min. 6 characters</span>
+              <span className="text-[10px] text-slate-500 font-medium">Min. 4 characters</span>
             </div>
             <div className="relative">
               <input
@@ -166,7 +166,7 @@ export const AuthModal: React.FC = () => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 6 characters"
+                placeholder="At least 4 characters"
                 className={`w-full pl-10 pr-10 py-2.5 bg-slate-50 border-2 rounded-xl text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white transition ${
                   password.length > 0 && isPasswordValid
                     ? 'border-emerald-500 focus:border-emerald-600'

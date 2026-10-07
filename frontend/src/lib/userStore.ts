@@ -80,8 +80,8 @@ export function validateUsername(username: string): { valid: boolean; error?: st
 }
 
 export function validatePassword(password: string): { valid: boolean; error?: string } {
-  if (!password || password.length < 6) {
-    return { valid: false, error: 'Password must be at least 6 characters long' };
+  if (!password || password.length < 4) {
+    return { valid: false, error: 'Password must be at least 4 characters long' };
   }
   return { valid: true };
 }
