@@ -322,6 +322,24 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
             case 'MICROSOFT_DEVICE_CODE': {
               setDiscoveryDeviceCode(msg.payload);
               setDiscoveryStatus('waiting_approval');
+
+              // Automatically copy code to clipboard & open browser tab
+              if (typeof window !== 'undefined') {
+                if (msg.payload?.userCode) {
+                  try {
+                    navigator.clipboard.writeText(msg.payload.userCode);
+                  } catch (e) {
+                    console.warn('[VistaAFK] Clipboard copy failed:', e);
+                  }
+                }
+                if (msg.payload?.verificationUri) {
+                  try {
+                    window.open(msg.payload.verificationUri, '_blank');
+                  } catch (e) {
+                    console.warn('[VistaAFK] Popup open failed:', e);
+                  }
+                }
+              }
               break;
             }
 
@@ -470,6 +488,11 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   const clearNotifications = () => setNotifications([]);
   const discoverMicrosoftAccount = () => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      setDiscoveryError('VistaAFK daemon is not connected. Please ensure your local daemon terminal is running.');
+      setDiscoveryStatus('error');
+      return;
+    }
     setDiscoveryStatus('waiting_code');
     setDiscoveryDeviceCode(null);
     setDiscoveryProfiles(null);

@@ -444,8 +444,15 @@ export default function AccountsPage() {
                     <RefreshCw className="h-6 w-6 text-emerald-600 animate-spin" />
                     <div>
                       <span className="text-xs font-bold text-slate-800 block">Connecting to Microsoft Identity Service...</span>
-                      <span className="text-[11px] text-slate-500 font-medium">Generating device authorization code</span>
+                      <span className="text-[11px] text-slate-500 font-medium">Generating device authorization code & opening sign-in tab</span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={resetDiscovery}
+                      className="text-[11px] text-slate-400 hover:text-slate-600 underline font-medium pt-1"
+                    >
+                      Cancel
+                    </button>
                   </div>
                 )}
 

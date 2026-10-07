@@ -1,4 +1,32 @@
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
 import { Authflow, Titles } from 'prismarine-auth';
+
+function getPrismarineHash(input: string): string {
+  return crypto.createHash('sha1').update(input ?? '', 'binary').digest('hex').substring(0, 6);
+}
+
+function syncTokenCaches(tokenFolder: string, sourceId: string, targetNames: string[]) {
+  const sourceHash = getPrismarineHash(sourceId);
+  const cacheIds = ['msal', 'live', 'sisu', 'xbl', 'bed', 'mca', 'mcs', 'pfb'];
+  try {
+    for (const targetName of targetNames) {
+      if (!targetName) continue;
+      const targetHash = getPrismarineHash(targetName);
+      for (const cacheId of cacheIds) {
+        const srcFile = path.join(tokenFolder, `${sourceHash}_${cacheId}-cache.json`);
+        const dstFile = path.join(tokenFolder, `${targetHash}_${cacheId}-cache.json`);
+        if (fs.existsSync(srcFile)) {
+          fs.copyFileSync(srcFile, dstFile);
+          console.log(`[VistaAFK Discovery] Cached token credentials ready for ${targetName} (${targetHash})`);
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn('[VistaAFK Discovery] Warning syncing token caches:', err.message);
+  }
+}
 
 export interface DiscoveredProfiles {
   java?: {
@@ -22,14 +50,18 @@ export async function discoverMicrosoftProfiles(
     accountId,
     tokenFolder,
     {
-      authTitle: Titles.MinecraftJava,
-      flow: 'msal',
+      authTitle: Titles.MinecraftNintendoSwitch,
+      flow: 'live',
     },
     (codeData: any) => {
-      console.log('[VistaAFK Discovery] Received Device Code:', codeData.user_code || codeData.userCode);
+      const userCode = codeData.user_code || codeData.userCode;
+      const baseUri = codeData.verification_uri || codeData.verificationUri || 'https://www.microsoft.com/link';
+      const directUri = userCode ? `https://www.microsoft.com/link?otc=${encodeURIComponent(userCode)}` : baseUri;
+
+      console.log(`[VistaAFK Discovery] Received Device Code: ${userCode} (Link: ${directUri})`);
       onDeviceCode({
-        userCode: codeData.user_code || codeData.userCode,
-        verificationUri: codeData.verification_uri || codeData.verificationUri || 'https://microsoft.com/link',
+        userCode,
+        verificationUri: directUri,
         expiresIn: codeData.expires_in || codeData.expiresIn || 900,
       });
     }
@@ -101,6 +133,12 @@ export async function discoverMicrosoftProfiles(
         gamertag: result.java.name,
       };
     }
+  }
+
+  // Sync token caches so future bot instances can instantly connect without re-auth
+  const targetNames = [result.java?.name, result.bedrock?.gamertag].filter(Boolean) as string[];
+  if (targetNames.length > 0) {
+    syncTokenCaches(tokenFolder, accountId, targetNames);
   }
 
   return result;
