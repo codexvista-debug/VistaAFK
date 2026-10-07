@@ -209,24 +209,297 @@ export async function saveUser(user: UserRecord): Promise<void> {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
-          return;
-        }
-      }
-
-      // Create new object
-      const createRes = await fetch(CLOUD_FALLBACK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (createRes.ok) {
-        const created = await createRes.json();
-        if (created?.id) {
-          user.cloudObjectId = created.id;
+        } else {
+          // Create new object
+          const createRes = await fetch(CLOUD_FALLBACK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (createRes.ok) {
+            const created = await createRes.json();
+            if (created?.id) {
+              user.cloudObjectId = created.id;
+            }
+          }
         }
       }
     }
   } catch (e) {
     console.error('[UserStore] Cloud sync warning:', e);
   }
+
+  // 4. Track in user index
+  try {
+    await addUserToIndex(username);
+  } catch (e) {}
+}
+
+export interface SystemSettings {
+  registrationEnabled: boolean;
+}
+
+export interface UserSummary {
+  id: string;
+  username: string;
+  createdAt: number;
+  updatedAt: number;
+  savedAccountsCount: number;
+  serverPresetsCount: number;
+  botConfigsCount: number;
+  hasDaemon: boolean;
+  role: 'admin' | 'user';
+}
+
+function getSettingsFilePath(): string {
+  const dir = path.resolve(process.cwd(), 'data');
+  if (!fs.existsSync(dir)) {
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+  }
+  return path.resolve(dir, 'settings.json');
+}
+
+export async function getSystemSettings(): Promise<SystemSettings> {
+  // Check local file
+  try {
+    const file = getSettingsFilePath();
+    if (fs.existsSync(file)) {
+      return JSON.parse(fs.readFileSync(file, 'utf8'));
+    }
+  } catch (e) {}
+
+  // Check cloud
+  try {
+    const res = await fetch(`${CLOUD_FALLBACK_URL}?name=vistaafk_system_settings`);
+    if (res.ok) {
+      const list = await res.json();
+      const existing = Array.isArray(list) ? list.find((i: any) => i.name === 'vistaafk_system_settings') : null;
+      if (existing && existing.data) {
+        return existing.data;
+      }
+    }
+  } catch (e) {}
+
+  return { registrationEnabled: true };
+}
+
+export async function updateSystemSettings(settings: Partial<SystemSettings>): Promise<SystemSettings> {
+  const current = await getSystemSettings();
+  const updated: SystemSettings = { ...current, ...settings };
+
+  // Save local
+  try {
+    const file = getSettingsFilePath();
+    fs.writeFileSync(file, JSON.stringify(updated, null, 2), 'utf8');
+  } catch (e) {}
+
+  // Save cloud
+  try {
+    const res = await fetch(`${CLOUD_FALLBACK_URL}?name=vistaafk_system_settings`);
+    let existingId: string | null = null;
+    if (res.ok) {
+      const list = await res.json();
+      const existing = Array.isArray(list) ? list.find((i: any) => i.name === 'vistaafk_system_settings') : null;
+      if (existing) existingId = existing.id;
+    }
+
+    const payload = {
+      name: 'vistaafk_system_settings',
+      data: updated,
+    };
+
+    if (existingId) {
+      await fetch(`${CLOUD_FALLBACK_URL}/${existingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } else {
+      await fetch(CLOUD_FALLBACK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    }
+  } catch (e) {}
+
+  return updated;
+}
+
+async function getUserIndex(): Promise<string[]> {
+  const localUsers = loadLocalUsers();
+  const set = new Set<string>(Object.keys(localUsers));
+
+  memoryCache.forEach((_, k) => {
+    set.add(k);
+  });
+
+  try {
+    const res = await fetch(`${CLOUD_FALLBACK_URL}?name=vistaafk_user_index`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const list = await res.json();
+      if (Array.isArray(list) && list.length > 0) {
+        const item = list.find((i: any) => i.name === 'vistaafk_user_index');
+        if (item && item.data && Array.isArray(item.data.usernames)) {
+          for (const u of item.data.usernames) {
+            set.add(u);
+          }
+        }
+      }
+    }
+  } catch (e) {}
+
+  set.add('vista');
+  return Array.from(set);
+}
+
+async function addUserToIndex(username: string): Promise<void> {
+  const list = await getUserIndex();
+  if (!list.includes(username)) {
+    list.push(username);
+    await saveUserIndex(list);
+  }
+}
+
+async function saveUserIndex(usernames: string[]): Promise<void> {
+  try {
+    const res = await fetch(`${CLOUD_FALLBACK_URL}?name=vistaafk_user_index`);
+    let existingId: string | null = null;
+    if (res.ok) {
+      const list = await res.json();
+      const existing = Array.isArray(list) ? list.find((i: any) => i.name === 'vistaafk_user_index') : null;
+      if (existing) existingId = existing.id;
+    }
+
+    const payload = {
+      name: 'vistaafk_user_index',
+      data: { usernames },
+    };
+
+    if (existingId) {
+      await fetch(`${CLOUD_FALLBACK_URL}/${existingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } else {
+      await fetch(CLOUD_FALLBACK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    }
+  } catch (e) {}
+}
+
+export async function getAllUsers(): Promise<UserSummary[]> {
+  const usernames = await getUserIndex();
+  const summaries: UserSummary[] = [];
+
+  for (const u of usernames) {
+    const user = await getUser(u);
+    if (user) {
+      summaries.push({
+        id: user.id,
+        username: user.username,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        savedAccountsCount: user.savedAccounts?.length || 0,
+        serverPresetsCount: user.serverPresets?.length || 0,
+        botConfigsCount: user.botConfigs?.length || 0,
+        hasDaemon: !!user.daemonUrl,
+        role: user.username.toLowerCase() === 'vista' ? 'admin' : 'user',
+      });
+    }
+  }
+
+  // Sort: vista first, then alphabetically
+  summaries.sort((a, b) => {
+    if (a.username.toLowerCase() === 'vista') return -1;
+    if (b.username.toLowerCase() === 'vista') return 1;
+    return a.username.localeCompare(b.username);
+  });
+
+  return summaries;
+}
+
+export async function deleteUser(rawUsername: string): Promise<{ success: boolean; error?: string }> {
+  const username = rawUsername.trim().toLowerCase();
+  if (username === 'vista') {
+    return { success: false, error: 'Cannot delete the primary administrator account (vista).' };
+  }
+
+  // 1. Memory cache
+  memoryCache.delete(username);
+
+  // 2. Local file
+  const localUsers = loadLocalUsers();
+  if (localUsers[username]) {
+    delete localUsers[username];
+    saveLocalUsers(localUsers);
+  }
+
+  // 3. Cloud store
+  const user = await getUser(username);
+  if (user && user.cloudObjectId) {
+    try {
+      await fetch(`${CLOUD_FALLBACK_URL}/${user.cloudObjectId}`, {
+        method: 'DELETE',
+      });
+    } catch (e) {}
+  }
+
+  // 4. Update index
+  const index = await getUserIndex();
+  const updated = index.filter(u => u !== username);
+  await saveUserIndex(updated);
+
+  return { success: true };
+}
+
+export async function resetPassword(rawUsername: string, newPass: string): Promise<{ success: boolean; error?: string }> {
+  const username = rawUsername.trim().toLowerCase();
+  const pVal = validatePassword(newPass);
+  if (!pVal.valid) {
+    return { success: false, error: pVal.error };
+  }
+
+  const user = await getUser(username);
+  if (!user) {
+    return { success: false, error: `User "${username}" not found.` };
+  }
+
+  const { hash, salt } = hashPassword(newPass);
+  user.passwordHash = hash;
+  user.salt = salt;
+  user.updatedAt = Date.now();
+
+  await saveUser(user);
+  return { success: true };
+}
+
+export function verifyAdmin(req: Request): { authorized: boolean; username?: string; error?: string } {
+  const authHeader = req.headers.get('authorization');
+  let token: string | null = null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7);
+  }
+  if (!token) {
+    const cookieHeader = req.headers.get('cookie') || '';
+    const match = cookieHeader.match(/vistaafk_auth_token=([^;]+)/);
+    if (match) token = match[1];
+  }
+  if (!token) {
+    return { authorized: false, error: 'Unauthorized: Missing session token' };
+  }
+  const username = verifySessionToken(token);
+  if (!username) {
+    return { authorized: false, error: 'Unauthorized: Invalid or expired session token' };
+  }
+  if (username.toLowerCase() !== 'vista') {
+    return { authorized: false, error: 'Forbidden: Admin access restricted to vista' };
+  }
+  return { authorized: true, username };
 }

@@ -30,6 +30,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const pathname = usePathname();
   const { user, openAuthModal, logout } = useAuth();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const isVista = user?.username?.toLowerCase() === 'vista';
 
   return (
     <header className="sticky top-0 z-40 w-full border-b-2 border-[#2b3a4f] bg-[#121a27]/95 backdrop-blur-md shadow-lg">
@@ -100,6 +101,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             )}
           </Link>
+
+          {isVista && (
+            <Link
+              href="/control-panel"
+              className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                pathname === '/control-panel'
+                  ? 'bg-amber-600 text-white border-amber-400 shadow-md shadow-amber-600/30'
+                  : 'bg-amber-500/15 text-amber-300 hover:text-white hover:bg-amber-600/30 border-amber-500/40 shadow-sm'
+              }`}
+            >
+              <ShieldCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[2.5]" />
+              <span>CP</span>
+            </Link>
+          )}
         </nav>
 
         {/* Right Section: User Login & Daemon Status */}
@@ -126,7 +141,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <div className="pb-2 border-b border-slate-800 flex items-center justify-between">
                       <div>
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Signed In As</span>
-                        <span className="font-extrabold text-sm text-white">{user.username}</span>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="font-extrabold text-sm text-white">{user.username}</span>
+                          {isVista && (
+                            <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                              ADMIN
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
                         Active
@@ -151,16 +173,28 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
 
                     <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                      <button
-                        onClick={() => {
-                          setIsUserMenuOpen(false);
-                          onOpenSettingsModal();
-                        }}
-                        className="text-slate-300 hover:text-white flex items-center space-x-1 text-[11px] font-bold"
-                      >
-                        <Settings className="h-3.5 w-3.5" />
-                        <span>Settings</span>
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        {isVista && (
+                          <Link
+                            href="/control-panel"
+                            onClick={() => setIsUserMenuOpen(false)}
+                            className="text-amber-400 hover:text-amber-300 flex items-center space-x-1 text-[11px] font-bold"
+                          >
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                            <span>CP</span>
+                          </Link>
+                        )}
+                        <button
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            onOpenSettingsModal();
+                          }}
+                          className="text-slate-300 hover:text-white flex items-center space-x-1 text-[11px] font-bold"
+                        >
+                          <Settings className="h-3.5 w-3.5" />
+                          <span>Settings</span>
+                        </button>
+                      </div>
 
                       <button
                         onClick={() => {

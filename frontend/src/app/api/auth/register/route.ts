@@ -8,6 +8,7 @@ import {
   hashPassword,
   createSessionToken,
   UserRecord,
+  getSystemSettings,
 } from '../../../../lib/userStore';
 
 const DEFAULT_SERVER_PRESETS = [
@@ -18,6 +19,14 @@ const DEFAULT_SERVER_PRESETS = [
 
 export async function POST(req: Request) {
   try {
+    const settings = await getSystemSettings();
+    if (!settings.registrationEnabled) {
+      return NextResponse.json(
+        { error: 'Public account registration is currently paused by administrator.' },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const { username, password } = body;
 
