@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { SavedAccount, ServerPreset, BotConfig } from '../types';
+import { supabase } from './supabase';
 
 export interface UserRecord {
   id: string;
@@ -16,13 +17,27 @@ export interface UserRecord {
   savedAccounts?: SavedAccount[];
   serverPresets?: ServerPreset[];
   botConfigs?: BotConfig[];
-  cloudObjectId?: string; // Cache ID for cloud fallback store
+}
+
+export interface SystemSettings {
+  registrationEnabled: boolean;
+}
+
+export interface UserSummary {
+  id: string;
+  username: string;
+  createdAt: number;
+  updatedAt: number;
+  savedAccountsCount: number;
+  serverPresetsCount: number;
+  botConfigsCount: number;
+  hasDaemon: boolean;
+  role: 'admin' | 'user';
 }
 
 const SECRET_KEY = process.env.VISTAAFK_AUTH_SECRET || 'vistaafk_cloud_auth_secret_token_2026';
-const CLOUD_FALLBACK_URL = 'https://api.restful-api.dev/objects';
 
-// In-memory memory cache for fast lookups
+// In-memory cache for ultra-fast session & auth verification
 const memoryCache = new Map<string, UserRecord>();
 
 function getLocalFilePath(): string {
@@ -107,6 +122,24 @@ export function verifySessionToken(token: string): string | null {
   }
 }
 
+// Convert Supabase database row to UserRecord
+function mapRowToUser(row: any): UserRecord {
+  return {
+    id: row.id,
+    username: row.username,
+    passwordHash: row.password_hash,
+    salt: row.salt,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+    daemonUrl: row.daemon_url || undefined,
+    secretToken: row.secret_token || undefined,
+    lastHeartbeat: row.last_heartbeat ? Number(row.last_heartbeat) : undefined,
+    savedAccounts: Array.isArray(row.saved_accounts) ? row.saved_accounts : [],
+    serverPresets: Array.isArray(row.server_presets) ? row.server_presets : [],
+    botConfigs: Array.isArray(row.bot_configs) ? row.bot_configs : [],
+  };
+}
+
 // User Record Persistence Functions
 export async function getUser(rawUsername: string): Promise<UserRecord | null> {
   const username = (rawUsername || '').trim().toLowerCase();
@@ -117,42 +150,33 @@ export async function getUser(rawUsername: string): Promise<UserRecord | null> {
     return memoryCache.get(username)!;
   }
 
-  // 2. Check local file storage (dev environment)
+  // 2. Check Supabase Postgres database
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (!error && data) {
+      const user = mapRowToUser(data);
+      memoryCache.set(username, user);
+      return user;
+    }
+  } catch (e) {
+    console.error('[UserStore] Supabase query error:', e);
+  }
+
+  // 3. Check local file storage (fallback)
   const localUsers = loadLocalUsers();
   if (localUsers[username]) {
     memoryCache.set(username, localUsers[username]);
     return localUsers[username];
   }
 
-  // 3. Check Cloud Fallback (persistent across Vercel serverless lambdas)
-  try {
-    const cloudKey = `vistaafk_u_${username}`;
-    // Query object from cloud store
-    const res = await fetch(`${CLOUD_FALLBACK_URL}?name=${encodeURIComponent(cloudKey)}`, {
-      headers: { 'Accept': 'application/json' },
-    });
-    if (res.ok) {
-      const list = await res.json();
-      if (Array.isArray(list) && list.length > 0) {
-        // Find exact match
-        const match = list.find((item: any) => item.name === cloudKey);
-        if (match && match.data) {
-          const userRecord: UserRecord = {
-            ...match.data,
-            cloudObjectId: match.id,
-          };
-          memoryCache.set(username, userRecord);
-          return userRecord;
-        }
-      }
-    }
-  } catch (e) {
-    // Cloud lookup error, ignore
-  }
-
-  // Auto-seed primary admin 'vista' if not found anywhere so it is always available
+  // 4. Auto-seed master administrator 'vista' with password 'placehub'
   if (username === 'vista') {
-    const { hash, salt } = hashPassword('vista2026');
+    const { hash, salt } = hashPassword('placehub');
     const defaultVista: UserRecord = {
       id: 'admin_vista_001',
       username: 'vista',
@@ -185,256 +209,99 @@ export async function saveUser(user: UserRecord): Promise<void> {
   // 1. Update memory cache
   memoryCache.set(username, user);
 
-  // 2. Save local file (for local dev)
+  // 2. Save local file (for local dev fallback)
   try {
     const localUsers = loadLocalUsers();
     localUsers[username] = user;
     saveLocalUsers(localUsers);
   } catch (e) {}
 
-  // 3. Save to Cloud Store (for Vercel serverless)
+  // 3. Save to Supabase Postgres database
   try {
-    const cloudKey = `vistaafk_u_${username}`;
     const payload = {
-      name: cloudKey,
-      data: {
-        id: user.id,
-        username: user.username,
-        passwordHash: user.passwordHash,
-        salt: user.salt,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        daemonUrl: user.daemonUrl,
-        secretToken: user.secretToken,
-        lastHeartbeat: user.lastHeartbeat,
-        savedAccounts: user.savedAccounts,
-        serverPresets: user.serverPresets,
-        botConfigs: user.botConfigs,
-      },
+      id: user.id,
+      username: user.username,
+      password_hash: user.passwordHash,
+      salt: user.salt,
+      created_at: user.createdAt,
+      updated_at: user.updatedAt,
+      daemon_url: user.daemonUrl || null,
+      secret_token: user.secretToken || null,
+      last_heartbeat: user.lastHeartbeat || null,
+      saved_accounts: user.savedAccounts || [],
+      server_presets: user.serverPresets || [],
+      bot_configs: user.botConfigs || [],
     };
 
-    if (user.cloudObjectId) {
-      // Update existing object
-      await fetch(`${CLOUD_FALLBACK_URL}/${user.cloudObjectId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-    } else {
-      // Check if one already exists
-      const checkRes = await fetch(`${CLOUD_FALLBACK_URL}?name=${encodeURIComponent(cloudKey)}`);
-      if (checkRes.ok) {
-        const list = await checkRes.json();
-        const existing = Array.isArray(list) ? list.find((i: any) => i.name === cloudKey) : null;
-        if (existing) {
-          user.cloudObjectId = existing.id;
-          await fetch(`${CLOUD_FALLBACK_URL}/${existing.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-        } else {
-          // Create new object
-          const createRes = await fetch(CLOUD_FALLBACK_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          if (createRes.ok) {
-            const created = await createRes.json();
-            if (created?.id) {
-              user.cloudObjectId = created.id;
-            }
-          }
-        }
-      }
+    const { error } = await supabase.from('users').upsert(payload, { onConflict: 'username' });
+    if (error) {
+      console.warn('[UserStore] Supabase saveUser notice:', error.message);
     }
   } catch (e) {
-    console.error('[UserStore] Cloud sync warning:', e);
+    console.error('[UserStore] Supabase saveUser error:', e);
   }
-
-  // 4. Track in user index
-  try {
-    await addUserToIndex(username);
-  } catch (e) {}
-}
-
-export interface SystemSettings {
-  registrationEnabled: boolean;
-}
-
-export interface UserSummary {
-  id: string;
-  username: string;
-  createdAt: number;
-  updatedAt: number;
-  savedAccountsCount: number;
-  serverPresetsCount: number;
-  botConfigsCount: number;
-  hasDaemon: boolean;
-  role: 'admin' | 'user';
-}
-
-function getSettingsFilePath(): string {
-  const dir = path.resolve(process.cwd(), 'data');
-  if (!fs.existsSync(dir)) {
-    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
-  }
-  return path.resolve(dir, 'settings.json');
-}
-
-export async function getSystemSettings(): Promise<SystemSettings> {
-  // Check local file
-  try {
-    const file = getSettingsFilePath();
-    if (fs.existsSync(file)) {
-      return JSON.parse(fs.readFileSync(file, 'utf8'));
-    }
-  } catch (e) {}
-
-  // Check cloud
-  try {
-    const res = await fetch(`${CLOUD_FALLBACK_URL}?name=vistaafk_system_settings`);
-    if (res.ok) {
-      const list = await res.json();
-      const existing = Array.isArray(list) ? list.find((i: any) => i.name === 'vistaafk_system_settings') : null;
-      if (existing && existing.data) {
-        return existing.data;
-      }
-    }
-  } catch (e) {}
-
-  return { registrationEnabled: true };
-}
-
-export async function updateSystemSettings(settings: Partial<SystemSettings>): Promise<SystemSettings> {
-  const current = await getSystemSettings();
-  const updated: SystemSettings = { ...current, ...settings };
-
-  // Save local
-  try {
-    const file = getSettingsFilePath();
-    fs.writeFileSync(file, JSON.stringify(updated, null, 2), 'utf8');
-  } catch (e) {}
-
-  // Save cloud
-  try {
-    const res = await fetch(`${CLOUD_FALLBACK_URL}?name=vistaafk_system_settings`);
-    let existingId: string | null = null;
-    if (res.ok) {
-      const list = await res.json();
-      const existing = Array.isArray(list) ? list.find((i: any) => i.name === 'vistaafk_system_settings') : null;
-      if (existing) existingId = existing.id;
-    }
-
-    const payload = {
-      name: 'vistaafk_system_settings',
-      data: updated,
-    };
-
-    if (existingId) {
-      await fetch(`${CLOUD_FALLBACK_URL}/${existingId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-    } else {
-      await fetch(CLOUD_FALLBACK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-    }
-  } catch (e) {}
-
-  return updated;
-}
-
-async function getUserIndex(): Promise<string[]> {
-  const localUsers = loadLocalUsers();
-  const set = new Set<string>(Object.keys(localUsers));
-
-  memoryCache.forEach((_, k) => {
-    set.add(k);
-  });
-
-  try {
-    const res = await fetch(`${CLOUD_FALLBACK_URL}?name=vistaafk_user_index`, {
-      headers: { Accept: 'application/json' },
-    });
-    if (res.ok) {
-      const list = await res.json();
-      if (Array.isArray(list) && list.length > 0) {
-        const item = list.find((i: any) => i.name === 'vistaafk_user_index');
-        if (item && item.data && Array.isArray(item.data.usernames)) {
-          for (const u of item.data.usernames) {
-            set.add(u);
-          }
-        }
-      }
-    }
-  } catch (e) {}
-
-  set.add('vista');
-  return Array.from(set);
-}
-
-async function addUserToIndex(username: string): Promise<void> {
-  const list = await getUserIndex();
-  if (!list.includes(username)) {
-    list.push(username);
-    await saveUserIndex(list);
-  }
-}
-
-async function saveUserIndex(usernames: string[]): Promise<void> {
-  try {
-    const res = await fetch(`${CLOUD_FALLBACK_URL}?name=vistaafk_user_index`);
-    let existingId: string | null = null;
-    if (res.ok) {
-      const list = await res.json();
-      const existing = Array.isArray(list) ? list.find((i: any) => i.name === 'vistaafk_user_index') : null;
-      if (existing) existingId = existing.id;
-    }
-
-    const payload = {
-      name: 'vistaafk_user_index',
-      data: { usernames },
-    };
-
-    if (existingId) {
-      await fetch(`${CLOUD_FALLBACK_URL}/${existingId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-    } else {
-      await fetch(CLOUD_FALLBACK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-    }
-  } catch (e) {}
 }
 
 export async function getAllUsers(): Promise<UserSummary[]> {
-  const usernames = await getUserIndex();
   const summaries: UserSummary[] = [];
+  const processed = new Set<string>();
 
-  for (const u of usernames) {
-    const user = await getUser(u);
-    if (user) {
+  // 1. Fetch from Supabase
+  try {
+    const { data, error } = await supabase.from('users').select('*');
+    if (!error && Array.isArray(data)) {
+      data.forEach((row) => {
+        const u = mapRowToUser(row);
+        memoryCache.set(u.username, u);
+        processed.add(u.username);
+        summaries.push({
+          id: u.id,
+          username: u.username,
+          createdAt: u.createdAt,
+          updatedAt: u.updatedAt,
+          savedAccountsCount: u.savedAccounts?.length || 0,
+          serverPresetsCount: u.serverPresets?.length || 0,
+          botConfigsCount: u.botConfigs?.length || 0,
+          hasDaemon: !!u.daemonUrl,
+          role: u.username === 'vista' ? 'admin' : 'user',
+        });
+      });
+    }
+  } catch (e) {}
+
+  // 2. Merge local file users if not yet processed
+  const localUsers = loadLocalUsers();
+  Object.values(localUsers).forEach((u) => {
+    if (!processed.has(u.username)) {
+      processed.add(u.username);
       summaries.push({
-        id: user.id,
-        username: user.username,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        savedAccountsCount: user.savedAccounts?.length || 0,
-        serverPresetsCount: user.serverPresets?.length || 0,
-        botConfigsCount: user.botConfigs?.length || 0,
-        hasDaemon: !!user.daemonUrl,
-        role: user.username.toLowerCase() === 'vista' ? 'admin' : 'user',
+        id: u.id,
+        username: u.username,
+        createdAt: u.createdAt,
+        updatedAt: u.updatedAt,
+        savedAccountsCount: u.savedAccounts?.length || 0,
+        serverPresetsCount: u.serverPresets?.length || 0,
+        botConfigsCount: u.botConfigs?.length || 0,
+        hasDaemon: !!u.daemonUrl,
+        role: u.username === 'vista' ? 'admin' : 'user',
+      });
+    }
+  });
+
+  // Ensure vista is always in summaries
+  if (!processed.has('vista')) {
+    const vista = await getUser('vista');
+    if (vista) {
+      summaries.push({
+        id: vista.id,
+        username: vista.username,
+        createdAt: vista.createdAt,
+        updatedAt: vista.updatedAt,
+        savedAccountsCount: vista.savedAccounts?.length || 0,
+        serverPresetsCount: vista.serverPresets?.length || 0,
+        botConfigsCount: vista.botConfigs?.length || 0,
+        hasDaemon: !!vista.daemonUrl,
+        role: 'admin',
       });
     }
   }
@@ -465,20 +332,10 @@ export async function deleteUser(rawUsername: string): Promise<{ success: boolea
     saveLocalUsers(localUsers);
   }
 
-  // 3. Cloud store
-  const user = await getUser(username);
-  if (user && user.cloudObjectId) {
-    try {
-      await fetch(`${CLOUD_FALLBACK_URL}/${user.cloudObjectId}`, {
-        method: 'DELETE',
-      });
-    } catch (e) {}
-  }
-
-  // 4. Update index
-  const index = await getUserIndex();
-  const updated = index.filter(u => u !== username);
-  await saveUserIndex(updated);
+  // 3. Supabase
+  try {
+    await supabase.from('users').delete().eq('username', username);
+  } catch (e) {}
 
   return { success: true };
 }
@@ -502,6 +359,59 @@ export async function resetPassword(rawUsername: string, newPass: string): Promi
 
   await saveUser(user);
   return { success: true };
+}
+
+function getSettingsFilePath(): string {
+  const dir = path.resolve(process.cwd(), 'data');
+  if (!fs.existsSync(dir)) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch (e) {}
+  }
+  return path.resolve(dir, 'settings.json');
+}
+
+export async function getSystemSettings(): Promise<SystemSettings> {
+  // 1. Supabase
+  try {
+    const { data, error } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'system')
+      .maybeSingle();
+
+    if (!error && data?.value) {
+      return data.value;
+    }
+  } catch (e) {}
+
+  // 2. Local file fallback
+  try {
+    const file = getSettingsFilePath();
+    if (fs.existsSync(file)) {
+      return JSON.parse(fs.readFileSync(file, 'utf8'));
+    }
+  } catch (e) {}
+
+  return { registrationEnabled: true };
+}
+
+export async function updateSystemSettings(settings: Partial<SystemSettings>): Promise<SystemSettings> {
+  const current = await getSystemSettings();
+  const updated: SystemSettings = { ...current, ...settings };
+
+  // 1. Save local
+  try {
+    const file = getSettingsFilePath();
+    fs.writeFileSync(file, JSON.stringify(updated, null, 2), 'utf8');
+  } catch (e) {}
+
+  // 2. Save Supabase
+  try {
+    await supabase.from('settings').upsert({ key: 'system', value: updated }, { onConflict: 'key' });
+  } catch (e) {}
+
+  return updated;
 }
 
 export function verifyAdmin(req: Request): { authorized: boolean; username?: string; error?: string } {
