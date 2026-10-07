@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BotInstance = void 0;
 const mineflayer_1 = __importDefault(require("mineflayer"));
 const socks_proxy_agent_1 = require("socks-proxy-agent");
+const terrainMapper_js_1 = require("./terrainMapper.js");
 const path_1 = __importDefault(require("path"));
 function romanNumeral(num) {
     const romanMap = [
@@ -1126,6 +1127,10 @@ class BotInstance {
                 pitch: 0,
                 targetBlock: null,
                 nearbyEntities: [],
+                nearbyPlayers: [],
+                currentBiome: 'Overworld',
+                currentLandBlock: 'Bedrock',
+                terrainGrid: null,
                 isPatrolling: false,
             };
         }
@@ -1152,6 +1157,10 @@ class BotInstance {
                 pitch: 0,
                 targetBlock: null,
                 nearbyEntities: [],
+                nearbyPlayers: [],
+                currentBiome: undefined,
+                currentLandBlock: undefined,
+                terrainGrid: null,
                 isPatrolling: false,
             };
         }
@@ -1182,17 +1191,59 @@ class BotInstance {
         catch (e) { }
         // Nearby entities in radar range (up to 24 blocks)
         const nearbyEntities = [];
+        // Nearby players in radar range (up to 36 blocks) with usernames for Xaero's minimap
+        const nearbyPlayers = [];
         try {
             const myPos = this.bot.entity.position;
+            const myId = this.bot.entity.id;
+            const myUsername = (this.bot.username || this.config.name).toLowerCase();
             for (const ent of Object.values(this.bot.entities)) {
-                if (!ent || ent.id === this.bot.entity.id || !ent.position)
+                if (!ent || ent.id === myId || !ent.position)
                     continue;
                 const dx = ent.position.x - myPos.x;
                 const dz = ent.position.z - myPos.z;
                 const dist = Math.sqrt(dx * dx + dz * dz);
+                const isPlayer = ent.type === 'player';
+                // 1. Collect nearby players with accurate usernames
+                if (isPlayer && dist <= 36) {
+                    let username = ent.username;
+                    if (!username) {
+                        const matchedPlayer = Object.values(this.bot.players || {}).find((p) => p?.entity?.id === ent.id);
+                        if (matchedPlayer)
+                            username = matchedPlayer.username;
+                    }
+                    if (!username) {
+                        username = ent.displayName?.text || ent.displayName || ent.name;
+                    }
+                    if (username && username.toLowerCase() !== myUsername) {
+                        const entYaw = ent.yaw || 0;
+                        const entDeg = (((-entYaw * 180 / Math.PI) % 360) + 360) % 360;
+                        let entFacing = 'South';
+                        if (entDeg >= 315 || entDeg < 45)
+                            entFacing = 'South';
+                        else if (entDeg >= 45 && entDeg < 135)
+                            entFacing = 'West';
+                        else if (entDeg >= 135 && entDeg < 225)
+                            entFacing = 'North';
+                        else
+                            entFacing = 'East';
+                        nearbyPlayers.push({
+                            username,
+                            x: Math.round(ent.position.x * 10) / 10,
+                            y: Math.round(ent.position.y * 10) / 10,
+                            z: Math.round(ent.position.z * 10) / 10,
+                            dx: Math.round(dx * 10) / 10,
+                            dz: Math.round(dz * 10) / 10,
+                            distance: Math.round(dist * 10) / 10,
+                            yaw: Math.round(entYaw * 100) / 100,
+                            facing: entFacing,
+                            health: ent.health ? Math.round(ent.health) : undefined,
+                        });
+                    }
+                }
+                // 2. Collect general entities
                 if (dist <= 24) {
                     const entName = ent.username || ent.name || ent.displayName || 'entity';
-                    const isPlayer = ent.type === 'player';
                     const isHostile = ['zombie', 'skeleton', 'creeper', 'spider', 'enderman', 'witch', 'blaze', 'ghast', 'warden', 'phantom', 'drowned'].includes(ent.name?.toLowerCase() || '');
                     nearbyEntities.push({
                         id: ent.id,
@@ -1207,8 +1258,11 @@ class BotInstance {
                 }
             }
             nearbyEntities.sort((a, b) => a.distance - b.distance);
+            nearbyPlayers.sort((a, b) => a.distance - b.distance);
         }
         catch (e) { }
+        // Sample terrain surface grid for Xaero's Minimap view
+        const terrainGrid = (0, terrainMapper_js_1.sampleTerrainGrid)(this.bot, 14);
         // Inventory serialization with enchantments and lore
         const inventoryList = [];
         try {
@@ -1320,6 +1374,10 @@ class BotInstance {
             pitch: Math.round(pitch * 100) / 100,
             targetBlock,
             nearbyEntities: nearbyEntities.slice(0, 15),
+            nearbyPlayers,
+            currentBiome: terrainGrid?.currentBiome,
+            currentLandBlock: terrainGrid?.currentLandBlock,
+            terrainGrid,
             isPatrolling: this.isPatrolling,
             isFarming: Boolean(this.config.farming?.enabled && this.currentStatus === 'online'),
         };

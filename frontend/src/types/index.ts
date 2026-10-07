@@ -78,6 +78,35 @@ export interface InventoryItem {
   enchantments?: ItemEnchantment[];
 }
 
+export interface MinimapPlayer {
+  username: string;
+  x: number;
+  y: number;
+  z: number;
+  dx: number;
+  dz: number;
+  distance: number;
+  yaw: number;
+  facing?: string;
+  health?: number;
+}
+
+export interface TerrainPaletteItem {
+  id: number;
+  name: string;
+  color: string;
+}
+
+export interface TerrainGridData {
+  radius: number;
+  size: number;
+  currentBiome?: string;
+  currentLandBlock?: string;
+  palette: TerrainPaletteItem[];
+  cells: number[];
+  heights: number[];
+}
+
 export interface BotTelemetry {
   id: string;
   name: string;
@@ -112,6 +141,10 @@ export interface BotTelemetry {
   pitch?: number;
   targetBlock?: { name: string; x: number; y: number; z: number } | null;
   nearbyEntities?: Array<{ id: number; name: string; type: string; distance: number; x: number; z: number; isPlayer: boolean; isHostile: boolean }>;
+  nearbyPlayers?: MinimapPlayer[];
+  currentBiome?: string;
+  currentLandBlock?: string;
+  terrainGrid?: TerrainGridData | null;
   isPatrolling?: boolean;
   isFarming?: boolean;
 }
