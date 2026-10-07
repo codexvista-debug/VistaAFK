@@ -97,6 +97,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             )}
           </Link>
+
+          <Link
+            href="/logs"
+            className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+              pathname === '/logs'
+                ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30'
+                : 'bg-[#1b2637]/70 text-slate-300 hover:text-white hover:bg-[#1b2637] border-slate-700'
+            }`}
+          >
+            <Terminal className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[2.5]" />
+            <span className="hidden sm:inline">Player Logs</span>
+            <span className="inline sm:hidden text-[11px]">Logs</span>
+          </Link>
         </nav>
 
         {/* Daemon Connection Pill */}

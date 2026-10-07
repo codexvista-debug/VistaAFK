@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   Play,
   Square,
@@ -94,7 +95,14 @@ export const BotCard: React.FC<BotCardProps> = ({
             message: l.message,
           }));
 
-  const recentActivities = displayLogs.slice(-6);
+  const recentActivities = displayLogs.slice(-50);
+  const logsContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (isLogsExpanded && logsContainerRef.current) {
+      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+    }
+  }, [displayLogs, isLogsExpanded]);
 
   return (
     <div className="bg-white border-2 border-slate-200/90 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
@@ -306,21 +314,23 @@ export const BotCard: React.FC<BotCardProps> = ({
                 >
                   {isLogsExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onOpenChat(config.id)}
-                  className="text-emerald-400 hover:text-emerald-300 transition flex items-center space-x-1 text-[10px] font-semibold"
-                  title="Open Full Console & Send Messages"
+                <Link
+                  href={`/logs?bot=${config.id}`}
+                  className="text-emerald-400 hover:text-emerald-300 transition flex items-center space-x-1 text-[10px] font-bold bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-700/80 px-2 py-0.5 rounded-md"
+                  title="Open Player Logs as dedicated tab"
                 >
-                  <span>Console</span>
+                  <span>Open Tab</span>
                   <ExternalLink className="h-2.5 w-2.5" />
-                </button>
+                </Link>
               </div>
             </div>
 
             {/* Activity Stream Messages */}
             {isLogsExpanded && (
-              <div className="mt-2 space-y-1.5 max-h-32 overflow-y-auto font-mono text-[11px] leading-tight pr-1 scrollbar-thin">
+              <div
+                ref={logsContainerRef}
+                className="mt-2 space-y-1.5 max-h-36 overflow-y-auto font-mono text-[11px] leading-tight pr-1 scrollbar-thin scroll-smooth"
+              >
                 {recentActivities.length === 0 ? (
                   <div className="text-slate-500 py-2 text-center text-[10px] italic">
                     {isOnline ? 'Bot is active in world. Waiting for next player activity...' : 'Bot is offline. Connect to start streaming logs.'}
