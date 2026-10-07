@@ -391,90 +391,93 @@ export const BotCard: React.FC<BotCardProps> = ({
       </div>
 
       {/* Action Footer */}
-      <div className="bg-slate-50/80 px-3.5 sm:px-5 py-2.5 sm:py-3 border-t border-slate-200/80 flex items-center justify-between gap-1.5 sm:gap-2">
+      <div className="bg-slate-50/90 px-3 sm:px-5 py-2.5 sm:py-3 border-t border-slate-200/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
         {/* Toggle Connect / Disconnect */}
-        {isOnline || isConnecting || isAuthenticating ? (
-          <button
-            onClick={() => onStop(config.id)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-lg shadow-sm transition"
-          >
-            <Square className="h-3 w-3 fill-current" />
-            <span>{isConnecting ? 'Cancel' : 'Disconnect'}</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => onStart(config.id)}
-            className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm shadow-emerald-600/25 transition"
-          >
-            <Play className="h-3 w-3 fill-current" />
-            <span>Connect</span>
-          </button>
-        )}
+        <div className="w-full sm:w-auto">
+          {isOnline || isConnecting || isAuthenticating ? (
+            <button
+              onClick={() => onStop(config.id)}
+              className="w-full sm:w-auto flex items-center justify-center space-x-1.5 px-4 py-2 sm:py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl shadow-sm transition active:scale-95"
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+              <span>{isConnecting ? 'Cancel' : 'Disconnect'}</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => onStart(config.id)}
+              className="w-full sm:w-auto flex items-center justify-center space-x-1.5 px-4 py-2 sm:py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-emerald-600/25 transition active:scale-95"
+            >
+              <Play className="h-3.5 w-3.5 fill-current" />
+              <span>Connect</span>
+            </button>
+          )}
+        </div>
 
-        <div className="flex items-center space-x-1.5">
-          {/* Player Live Logs Button - Opens dedicated page in new tab */}
+        {/* 6 Quick Action Tool Buttons */}
+        <div className="grid grid-cols-6 sm:flex items-center gap-1.5 w-full sm:w-auto">
+          {/* 1. Player Live Logs Button */}
           <a
             href={`/logs?bot=${config.id}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="p-1.5 rounded-lg border shadow-sm transition flex items-center space-x-1 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border-slate-200"
-            title="Open Dedicated Player Logs in a new tab"
+            className="h-10 sm:h-8 px-2 sm:px-2.5 rounded-xl border shadow-xs transition flex items-center justify-center space-x-1 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border-slate-200 active:scale-95"
+            title="Open Dedicated Player Logs"
           >
-            <Terminal className="h-4 w-4 text-emerald-700" />
+            <Terminal className="h-4 w-4 text-emerald-700 shrink-0" />
             {displayLogs.length > 0 && (
-              <span className="text-[10px] font-mono font-bold text-emerald-800">
+              <span className="text-[10px] font-mono font-bold text-emerald-800 hidden md:inline">
                 {displayLogs.length}
               </span>
             )}
           </a>
 
-          {/* Tactical Sight & Movement Controls */}
+          {/* 2. Tactical Sight & Movement Controls */}
           {onOpenSightModal && (
             <button
               onClick={() => onOpenSightModal(config)}
-              className="p-1.5 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 rounded-lg border border-slate-200 shadow-sm transition"
+              className="h-10 sm:h-8 px-2 sm:px-2 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 rounded-xl border border-slate-200 shadow-xs transition flex items-center justify-center active:scale-95"
               title="Tactical Radar & Movement Controls"
             >
-              <Compass className="h-4 w-4" />
+              <Compass className="h-4 w-4 text-emerald-700 shrink-0" />
             </button>
           )}
 
-          {/* Player Inventory & Lore Viewer */}
+          {/* 3. Player Inventory & Lore Viewer */}
           {onOpenInventory && (
             <button
               onClick={() => onOpenInventory(config)}
-              className="p-1.5 bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-700 rounded-lg border border-slate-200 shadow-sm transition"
-              title="View Player Inventory, Items & Lore"
+              className="h-10 sm:h-8 px-2 sm:px-2 bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-700 rounded-xl border border-slate-200 shadow-xs transition flex items-center justify-center active:scale-95"
+              title="View Player Inventory & Items"
             >
-              <Package className="h-4 w-4" />
+              <Package className="h-4 w-4 text-amber-700 shrink-0" />
             </button>
           )}
 
-          {/* Live Chat & Full Console */}
+          {/* 4. Live Chat & Full Console */}
           <button
             onClick={() => onOpenChat(config.id)}
-            className="p-1.5 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 shadow-sm transition"
-            title="Open Full Console & Send Messages"
+            className="h-10 sm:h-8 px-2 sm:px-2 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-xl border border-slate-200 shadow-xs transition flex items-center justify-center active:scale-95"
+            title="Open Console & Send Chat"
           >
-            <MessageSquare className="h-4 w-4" />
+            <MessageSquare className="h-4 w-4 text-blue-600 shrink-0" />
           </button>
 
-          {/* Edit Settings */}
+          {/* 5. Edit Settings */}
           <button
             onClick={() => onEdit(config)}
-            className="p-1.5 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 shadow-sm transition"
-            title="Account Settings"
+            className="h-10 sm:h-8 px-2 sm:px-2 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-xl border border-slate-200 shadow-xs transition flex items-center justify-center active:scale-95"
+            title="Bot Settings"
           >
-            <Settings2 className="h-4 w-4" />
+            <Settings2 className="h-4 w-4 text-slate-600 shrink-0" />
           </button>
 
-          {/* Delete Bot */}
+          {/* 6. Delete Bot */}
           <button
             onClick={() => onDelete(config.id)}
-            className="p-1.5 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg border border-slate-200 shadow-sm transition"
-            title="Delete Account"
+            className="h-10 sm:h-8 px-2 sm:px-2 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-xl border border-slate-200 shadow-xs transition flex items-center justify-center active:scale-95"
+            title="Delete Deployment"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-4 w-4 text-rose-500 shrink-0" />
           </button>
         </div>
       </div>
