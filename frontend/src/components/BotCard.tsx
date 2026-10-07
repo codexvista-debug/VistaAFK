@@ -61,6 +61,9 @@ export const BotCard: React.FC<BotCardProps> = ({
   const isConnecting = status === 'connecting' || status === 'reconnecting';
 
   const health = telemetry?.health ?? 0;
+  const maxHealth = telemetry?.maxHealth || 20;
+  const hearts = telemetry?.hearts ?? Math.round((health / 2) * 10) / 10;
+  const maxHearts = telemetry?.maxHearts ?? Math.round((maxHealth / 2) * 10) / 10;
   const food = telemetry?.food ?? 0;
   const coords = telemetry?.coordinates ?? { x: 0, y: 0, z: 0 };
   const dimension = telemetry?.dimension || 'overworld';
@@ -203,13 +206,20 @@ export const BotCard: React.FC<BotCardProps> = ({
                 <span className="text-slate-500 font-medium flex items-center space-x-1">
                   <Heart className="h-3 w-3 text-rose-500 fill-rose-500" />
                   <span>HP</span>
+                  {isOnline && (
+                    <span className="text-[10px] text-rose-600 font-mono font-bold bg-rose-50 px-1 py-0.2 rounded border border-rose-200">
+                      {hearts}/{maxHearts}❤
+                    </span>
+                  )}
                 </span>
-                <span className="font-mono text-slate-800 font-semibold">{isOnline ? `${Math.round(health)} / 20` : '--'}</span>
+                <span className="font-mono text-slate-800 font-semibold">
+                  {isOnline ? `${Math.round(health)} / ${Math.round(maxHealth)}` : '--'}
+                </span>
               </div>
               <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                 <div
                   className="bg-rose-500 h-full transition-all duration-300 rounded-full"
-                  style={{ width: `${isOnline ? Math.min(100, (health / 20) * 100) : 0}%` }}
+                  style={{ width: `${isOnline ? Math.min(100, (health / maxHealth) * 100) : 0}%` }}
                 />
               </div>
             </div>
@@ -314,14 +324,16 @@ export const BotCard: React.FC<BotCardProps> = ({
                 >
                   {isLogsExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                 </button>
-                <Link
+                <a
                   href={`/logs?bot=${config.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-emerald-400 hover:text-emerald-300 transition flex items-center space-x-1 text-[10px] font-bold bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-700/80 px-2 py-0.5 rounded-md"
-                  title="Open Player Logs as dedicated tab"
+                  title="Open Player Logs as dedicated page in a new tab"
                 >
                   <span>Open Tab</span>
                   <ExternalLink className="h-2.5 w-2.5" />
-                </Link>
+                </a>
               </div>
             </div>
 
@@ -373,23 +385,21 @@ export const BotCard: React.FC<BotCardProps> = ({
         )}
 
         <div className="flex items-center space-x-1.5">
-          {/* Player Live Logs Button (Located exactly where requested) */}
-          <button
-            onClick={() => setIsLogsExpanded(!isLogsExpanded)}
-            className={`p-1.5 rounded-lg border shadow-sm transition flex items-center space-x-1 ${
-              isLogsExpanded
-                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
-            }`}
-            title="Player Activity & Logs (Toggle in-card stream)"
+          {/* Player Live Logs Button - Opens dedicated page in new tab */}
+          <a
+            href={`/logs?bot=${config.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1.5 rounded-lg border shadow-sm transition flex items-center space-x-1 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border-slate-200"
+            title="Open Dedicated Player Logs in a new tab"
           >
             <Terminal className="h-4 w-4 text-emerald-700" />
-            {logs.length > 0 && (
+            {displayLogs.length > 0 && (
               <span className="text-[10px] font-mono font-bold text-emerald-800">
-                {logs.length}
+                {displayLogs.length}
               </span>
             )}
-          </button>
+          </a>
 
           {/* Tactical Sight & Movement Controls */}
           {onOpenSightModal && (

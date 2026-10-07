@@ -85,6 +85,8 @@ export interface BotTelemetry {
   };
   health: number;
   maxHealth: number;
+  hearts?: number;
+  maxHearts?: number;
   food: number;
   coordinates: {
     x: number;

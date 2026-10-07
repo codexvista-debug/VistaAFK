@@ -103,7 +103,11 @@ function ChatContent() {
           <div className="flex items-center space-x-4 text-xs font-mono">
             <div className="flex items-center space-x-1.5 text-rose-600 font-bold">
               <Heart className="h-4 w-4 fill-current" />
-              <span>{isOnline ? `${Math.round(currentTelemetry?.health || 0)}/20` : '--'}</span>
+              <span>
+                {isOnline
+                  ? `${Math.round(currentTelemetry?.health || 0)}/${Math.round(currentTelemetry?.maxHealth || 20)} HP (${currentTelemetry?.hearts ?? Math.round(((currentTelemetry?.health || 0) / 2) * 10) / 10}/${currentTelemetry?.maxHearts ?? Math.round(((currentTelemetry?.maxHealth || 20) / 2) * 10) / 10}❤)`
+                  : '--'}
+              </span>
             </div>
             <div className="flex items-center space-x-1.5 text-amber-600 font-bold">
               <Utensils className="h-4 w-4" />

@@ -355,6 +355,22 @@ export class BotInstance {
       this.checkSurvivalActions();
     });
 
+    this.bot.on('entityAttributes', (entity) => {
+      if (this.bot && entity === this.bot.entity) {
+        this.emitTelemetry();
+        this.checkSurvivalActions();
+      }
+    });
+
+    (this.bot as any)._client?.on('entity_update_attributes', (packet: any) => {
+      if (this.bot && packet.entityId === this.bot.entity?.id) {
+        setTimeout(() => {
+          this.emitTelemetry();
+          this.checkSurvivalActions();
+        }, 150);
+      }
+    });
+
     // Auto accept resource packs (critical for SMP sub-servers like Lifesteal with custom packs)
     (this.bot as any).on('resourcePack', (url: string, hash: string) => {
       try {
@@ -504,6 +520,62 @@ export class BotInstance {
     }, intervalMs);
   }
 
+  public getMaxHealth(): number {
+    if (!this.bot) return 20;
+
+    // 1. Check entity attributes (minecraft:generic.max_health)
+    const entityAny = this.bot.entity as any;
+    if (entityAny?.attributes) {
+      const attr =
+        entityAny.attributes['minecraft:generic.max_health'] ||
+        entityAny.attributes['generic.max_health'];
+
+      if (attr && typeof attr.value === 'number' && attr.value > 0) {
+        let finalVal = attr.value;
+        if (Array.isArray(attr.modifiers) && attr.modifiers.length > 0) {
+          let op0 = 0;
+          let op1 = 0;
+          let op2 = 1;
+          for (const mod of attr.modifiers) {
+            if (mod.operation === 0) op0 += (mod.amount || 0);
+            else if (mod.operation === 1) op1 += (mod.amount || 0);
+            else if (mod.operation === 2) op2 *= (1 + (mod.amount || 0));
+          }
+          finalVal = Math.max(1, (attr.value + op0) * (1 + op1) * op2);
+        }
+        return Math.round(finalVal * 10) / 10;
+      }
+    }
+
+    // 2. Check scoreboard lines for "Hearts: X" (e.g. FreshSMP / Lifesteal)
+    if ((this.bot as any).scoreboards) {
+      try {
+        const boards = Object.values((this.bot as any).scoreboards);
+        for (const board of boards as any[]) {
+          if (!board || !board.items) continue;
+          const items = Object.values(board.items) as any[];
+          for (const it of items) {
+            const text = it.displayName || it.name || '';
+            const match = text.match(/Hearts?:\s*([0-9]+)/i);
+            if (match) {
+              const hearts = parseInt(match[1], 10);
+              if (hearts > 0 && hearts <= 100) {
+                return hearts * 2;
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 3. Fallback: if bot.health is higher than 20
+    if (this.bot.health && this.bot.health > 20) {
+      return Math.round(this.bot.health);
+    }
+
+    return 20;
+  }
+
   private checkSurvivalActions() {
     if (!this.bot) return;
 
@@ -527,11 +599,12 @@ export class BotInstance {
     // 2. Universal Auto Eat & Healing
     if (this.config.survival.autoEat && !this.isEatingFood && this.bot.inventory) {
       try {
-        const currentHealth = this.bot.health ?? 20;
+        const currentHealth = Math.round((this.bot.health ?? 20) * 10) / 10;
         const currentFood = this.bot.food ?? 20;
-        const isInjured = currentHealth < 20;
+        const maxHealth = this.getMaxHealth();
+        const isInjured = currentHealth < maxHealth;
         const isHungry = currentFood < 20;
-        const eatThreshold = this.config.survival.eatThreshold || 18;
+        const eatThreshold = this.config.survival.eatThreshold || (maxHealth - 2);
         const hungerBelowThreshold = currentFood <= eatThreshold;
 
         // In Minecraft:
@@ -814,6 +887,8 @@ export class BotInstance {
         authCodeInfo: this.authCodeInfo,
         health: 0,
         maxHealth: 20,
+        hearts: 0,
+        maxHearts: 10,
         food: 0,
         coordinates: { x: 0, y: 0, z: 0 },
         dimension: 'unknown',
@@ -958,14 +1033,21 @@ export class BotInstance {
       }
     } catch (e) {}
 
+    const currentHealth = Math.round((this.bot.health || 0) * 10) / 10;
+    const maxHealth = this.getMaxHealth();
+    const hearts = Math.round((currentHealth / 2) * 10) / 10;
+    const maxHearts = Math.round((maxHealth / 2) * 10) / 10;
+
     return {
       id: this.config.id,
       name: this.config.name,
       status: this.currentStatus,
       statusMessage: this.statusMessage,
       authCodeInfo: this.authCodeInfo,
-      health: this.bot.health || 0,
-      maxHealth: 20,
+      health: currentHealth,
+      maxHealth,
+      hearts,
+      maxHearts,
       food: this.bot.food || 0,
       coordinates: {
         x: Math.round(pos.x * 10) / 10,
