@@ -31,8 +31,8 @@ fi
 
 # 5. Ensure Bedrock protocol dependencies are installed
 if [ ! -d "node_modules/bedrock-protocol" ]; then
-  echo "📦 Installing Bedrock support (npm install bedrock-protocol --no-optional)..."
-  npm install bedrock-protocol@^3.60.1 --no-optional
+  echo "📦 Installing Bedrock support (pure JS, 0 compilation)..."
+  npm install bedrock-protocol --ignore-scripts --omit=optional
 fi
 
 # 6. Run the pre-compiled daemon directly (Zero compilation needed on mobile!)
