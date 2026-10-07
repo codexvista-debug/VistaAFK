@@ -151,6 +151,20 @@ export class BotManager {
     }
   }
 
+  public moveSlotItem(botId: string, sourceSlot: number, targetSlot: number) {
+    const instance = this.bots.get(botId);
+    if (instance) {
+      instance.moveSlotItem(sourceSlot, targetSlot);
+    }
+  }
+
+  public setQuickBarSlot(botId: string, slot: number) {
+    const instance = this.bots.get(botId);
+    if (instance) {
+      instance.setQuickBarSlot(slot);
+    }
+  }
+
   public getAllConfigs(): BotConfig[] {
     return Array.from(this.configs.values());
   }

@@ -20,6 +20,7 @@ import {
   ChevronDown,
   ChevronUp,
   Package,
+  Swords,
 } from 'lucide-react';
 import { BotConfig, BotTelemetry, ChatMessage, ActivityLog } from '../types';
 
@@ -270,6 +271,13 @@ export const BotCard: React.FC<BotCardProps> = ({
               <Shield className="h-2.5 w-2.5" />
               <span>Totem</span>
             </span>
+
+            {config.farming?.enabled && (
+              <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full font-bold border bg-purple-50 border-purple-200 text-purple-700 animate-pulse">
+                <Swords className="h-2.5 w-2.5" />
+                <span>Farm (Auto-Swing)</span>
+              </span>
+            )}
 
             {isOnline && (
               <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full font-mono font-bold text-[10px] bg-emerald-100 text-emerald-800 border-2 border-emerald-400 shadow-xs">

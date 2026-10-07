@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Bot, Server, Zap, Heart, Bell, Terminal, ShieldCheck } from 'lucide-react';
+import { X, Bot, Server, Zap, Heart, Bell, Terminal, ShieldCheck, Swords } from 'lucide-react';
 import { BotConfig } from '../types';
 
 interface AddBotModalProps {
@@ -38,10 +38,16 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
       recurringCommand: initialConfig?.survival?.recurringCommand || '',
       recurringIntervalSeconds: initialConfig?.survival?.recurringIntervalSeconds || undefined,
     },
+    farming: {
+      enabled: initialConfig?.farming?.enabled ?? false,
+      autoEquipSword: initialConfig?.farming?.autoEquipSword ?? true,
+      swingIntervalMs: initialConfig?.farming?.swingIntervalMs || 900,
+      targetMode: initialConfig?.farming?.targetMode || 'continuous',
+    },
     discordWebhookUrl: initialConfig?.discordWebhookUrl || '',
   });
 
-  const [activeTab, setActiveTab] = useState<'connection' | 'antiAfk' | 'survival' | 'alerts'>('connection');
+  const [activeTab, setActiveTab] = useState<'connection' | 'antiAfk' | 'survival' | 'farming' | 'alerts'>('connection');
   const [testWebhookStatus, setTestWebhookStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
 
   const handleTestWebhook = async () => {
@@ -124,6 +130,16 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
           >
             <Heart className="h-3.5 w-3.5" />
             <span>Survival</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('farming')}
+            className={`py-3 flex items-center space-x-1.5 border-b-2 transition ${
+              activeTab === 'farming' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Swords className="h-3.5 w-3.5" />
+            <span>Farming</span>
           </button>
           <button
             type="button"
@@ -563,6 +579,177 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
                   <p className="text-[10px] text-slate-500 leading-tight">
                     Repeats this command every X seconds (e.g. 180s for 3 minutes) while chunk-loading.
                   </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Farming Tab */}
+          {activeTab === 'farming' && (
+            <div className="space-y-4">
+              {/* Enable Mob Farming */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="p-2 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <Swords className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">Mob Farming & Auto-Swing</h4>
+                      <p className="text-[11px] text-slate-500">
+                        Automatically swings weapon to kill Endermen, Zombies, or XP farm mobs
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={formData.farming?.enabled ?? false}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        farming: {
+                          enabled: e.target.checked,
+                          autoEquipSword: formData.farming?.autoEquipSword ?? true,
+                          swingIntervalMs: formData.farming?.swingIntervalMs || 900,
+                          targetMode: formData.farming?.targetMode || 'continuous',
+                        },
+                      })
+                    }
+                    className="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Auto Pick & Equip Sword */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800">Auto-Pick Sword from Any Inventory Slot</h4>
+                    <p className="text-[11px] text-slate-500">
+                      Searches any slot (main storage or hotbar) for Netherite, Diamond, or Iron swords and equips to main hand. Automatically replaces broken swords.
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={formData.farming?.autoEquipSword ?? true}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        farming: {
+                          enabled: formData.farming?.enabled ?? false,
+                          autoEquipSword: e.target.checked,
+                          swingIntervalMs: formData.farming?.swingIntervalMs || 900,
+                          targetMode: formData.farming?.targetMode || 'continuous',
+                        },
+                      })
+                    }
+                    className="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Attack Speed / Swing Interval */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800">Swing Interval / Cooldown</h4>
+                    <p className="text-[11px] text-slate-500">
+                      Cooldown between swings (allows Minecraft sword sweep attack meter to charge for group kills)
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    {((formData.farming?.swingIntervalMs || 900) / 1000).toFixed(1)}s
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="400"
+                  max="2000"
+                  step="100"
+                  value={formData.farming?.swingIntervalMs || 900}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      farming: {
+                        enabled: formData.farming?.enabled ?? false,
+                        autoEquipSword: formData.farming?.autoEquipSword ?? true,
+                        swingIntervalMs: Number(e.target.value),
+                        targetMode: formData.farming?.targetMode || 'continuous',
+                      },
+                    })
+                  }
+                  className="w-full accent-emerald-600 cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                  <span>Fast (0.4s)</span>
+                  <span>Optimal Sweep (0.9s)</span>
+                  <span>Slow (2.0s)</span>
+                </div>
+              </div>
+
+              {/* Target Mode */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <label className="block text-xs font-bold text-slate-800">Grinder Attack Mode</label>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        farming: {
+                          enabled: formData.farming?.enabled ?? false,
+                          autoEquipSword: formData.farming?.autoEquipSword ?? true,
+                          swingIntervalMs: formData.farming?.swingIntervalMs || 900,
+                          targetMode: 'continuous',
+                        },
+                      })
+                    }
+                    className={`p-2.5 rounded-xl border text-left text-xs transition ${
+                      formData.farming?.targetMode !== 'entity'
+                        ? 'border-emerald-500 bg-emerald-50/80 text-emerald-950 font-bold shadow-xs'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="font-bold flex items-center justify-between">
+                      <span>Continuous Swing</span>
+                      {formData.farming?.targetMode !== 'entity' && (
+                        <span className="text-[10px] text-emerald-600">✓</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-normal mt-0.5">
+                      Swings constantly into drop chute (Ideal for 1-hit Enderman farms & XP drop grinders)
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        farming: {
+                          enabled: formData.farming?.enabled ?? false,
+                          autoEquipSword: formData.farming?.autoEquipSword ?? true,
+                          swingIntervalMs: formData.farming?.swingIntervalMs || 900,
+                          targetMode: 'entity',
+                        },
+                      })
+                    }
+                    className={`p-2.5 rounded-xl border text-left text-xs transition ${
+                      formData.farming?.targetMode === 'entity'
+                        ? 'border-emerald-500 bg-emerald-50/80 text-emerald-950 font-bold shadow-xs'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="font-bold flex items-center justify-between">
+                      <span>Target Nearby Mobs</span>
+                      {formData.farming?.targetMode === 'entity' && (
+                        <span className="text-[10px] text-emerald-600">✓</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-normal mt-0.5">
+                      Only attacks when hostile mobs are within striking distance (3.5 blocks)
+                    </p>
+                  </button>
                 </div>
               </div>
             </div>

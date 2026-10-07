@@ -42,6 +42,7 @@ export default function Dashboard() {
     moveBot,
     togglePatrol,
     lookAt,
+    dismissNotification,
   } = useVistaWebSocket();
 
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
@@ -70,7 +71,7 @@ export default function Dashboard() {
   };
 
   const handleDismissNotification = (id: string) => {
-    // handled by notification toast
+    dismissNotification(id);
   };
 
   const onlineCount = Object.values(telemetry).filter((t) => t.status === 'online').length;

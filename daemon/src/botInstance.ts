@@ -132,6 +132,8 @@ export class BotInstance {
   private reconnectAttempts: number = 0;
   private patrolInterval: NodeJS.Timeout | null = null;
   private isPatrolling: boolean = false;
+  private farmingInterval: NodeJS.Timeout | null = null;
+  private lastSwordEquipCheck: number = 0;
   private recurringCommandInterval: NodeJS.Timeout | null = null;
   private spawnCommandTimeout: NodeJS.Timeout | null = null;
   private lastChatText: string = '';
@@ -177,6 +179,7 @@ export class BotInstance {
     if (this.bot && this.currentStatus === 'online') {
       this.setupAntiAfk();
       this.setupAutoCommands();
+      this.setupFarming();
     }
   }
 
@@ -289,6 +292,7 @@ export class BotInstance {
       this.sendDiscordAlert(`🟢 **${this.config.name}** joined lobby/world on \`${this.config.host}:${this.config.port || 25565}\` (${dimension})`);
 
       this.setupAntiAfk();
+      this.setupFarming();
       this.setupTelemetryLoop();
       this.checkSurvivalActions();
       this.setupAutoCommands();
@@ -370,6 +374,7 @@ export class BotInstance {
 
     this.bot.on('respawn', () => {
       this.setupAntiAfk();
+      this.setupFarming();
       this.checkSurvivalActions();
       this.emitActivity('spawn', '♻️ Respawned in world');
       this.callbacks.onChatMessage({
@@ -688,6 +693,117 @@ export class BotInstance {
     } catch (e) {}
   }
 
+  public setupFarming() {
+    if (this.farmingInterval) {
+      clearInterval(this.farmingInterval);
+      this.farmingInterval = null;
+    }
+    if (!this.config.farming?.enabled || !this.bot || this.currentStatus !== 'online') return;
+
+    const swingInterval = Math.max(300, this.config.farming.swingIntervalMs || 900);
+    this.emitActivity('survival', `⚔️ Mob Farm active: Auto-swinging every ${(swingInterval / 1000).toFixed(1)}s (Auto-equip sword: ${this.config.farming.autoEquipSword ? 'ON' : 'OFF'})`);
+
+    this.farmingInterval = setInterval(async () => {
+      if (!this.bot || !this.bot.entity || this.currentStatus !== 'online') return;
+      if (this.isEatingFood) return; // Respect auto-eat priority
+
+      try {
+        // 1. Auto Pick & Equip Sword from any slot
+        if (this.config.farming?.autoEquipSword && Date.now() - this.lastSwordEquipCheck > 1500) {
+          this.lastSwordEquipCheck = Date.now();
+          const heldItem = this.bot.heldItem;
+          const isHoldingSword = heldItem && (heldItem.name.endsWith('_sword') || heldItem.name.includes('sword'));
+
+          if (!isHoldingSword && this.bot.inventory) {
+            const SWORD_PRIORITY = [
+              'netherite_sword',
+              'diamond_sword',
+              'iron_sword',
+              'golden_sword',
+              'stone_sword',
+              'wooden_sword',
+            ];
+            const items = this.bot.inventory.items();
+            let sword = items.find((i) => SWORD_PRIORITY.includes(i.name)) || items.find((i) => i.name.endsWith('_sword'));
+
+            if (sword) {
+              await this.bot.equip(sword, 'hand');
+              this.emitActivity('survival', `⚔️ Auto-Equipped ${sword.displayName || sword.name} from inventory for mob farming`);
+              this.emitTelemetry();
+            }
+          }
+        }
+
+        // 2. Mob Attack / Grinder Swing
+        const targetMode = this.config.farming?.targetMode || 'continuous';
+
+        // Check for nearby hostile entities within attack reach (3.5 blocks)
+        let targetEntity: any = null;
+        if (this.bot.entities) {
+          const entities = Object.values(this.bot.entities);
+          targetEntity = entities.find((e: any) => {
+            if (!e || e === this.bot?.entity || !e.position) return false;
+            const dist = this.bot!.entity.position.distanceTo(e.position);
+            if (dist > 3.5) return false;
+            const name = (e.name || (e as any).displayName || '').toLowerCase();
+            const type = (e.type || '').toLowerCase();
+            return type === 'hostile' || type === 'mob' || [
+              'enderman', 'zombie', 'skeleton', 'creeper', 'spider', 'cave_spider',
+              'zombified_piglin', 'blaze', 'piglin', 'wither_skeleton', 'slime', 'magma_cube',
+              'drowned', 'husk', 'stray', 'witch', 'phantom', 'pillager', 'vindicator', 'ravager'
+            ].some((m) => name.includes(m));
+          });
+        }
+
+        if (targetEntity) {
+          try {
+            await this.bot.lookAt(targetEntity.position.offset(0, targetEntity.height ? targetEntity.height * 0.7 : 1, 0), true);
+          } catch (e) {}
+          this.bot.attack(targetEntity);
+        } else if (targetMode === 'continuous') {
+          // Continuously swing arm into drop chute (for 1-hit Enderman farms & XP grinders)
+          this.bot.swingArm('right');
+        }
+      } catch (err: any) {
+        // Safe catch
+      }
+    }, swingInterval);
+  }
+
+  public async moveSlotItem(sourceSlot: number, targetSlot: number) {
+    if (!this.bot || this.currentStatus !== 'online') {
+      this.callbacks.onNotification('warn', 'Bot is offline, cannot move items', this.config.id);
+      return;
+    }
+    try {
+      if (typeof (this.bot as any).moveSlotItem === 'function') {
+        await (this.bot as any).moveSlotItem(sourceSlot, targetSlot);
+      } else {
+        await (this.bot as any).clickWindow(sourceSlot, 0, 0);
+        await (this.bot as any).clickWindow(targetSlot, 0, 0);
+        if (this.bot.inventory?.selectedItem) {
+          await (this.bot as any).clickWindow(sourceSlot, 0, 0);
+        }
+      }
+      this.callbacks.onNotification('success', `Moved item between slot #${sourceSlot} and #${targetSlot}`, this.config.id);
+      this.emitActivity('survival', `📦 Moved item from slot #${sourceSlot} to #${targetSlot}`);
+      this.emitTelemetry();
+    } catch (err: any) {
+      console.error(`[VistaAFK] Failed to move slot item from ${sourceSlot} to ${targetSlot}:`, err.message);
+      this.callbacks.onNotification('error', `Failed to move item: ${err.message}`, this.config.id);
+    }
+  }
+
+  public async setQuickBarSlot(slot: number) {
+    if (!this.bot || this.currentStatus !== 'online') return;
+    try {
+      this.bot.setQuickBarSlot(slot);
+      this.emitTelemetry();
+    } catch (err: any) {
+      console.error(`[VistaAFK] Failed to set quick bar slot ${slot}:`, err.message);
+    }
+  }
+
   public getTelemetry(): BotTelemetry {
     if (!this.bot || !this.bot.entity) {
       return {
@@ -871,6 +987,7 @@ export class BotInstance {
       targetBlock,
       nearbyEntities: nearbyEntities.slice(0, 15),
       isPatrolling: this.isPatrolling,
+      isFarming: Boolean(this.config.farming?.enabled && this.currentStatus === 'online'),
     };
   }
 
@@ -885,12 +1002,14 @@ export class BotInstance {
     if (this.antiAfkInterval) clearInterval(this.antiAfkInterval);
     if (this.telemetryInterval) clearInterval(this.telemetryInterval);
     if (this.patrolInterval) clearInterval(this.patrolInterval);
+    if (this.farmingInterval) clearInterval(this.farmingInterval);
     if (this.recurringCommandInterval) clearInterval(this.recurringCommandInterval);
     if (this.spawnCommandTimeout) clearTimeout(this.spawnCommandTimeout);
     this.reconnectTimeout = null;
     this.antiAfkInterval = null;
     this.telemetryInterval = null;
     this.patrolInterval = null;
+    this.farmingInterval = null;
     this.recurringCommandInterval = null;
     this.spawnCommandTimeout = null;
   }

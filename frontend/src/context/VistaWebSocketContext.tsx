@@ -59,6 +59,9 @@ export interface VistaWebSocketContextType {
   moveBot: (botId: string, control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean) => void;
   togglePatrol: (botId: string, enabled: boolean) => void;
   lookAt: (botId: string, yaw: number, pitch: number) => void;
+  moveInventoryItem: (botId: string, sourceSlot: number, targetSlot: number) => void;
+  setQuickBarSlot: (botId: string, slot: number) => void;
+  dismissNotification: (id: string) => void;
   clearNotifications: () => void;
 }
 
@@ -392,6 +395,12 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     send({ type: 'TOGGLE_PATROL', payload: { botId, enabled } });
   const lookAt = (botId: string, yaw: number, pitch: number) =>
     send({ type: 'LOOK_AT', payload: { botId, yaw, pitch } });
+  const moveInventoryItem = (botId: string, sourceSlot: number, targetSlot: number) =>
+    send({ type: 'MOVE_INVENTORY_ITEM', payload: { botId, sourceSlot, targetSlot } });
+  const setQuickBarSlot = (botId: string, slot: number) =>
+    send({ type: 'SET_QUICK_BAR_SLOT', payload: { botId, slot } });
+  const dismissNotification = (id: string) =>
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
   const clearNotifications = () => setNotifications([]);
 
   // Deploy a saved account to a specific server instance
@@ -464,6 +473,9 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         moveBot,
         togglePatrol,
         lookAt,
+        moveInventoryItem,
+        setQuickBarSlot,
+        dismissNotification,
         clearNotifications,
       }}
     >

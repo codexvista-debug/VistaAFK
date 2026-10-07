@@ -41,6 +41,7 @@ export default function AccountsPage() {
     secretToken,
     updateDaemonConfig,
     notifications,
+    dismissNotification,
   } = useVistaWebSocket();
 
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
@@ -474,7 +475,7 @@ export default function AccountsPage() {
       {/* Live Toast Notifications */}
       <NotificationToast
         notifications={notifications}
-        onDismiss={() => {}}
+        onDismiss={dismissNotification}
       />
     </div>
   );

@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Shield, Sparkles, Package, Info, Swords, ArrowRight } from 'lucide-react';
+import { X, Shield, Sparkles, Package, Info, Swords, ArrowRight, ArrowLeftRight, Check } from 'lucide-react';
 import { BotConfig, BotTelemetry, InventoryItem } from '../types';
+import { useVistaWebSocket } from '../hooks/useVistaWebSocket';
 
 interface BotInventoryModalProps {
   onClose: () => void;
@@ -15,6 +16,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
   config,
   telemetry,
 }) => {
+  const { moveInventoryItem, setQuickBarSlot } = useVistaWebSocket();
   const inventory = telemetry?.inventory || [];
   const selectedHotbarIndex = telemetry?.selectedSlot ?? 0;
 
@@ -29,19 +31,15 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
 
   // Selected item to display in the Lore & Details inspector
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number | null>(
-    // Default to main hand item if present
     36 + selectedHotbarIndex
   );
 
-  const activeItem = selectedSlotIndex !== null ? slotMap.get(selectedSlotIndex) : null;
+  // Moving slot state for interactive two-click swap or drag & drop
+  const [movingSlot, setMovingSlot] = useState<number | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
 
-  // Equipment slots
-  const helmetItem = slotMap.get(5);
-  const chestItem = slotMap.get(6);
-  const legsItem = slotMap.get(7);
-  const bootsItem = slotMap.get(8);
-  const offhandItem = slotMap.get(45);
-  const mainHandItem = slotMap.get(36 + selectedHotbarIndex);
+  const activeItem = selectedSlotIndex !== null ? slotMap.get(selectedSlotIndex) : null;
+  const movingItem = movingSlot !== null ? slotMap.get(movingSlot) : null;
 
   const getItemTextureUrl = (name: string) => {
     const cleanName = name.replace(/^minecraft:/, '');
@@ -53,30 +51,98 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
     return `https://assets.mcasset.cloud/1.20.4/assets/minecraft/textures/block/${cleanName}.png`;
   };
 
+  const handleSlotClick = (slotNumber: number) => {
+    // If we are currently in move mode
+    if (movingSlot !== null) {
+      if (movingSlot === slotNumber) {
+        // Cancel move if clicked same slot
+        setMovingSlot(null);
+      } else {
+        // Execute move / swap
+        moveInventoryItem(config.id, movingSlot, slotNumber);
+        setSelectedSlotIndex(slotNumber);
+        setMovingSlot(null);
+      }
+      return;
+    }
+
+    // Normal slot selection to inspect
+    setSelectedSlotIndex(slotNumber);
+  };
+
+  const handleDragStart = (e: React.DragEvent, slotNumber: number) => {
+    const item = slotMap.get(slotNumber);
+    if (!item) return;
+    e.dataTransfer.setData('text/plain', String(slotNumber));
+    e.dataTransfer.effectAllowed = 'move';
+    setMovingSlot(slotNumber);
+  };
+
+  const handleDragOver = (e: React.DragEvent, slotNumber: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverSlot !== slotNumber) {
+      setDragOverSlot(slotNumber);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetSlot: number) => {
+    e.preventDefault();
+    setDragOverSlot(null);
+    const sourceSlotRaw = e.dataTransfer.getData('text/plain');
+    const sourceSlot = parseInt(sourceSlotRaw, 10);
+    if (!isNaN(sourceSlot) && sourceSlot !== targetSlot) {
+      moveInventoryItem(config.id, sourceSlot, targetSlot);
+      setSelectedSlotIndex(targetSlot);
+    }
+    setMovingSlot(null);
+  };
+
   const renderSlot = (slotNumber: number, label?: string, isHotbarActive?: boolean) => {
     const item = slotMap.get(slotNumber);
     const isSelected = selectedSlotIndex === slotNumber;
+    const isMovingThis = movingSlot === slotNumber;
+    const isTargetOfMove = movingSlot !== null && movingSlot !== slotNumber;
+    const isDragOver = dragOverSlot === slotNumber;
     const isEnchanted = Boolean(item?.enchantments && item.enchantments.length > 0);
 
     return (
       <div
         key={slotNumber}
-        onClick={() => setSelectedSlotIndex(slotNumber)}
-        className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-lg border-2 flex items-center justify-center cursor-pointer transition-all select-none ${
-          isSelected
+        onClick={() => handleSlotClick(slotNumber)}
+        draggable={Boolean(item)}
+        onDragStart={(e) => handleDragStart(e, slotNumber)}
+        onDragOver={(e) => handleDragOver(e, slotNumber)}
+        onDragLeave={() => setDragOverSlot(null)}
+        onDrop={(e) => handleDrop(e, slotNumber)}
+        className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl border-2 flex items-center justify-center cursor-pointer transition-all select-none ${
+          isMovingThis
+            ? 'bg-emerald-100 border-emerald-500 ring-4 ring-emerald-400/60 scale-105 z-20 animate-pulse'
+            : isDragOver
+            ? 'bg-emerald-200/80 border-emerald-600 ring-2 ring-emerald-500 scale-105 z-10'
+            : isSelected
             ? 'bg-amber-100/90 border-amber-500 shadow-md ring-2 ring-amber-400/50 scale-105 z-10'
+            : isTargetOfMove
+            ? 'bg-slate-100/90 border-dashed border-emerald-400 hover:border-emerald-600 hover:bg-emerald-50'
             : isHotbarActive
             ? 'bg-emerald-50/80 border-emerald-500 shadow-xs'
             : isEnchanted
             ? 'bg-purple-50/70 border-purple-400 hover:border-purple-500'
             : 'bg-slate-100/80 border-slate-300 hover:border-slate-400 hover:bg-slate-200/60'
         }`}
-        title={item ? `${item.displayName} (x${item.count})` : label || `Slot ${slotNumber}`}
+        title={item ? `${item.displayName} (x${item.count}) • Slot #${slotNumber}` : label || `Slot #${slotNumber}`}
       >
         {/* Placeholder Slot Label if empty */}
         {!item && label && (
           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none px-0.5">
             {label}
+          </span>
+        )}
+
+        {/* Move Destination Pulse Hint */}
+        {isTargetOfMove && !item && (
+          <span className="text-[9px] font-mono font-bold text-emerald-600">
+            #{slotNumber >= 36 && slotNumber <= 44 ? `H${slotNumber - 35}` : slotNumber}
           </span>
         )}
 
@@ -162,7 +228,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-mono font-medium">
-                {config.host}:{config.port} &bull; Synchronized via Live Telemetry
+                {config.host}:{config.port} &bull; Drag & drop or click items to move
               </p>
             </div>
           </div>
@@ -174,6 +240,25 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {/* Interactive Move Instruction Banner */}
+        {movingSlot !== null && (
+          <div className="bg-emerald-600 px-4 py-2.5 text-white flex items-center justify-between shadow-inner animate-in slide-in-from-top-1 duration-150">
+            <div className="flex items-center space-x-2 text-xs font-bold font-mono">
+              <ArrowLeftRight className="h-4 w-4 animate-spin text-emerald-200" />
+              <span>
+                Moving {movingItem?.displayName || `Slot #${movingSlot}`} ➜ Click any destination slot or hotbar slot to move / swap!
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMovingSlot(null)}
+              className="px-2.5 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-[11px] font-bold transition"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         {/* Content Body: Split into Equipment/Grid + Item Lore Inspector */}
         <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-5 overflow-y-auto">
@@ -213,7 +298,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   Main Inventory (27 Slots)
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium">Click any item to inspect lore</span>
+                <span className="text-[10px] text-slate-400 font-medium">Click to inspect or drag to move</span>
               </div>
 
               <div className="grid grid-cols-9 gap-1 sm:gap-1.5 justify-items-center">
@@ -231,7 +316,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                   </span>
                 </div>
                 <span className="text-[10px] font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  Equipped
+                  Equipped in Hand
                 </span>
               </div>
 
@@ -243,7 +328,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
 
           {/* Right Col: Detailed Item Lore & Enchantment Inspector */}
           <div className="md:col-span-1">
-            <div className="bg-[#121622] border-2 border-slate-700 rounded-2xl p-4 text-white shadow-inner flex flex-col justify-between h-full min-h-[340px]">
+            <div className="bg-[#121622] border-2 border-slate-700 rounded-2xl p-4 text-white shadow-inner flex flex-col justify-between h-full min-h-[360px]">
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                   <div className="flex items-center space-x-2">
@@ -260,7 +345,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                 </div>
 
                 {activeItem ? (
-                  <div className="mt-4 space-y-3.5">
+                  <div className="mt-4 space-y-3">
                     {/* Item Title and Image */}
                     <div className="flex items-start space-x-3">
                       <div className="w-12 h-12 rounded-xl bg-slate-800/80 border border-slate-700 p-2 flex items-center justify-center shrink-0">
@@ -294,9 +379,100 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                       </div>
                     </div>
 
+                    {/* Move & Quick Equip Actions */}
+                    <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between text-[11px] font-mono">
+                        <span className="font-bold text-slate-200">Move / Swap Item:</span>
+                        {movingSlot === activeItem.slot && (
+                          <span className="text-[10px] text-emerald-400 font-bold animate-pulse">Pick target slot</span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (movingSlot === activeItem.slot) {
+                              setMovingSlot(null);
+                            } else {
+                              setMovingSlot(activeItem.slot);
+                            }
+                          }}
+                          className={`py-1.5 px-2 rounded-lg text-xs font-bold font-mono transition flex items-center justify-center space-x-1 border ${
+                            movingSlot === activeItem.slot
+                              ? 'bg-emerald-600 border-emerald-400 text-white'
+                              : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
+                          }`}
+                        >
+                          <ArrowLeftRight className="h-3 w-3" />
+                          <span>{movingSlot === activeItem.slot ? 'Cancel Move' : 'Move / Swap'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (activeItem.slot >= 36 && activeItem.slot <= 44) {
+                              setQuickBarSlot(config.id, activeItem.slot - 36);
+                            } else {
+                              moveInventoryItem(config.id, activeItem.slot, 36 + selectedHotbarIndex);
+                            }
+                          }}
+                          className="py-1.5 px-2 rounded-lg text-xs font-bold font-mono bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 transition flex items-center justify-center space-x-1"
+                        >
+                          <Swords className="h-3 w-3" />
+                          <span>Equip Main</span>
+                        </button>
+                      </div>
+
+                      {/* Move to Hotbar 1-9 Quick Buttons */}
+                      <div className="pt-1.5 border-t border-slate-800/80">
+                        <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider block mb-1">
+                          Move to Hotbar Slot:
+                        </span>
+                        <div className="grid grid-cols-9 gap-1">
+                          {Array.from({ length: 9 }, (_, i) => {
+                            const targetHotbarSlot = 36 + i;
+                            const isCurrentSlot = activeItem.slot === targetHotbarSlot;
+                            return (
+                              <button
+                                key={i}
+                                type="button"
+                                disabled={isCurrentSlot}
+                                onClick={() => {
+                                  moveInventoryItem(config.id, activeItem.slot, targetHotbarSlot);
+                                  setSelectedSlotIndex(targetHotbarSlot);
+                                }}
+                                className={`py-1 text-center font-mono text-[10px] font-bold rounded border transition ${
+                                  isCurrentSlot
+                                    ? 'bg-emerald-950 border-emerald-700 text-emerald-300'
+                                    : 'bg-slate-800 hover:bg-emerald-600 hover:text-white border-slate-700 text-slate-300'
+                                }`}
+                                title={`Move to Hotbar Slot #${i + 1}`}
+                              >
+                                {i + 1}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Move to Off-Hand */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          moveInventoryItem(config.id, activeItem.slot, 45);
+                          setSelectedSlotIndex(45);
+                        }}
+                        className="w-full py-1.5 px-2 rounded-lg text-xs font-bold font-mono bg-slate-800 hover:bg-slate-700 border border-slate-700 text-purple-300 transition flex items-center justify-center space-x-1 mt-1"
+                      >
+                        <Shield className="h-3 w-3" />
+                        <span>Move to Off-Hand (Slot #45)</span>
+                      </button>
+                    </div>
+
                     {/* Durability */}
                     {typeof activeItem.durabilityUsed === 'number' && typeof activeItem.maxDurability === 'number' && activeItem.maxDurability > 0 && (
-                      <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-800 space-y-1">
+                      <div className="p-2 bg-slate-900/90 rounded-xl border border-slate-800 space-y-1">
                         <div className="flex items-center justify-between text-[11px] font-mono">
                           <span className="text-slate-400 font-medium">Durability:</span>
                           <span className="text-emerald-400 font-bold">
@@ -316,12 +492,12 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
 
                     {/* Enchantments Section */}
                     {activeItem.enchantments && activeItem.enchantments.length > 0 && (
-                      <div className="p-3 bg-purple-950/40 border border-purple-800/60 rounded-xl space-y-1.5">
+                      <div className="p-2.5 bg-purple-950/40 border border-purple-800/60 rounded-xl space-y-1">
                         <div className="flex items-center space-x-1.5 text-purple-300 font-bold text-xs">
                           <Sparkles className="h-3.5 w-3.5 text-purple-400" />
                           <span>Enchantments ({activeItem.enchantments.length})</span>
                         </div>
-                        <div className="space-y-1 pt-1 font-mono text-xs">
+                        <div className="space-y-1 pt-0.5 font-mono text-xs">
                           {activeItem.enchantments.map((ench, idx) => (
                             <div key={idx} className="flex items-center justify-between text-cyan-300 font-semibold">
                               <span>&bull; {ench.displayName}</span>
@@ -334,7 +510,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
 
                     {/* Item Custom Lore Section */}
                     {activeItem.lore && activeItem.lore.length > 0 && (
-                      <div className="p-3 bg-slate-900/90 border border-purple-900/50 rounded-xl space-y-1">
+                      <div className="p-2.5 bg-slate-900/90 border border-purple-900/50 rounded-xl space-y-1">
                         <span className="text-[10px] font-mono uppercase tracking-wider text-purple-400 font-bold">
                           Item Lore
                         </span>
@@ -351,13 +527,13 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                 ) : (
                   <div className="py-16 text-center text-slate-500 font-mono text-xs space-y-2">
                     <Package className="h-8 w-8 mx-auto text-slate-600 stroke-[1.5]" />
-                    <p>Select any item slot from the inventory grid to inspect its lore and enchantments.</p>
+                    <p>Select or drag any item slot to inspect or move it.</p>
                   </div>
                 )}
               </div>
 
               <div className="pt-3 border-t border-slate-800 text-[10px] font-mono text-slate-500 text-center">
-                Updates in real-time as bot picks up or consumes items
+                Updates in real-time as bot picks up, moves, or consumes items
               </div>
             </div>
           </div>
@@ -367,7 +543,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
         <div className="px-5 py-3 border-t-2 border-slate-200 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center space-x-2 text-xs text-slate-500 font-medium">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Live Inventory Stream</span>
+            <span>Interactive Inventory Manager</span>
           </div>
 
           <button

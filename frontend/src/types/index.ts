@@ -43,6 +43,12 @@ export interface BotConfig {
     recurringCommand?: string;
     recurringIntervalSeconds?: number;
   };
+  farming?: {
+    enabled: boolean;
+    autoEquipSword: boolean;
+    swingIntervalMs: number;
+    targetMode: 'continuous' | 'entity';
+  };
   discordWebhookUrl?: string;
 }
 
@@ -100,6 +106,7 @@ export interface BotTelemetry {
   targetBlock?: { name: string; x: number; y: number; z: number } | null;
   nearbyEntities?: Array<{ id: number; name: string; type: string; distance: number; x: number; z: number; isPlayer: boolean; isHostile: boolean }>;
   isPatrolling?: boolean;
+  isFarming?: boolean;
 }
 
 export interface ChatMessage {

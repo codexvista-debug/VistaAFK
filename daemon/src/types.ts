@@ -27,6 +27,12 @@ export interface BotConfig {
     recurringCommand?: string;
     recurringIntervalSeconds?: number;
   };
+  farming?: {
+    enabled: boolean;
+    autoEquipSword: boolean;
+    swingIntervalMs: number;
+    targetMode: 'continuous' | 'entity';
+  };
   discordWebhookUrl?: string;
 }
 
@@ -84,6 +90,7 @@ export interface BotTelemetry {
   targetBlock?: { name: string; x: number; y: number; z: number } | null;
   nearbyEntities?: Array<{ id: number; name: string; type: string; distance: number; x: number; z: number; isPlayer: boolean; isHostile: boolean }>;
   isPatrolling?: boolean;
+  isFarming?: boolean;
 }
 
 export interface ChatMessage {
@@ -115,7 +122,9 @@ export type ClientMessage =
   | { type: 'SEND_CHAT'; payload: { botId: string; message: string } }
   | { type: 'MOVE_BOT'; payload: { botId: string; control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak'; state: boolean } }
   | { type: 'TOGGLE_PATROL'; payload: { botId: string; enabled: boolean } }
-  | { type: 'LOOK_AT'; payload: { botId: string; yaw: number; pitch: number } };
+  | { type: 'LOOK_AT'; payload: { botId: string; yaw: number; pitch: number } }
+  | { type: 'MOVE_INVENTORY_ITEM'; payload: { botId: string; sourceSlot: number; targetSlot: number } }
+  | { type: 'SET_QUICK_BAR_SLOT'; payload: { botId: string; slot: number } };
 
 export type ServerMessage =
   | { type: 'AUTH_SUCCESS' }

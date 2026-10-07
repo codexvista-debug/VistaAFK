@@ -117,6 +117,12 @@ wss.on('connection', (ws) => {
         case 'LOOK_AT':
           botManager.lookAt(msg.payload.botId, msg.payload.yaw, msg.payload.pitch);
           break;
+        case 'MOVE_INVENTORY_ITEM':
+          botManager.moveSlotItem(msg.payload.botId, msg.payload.sourceSlot, msg.payload.targetSlot);
+          break;
+        case 'SET_QUICK_BAR_SLOT':
+          botManager.setQuickBarSlot(msg.payload.botId, msg.payload.slot);
+          break;
       }
     } catch (err: any) {
       console.error('[VistaAFK Daemon] Error processing message:', err.message);
