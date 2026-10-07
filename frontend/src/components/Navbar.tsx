@@ -60,21 +60,20 @@ export const Navbar: React.FC<NavbarProps> = ({
           </Link>
         </div>
 
-        {/* Primary Page Navigation */}
-        <nav className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
+        {/* Primary Page Navigation: Just Icons + Badge */}
+        <nav className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
           <Link
             href="/"
-            className={`flex items-center space-x-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+            className={`flex items-center space-x-1.5 p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-black transition-all border ${
               pathname === '/'
                 ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30'
                 : 'bg-[#1b2637]/70 text-slate-300 hover:text-white hover:bg-[#1b2637] border-slate-700'
             }`}
             title="Server Fleet"
           >
-            <Server className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[2.5]" />
-            <span>Fleet</span>
+            <Server className="h-4 w-4 stroke-[2.5]" />
             {botCount > 0 && (
-              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+              <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold ${
                 pathname === '/' ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-800 text-slate-300'
               }`}>
                 {botCount}
@@ -84,17 +83,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <Link
             href="/accounts"
-            className={`flex items-center space-x-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+            className={`flex items-center space-x-1.5 p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-black transition-all border ${
               pathname === '/accounts'
                 ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30'
                 : 'bg-[#1b2637]/70 text-slate-300 hover:text-white hover:bg-[#1b2637] border-slate-700'
             }`}
             title="Accounts Vault"
           >
-            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[2.5]" />
-            <span>Vault</span>
+            <Users className="h-4 w-4 stroke-[2.5]" />
             {typeof savedAccountCount === 'number' && savedAccountCount > 0 && (
-              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+              <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold ${
                 pathname === '/accounts' ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-800 text-slate-300'
               }`}>
                 {savedAccountCount}
@@ -107,7 +105,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="relative shrink-0">
           <button
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="flex items-center space-x-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-[#1b2637]/90 hover:bg-[#253449] border border-slate-700 hover:border-emerald-500/80 text-xs font-bold transition shadow-sm active:scale-95 text-slate-200"
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-[#1b2637]/90 hover:bg-[#253449] border border-slate-700 hover:border-emerald-500/80 text-xs font-bold transition shadow-sm active:scale-95 text-slate-200"
             title="Menu & Controls"
           >
             {/* Live Indicator Dot for Daemon Status */}
@@ -137,7 +135,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {isUserMenuOpen && (
             <>
               <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs" onClick={() => setIsUserMenuOpen(false)} />
-              <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-slate-900 border-2 border-slate-700 rounded-3xl shadow-2xl p-4 z-50 text-xs space-y-3.5 animate-in fade-in duration-150">
+              <div className="fixed sm:absolute top-16 sm:top-auto sm:mt-2 right-2 sm:right-0 w-[calc(100vw-16px)] sm:w-80 max-w-sm bg-slate-900 border-2 border-slate-700 rounded-3xl shadow-2xl p-4 z-50 text-xs space-y-3.5 animate-in fade-in duration-150">
                 {/* 1. Daemon Status Card */}
                 <div className="p-3 rounded-2xl bg-slate-800/90 border border-slate-700/80 space-y-2.5">
                   <div className="flex items-center justify-between">
