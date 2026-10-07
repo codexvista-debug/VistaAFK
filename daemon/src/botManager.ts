@@ -55,6 +55,11 @@ export class BotManager {
   }
 
   private createBotInstance(config: BotConfig): BotInstance {
+    const existing = this.bots.get(config.id);
+    if (existing) {
+      existing.stop();
+      this.bots.delete(config.id);
+    }
     if ((config.port === 19132 || config.id.includes('bedrock')) && config.edition !== 'bedrock') {
       config.edition = 'bedrock';
     }
@@ -63,6 +68,10 @@ export class BotManager {
       onChatMessage: (m) => this.callbacks.onChatMessage(m),
       onActivityLog: (log) => {
         const cur = this.activityLogs.get(log.botId) || [];
+        const last = cur[cur.length - 1];
+        if (last && last.message === log.message && Math.abs(log.timestamp - last.timestamp) < 2500) {
+          return;
+        }
         this.activityLogs.set(log.botId, [...cur.slice(-50), log]);
         this.callbacks.onActivityLog(log);
       },

@@ -94,7 +94,7 @@ export const BotCard: React.FC<BotCardProps> = ({
   };
 
   // Filter to dedicated bot activity events (connects, joins, commands, survival, kicks, reconnects)
-  const displayLogs: Array<{ id: string; timestamp: number; type?: string; message: string }> =
+  const rawLogs: Array<{ id: string; timestamp: number; type?: string; message: string }> =
     activityLogs.length > 0
       ? activityLogs
       : logs
@@ -105,6 +105,13 @@ export const BotCard: React.FC<BotCardProps> = ({
             type: 'status',
             message: l.message,
           }));
+
+  // Clean consecutive duplicate logs
+  const displayLogs = rawLogs.filter((item, idx, arr) => {
+    if (idx === 0) return true;
+    const prev = arr[idx - 1];
+    return !(prev.message === item.message && Math.abs(item.timestamp - prev.timestamp) < 3000);
+  });
 
   const recentActivities = displayLogs.slice(-50);
   const logsContainerRef = useRef<HTMLDivElement | null>(null);

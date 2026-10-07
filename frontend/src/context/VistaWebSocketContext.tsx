@@ -323,6 +323,10 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
               const log: ActivityLog = msg.payload;
               setActivityLogs((prev) => {
                 const current = prev[log.botId] || [];
+                const last = current[current.length - 1];
+                if (last && last.message === log.message && Math.abs(log.timestamp - last.timestamp) < 2500) {
+                  return prev;
+                }
                 return {
                   ...prev,
                   [log.botId]: [...current.slice(-60), log],

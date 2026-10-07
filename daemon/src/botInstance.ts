@@ -149,12 +149,22 @@ export class BotInstance {
     this.callbacks = callbacks;
   }
 
+  private lastActivityMsg: string = '';
+  private lastActivityTime: number = 0;
+
   private emitActivity(type: ActivityLog['type'], message: string) {
+    const now = Date.now();
+    if (message === this.lastActivityMsg && (now - this.lastActivityTime) < 2500) {
+      return;
+    }
+    this.lastActivityMsg = message;
+    this.lastActivityTime = now;
+
     if (this.callbacks.onActivityLog) {
       this.callbacks.onActivityLog({
         id: Math.random().toString(36).substring(2, 9),
         botId: this.config.id,
-        timestamp: Date.now(),
+        timestamp: now,
         type,
         message,
       });
