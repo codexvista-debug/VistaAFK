@@ -31,8 +31,10 @@ import {
 import { BotInventoryModal } from '../../components/BotInventoryModal';
 import { BotConfig } from '../../types';
 import Link from 'next/link';
+import { useAuth } from '../../context/VistaAuthContext';
 
 export default function AccountsPage() {
+  const { user, openAuthModal, isLoading: isAuthLoading } = useAuth();
   const {
     savedAccounts,
     saveAccount,
@@ -225,6 +227,41 @@ export default function AccountsPage() {
   };
 
   const onlineCount = Object.values(telemetry).filter((t) => t.status === 'online').length;
+
+  if (!user && !isAuthLoading) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#f8fafc] text-slate-800 font-sans">
+        <Navbar
+          isConnected={false}
+          isConnecting={false}
+          onOpenAddModal={openAuthModal}
+          onOpenSettingsModal={() => {}}
+          botCount={0}
+          onlineCount={0}
+          savedAccountCount={0}
+        />
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-16 flex flex-col items-center justify-center">
+          <div className="max-w-md w-full bg-white border-2 border-slate-200 rounded-3xl p-8 text-center shadow-lg space-y-4">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-50 border-2 border-emerald-200 mx-auto flex items-center justify-center text-emerald-600 shadow-sm">
+              <Users className="h-8 w-8 stroke-[2]" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-slate-900">Sign In to Access Your Vault</h2>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Your Minecraft Java and Bedrock accounts are linked to your VistaAFK account. Sign in to view and deploy your accounts.
+              </p>
+            </div>
+            <button
+              onClick={openAuthModal}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center justify-center space-x-2"
+            >
+              <span>Sign In / Create Account</span>
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#e2e8f0] text-slate-800 font-sans">

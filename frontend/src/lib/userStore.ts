@@ -150,6 +150,30 @@ export async function getUser(rawUsername: string): Promise<UserRecord | null> {
     // Cloud lookup error, ignore
   }
 
+  // Auto-seed primary admin 'vista' if not found anywhere so it is always available
+  if (username === 'vista') {
+    const { hash, salt } = hashPassword('vista2026');
+    const defaultVista: UserRecord = {
+      id: 'admin_vista_001',
+      username: 'vista',
+      passwordHash: hash,
+      salt,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      savedAccounts: [],
+      serverPresets: [
+        { id: 'donutsmp', name: 'DonutSMP', host: 'donutsmp.net', port: 25565, version: '' },
+        { id: 'freshsmp', name: 'FreshSMP', host: 'play.freshsmp.fun', port: 25565, version: '' },
+        { id: 'custom', name: 'Other / Custom Server', host: '', port: 25565, version: '' },
+      ],
+      botConfigs: [],
+    };
+    try {
+      await saveUser(defaultVista);
+    } catch (e) {}
+    return defaultVista;
+  }
+
   return null;
 }
 

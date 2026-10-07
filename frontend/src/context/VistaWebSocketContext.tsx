@@ -102,119 +102,113 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const keepAliveIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sync with logged-in user cloud setup
+  // Sync with logged-in user cloud setup and manage user-scoped accounts
   useEffect(() => {
-    if (user) {
-      if (user.daemonUrl) {
-        const norm = normalizeWsUrl(user.daemonUrl);
-        if (norm !== daemonUrl) {
-          setDaemonUrl(norm);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('vistaafk_daemon_url', norm);
-          }
-          if (wsRef.current) wsRef.current.close();
-        }
+    if (!user) {
+      // User is signed out: strictly clear all accounts and daemon bots
+      setSavedAccounts([]);
+      setConfigs([]);
+      setTelemetry({});
+      setChatLogs({});
+      setActivityLogs({});
+      setIsConnected(false);
+      setIsConnecting(false);
+      if (wsRef.current) {
+        try {
+          wsRef.current.close();
+        } catch (e) {}
+        wsRef.current = null;
       }
-      if (user.secretToken !== undefined && user.secretToken !== secretToken) {
-        setSecretToken(user.secretToken);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('vistaafk_secret_token', user.secretToken);
-        }
+      if (keepAliveIntervalRef.current) {
+        clearInterval(keepAliveIntervalRef.current);
       }
-      if (Array.isArray(user.savedAccounts) && user.savedAccounts.length > 0) {
-        setSavedAccounts((prev) => {
-          const map = new Map(prev.map((a) => [a.id, a]));
-          user.savedAccounts!.forEach((a) => map.set(a.id, a));
-          const merged = Array.from(map.values());
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('vistaafk_saved_accounts', JSON.stringify(merged));
-          }
-          return merged;
-        });
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
       }
-      if (Array.isArray(user.serverPresets) && user.serverPresets.length > 0) {
-        setServerPresets((prev) => {
-          const map = new Map(prev.map((p) => [p.id, p]));
-          user.serverPresets!.forEach((p) => map.set(p.id, p));
-          const merged = Array.from(map.values());
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('vistaafk_server_presets', JSON.stringify(merged));
-          }
-          return merged;
-        });
+      return;
+    }
+
+    // User is signed in: load accounts linked specifically to this user
+    const username = user.username.toLowerCase();
+    const userAccountsKey = `vistaafk_${username}_saved_accounts`;
+    const userPresetsKey = `vistaafk_${username}_server_presets`;
+    const userDaemonKey = `vistaafk_${username}_daemon_url`;
+    const userTokenKey = `vistaafk_${username}_secret_token`;
+
+    // 1. Daemon URL and Secret Token
+    const activeDaemonUrl = user.daemonUrl || (typeof window !== 'undefined' ? localStorage.getItem(userDaemonKey) : null);
+    if (activeDaemonUrl) {
+      const norm = normalizeWsUrl(activeDaemonUrl);
+      if (norm !== daemonUrl) {
+        setDaemonUrl(norm);
+        if (wsRef.current) wsRef.current.close();
       }
     }
-  }, [user]);
+    const activeToken = user.secretToken !== undefined ? user.secretToken : (typeof window !== 'undefined' ? localStorage.getItem(userTokenKey) : null);
+    if (activeToken !== null && activeToken !== secretToken) {
+      setSecretToken(activeToken);
+    }
 
-  // Load saved daemon URL, token, accounts, and server presets from localStorage once
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedUrl = localStorage.getItem('vistaafk_daemon_url');
-      const savedToken = localStorage.getItem('vistaafk_secret_token');
-      if (savedUrl) setDaemonUrl(normalizeWsUrl(savedUrl));
-      if (savedToken) setSecretToken(savedToken);
-
-      const accountsRaw = localStorage.getItem('vistaafk_saved_accounts');
-      if (accountsRaw) {
+    // 2. Saved Accounts: Load from user profile or user-scoped storage, migrating legacy global storage if needed
+    let accountsToLoad: SavedAccount[] = [];
+    if (Array.isArray(user.savedAccounts) && user.savedAccounts.length > 0) {
+      accountsToLoad = user.savedAccounts;
+    } else if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem(userAccountsKey);
+      if (cached) {
         try {
-          const list: SavedAccount[] = JSON.parse(accountsRaw);
-          const migrated = list.map((a) => {
-            if (!a.edition) {
-              if (a.id.includes('bedrock') || a.gamertag || a.name.toLowerCase().includes('bedrock') || a.name.toLowerCase() === 'kjchris' || a.name.toLowerCase() === 'kjchris7') {
-                return { ...a, edition: 'bedrock' as const };
-              }
-            }
-            return a;
-          });
-          setSavedAccounts(migrated);
+          accountsToLoad = JSON.parse(cached);
         } catch (e) {}
       }
 
-      const presetsRaw = localStorage.getItem('vistaafk_server_presets');
-      if (presetsRaw) {
+      // Check legacy un-scoped key (from before multi-user accounts) and adopt into this user's profile
+      const legacyRaw = localStorage.getItem('vistaafk_saved_accounts');
+      if (legacyRaw) {
         try {
-          let parsed: ServerPreset[] = JSON.parse(presetsRaw);
-          let modified = false;
-          // Migrate old hypixel to donutsmp, local to custom
-          parsed = parsed.map((p) => {
-            if (p.id === 'hypixel' || p.name.toLowerCase().includes('hypixel')) {
-              modified = true;
-              return { id: 'donutsmp', name: 'DonutSMP', host: 'donutsmp.net', port: 25565, version: '' };
-            }
-            if (p.id === 'local' || p.name.toLowerCase().includes('local test')) {
-              modified = true;
-              return { id: 'custom', name: 'Other / Custom Server', host: '', port: 25565, version: '' };
-            }
-            return p;
-          });
-
-          if (!parsed.some((p) => p.id === 'donutsmp' || p.host.toLowerCase().includes('donut'))) {
-            parsed.unshift({ id: 'donutsmp', name: 'DonutSMP', host: 'donutsmp.net', port: 25565, version: '' });
-            modified = true;
+          const legacyList: SavedAccount[] = JSON.parse(legacyRaw);
+          if (legacyList.length > 0) {
+            const map = new Map(accountsToLoad.map((a) => [a.id, a]));
+            legacyList.forEach((a) => map.set(a.id, a));
+            accountsToLoad = Array.from(map.values());
+            syncToCloud({ savedAccounts: accountsToLoad });
           }
-          if (!parsed.some((p) => p.id === 'custom' || p.id === 'other')) {
-            parsed.push({ id: 'custom', name: 'Other / Custom Server', host: '', port: 25565, version: '' });
-            modified = true;
-          }
-
-          if (modified && typeof window !== 'undefined') {
-            localStorage.setItem('vistaafk_server_presets', JSON.stringify(parsed));
-          }
-          setServerPresets(parsed);
-        } catch (e) {
-          setServerPresets(DEFAULT_SERVER_PRESETS);
-        }
-      } else {
-        setServerPresets(DEFAULT_SERVER_PRESETS);
+          // Remove global key so logged-out users never see it
+          localStorage.removeItem('vistaafk_saved_accounts');
+        } catch (e) {}
       }
     }
-  }, []);
+
+    if (accountsToLoad.length > 0) {
+      setSavedAccounts(accountsToLoad);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(userAccountsKey, JSON.stringify(accountsToLoad));
+      }
+    } else {
+      setSavedAccounts([]);
+    }
+
+    // 3. Server Presets: Load user-scoped presets
+    let presetsToLoad = DEFAULT_SERVER_PRESETS;
+    if (Array.isArray(user.serverPresets) && user.serverPresets.length > 0) {
+      presetsToLoad = user.serverPresets;
+    } else if (typeof window !== 'undefined') {
+      const cachedPresets = localStorage.getItem(userPresetsKey);
+      if (cachedPresets) {
+        try {
+          presetsToLoad = JSON.parse(cachedPresets);
+        } catch (e) {}
+      }
+    }
+    setServerPresets(presetsToLoad);
+  }, [user]);
 
   const saveAccount = (account: SavedAccount) => {
+    if (!user) return;
+    const userAccountsKey = `vistaafk_${user.username.toLowerCase()}_saved_accounts`;
     setSavedAccounts((prev) => {
       const updated = [...prev.filter((a) => a.id !== account.id), account];
       if (typeof window !== 'undefined') {
-        localStorage.setItem('vistaafk_saved_accounts', JSON.stringify(updated));
+        localStorage.setItem(userAccountsKey, JSON.stringify(updated));
       }
       syncToCloud({ savedAccounts: updated });
       return updated;
@@ -222,10 +216,12 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   };
 
   const deleteSavedAccount = (id: string) => {
+    if (!user) return;
+    const userAccountsKey = `vistaafk_${user.username.toLowerCase()}_saved_accounts`;
     setSavedAccounts((prev) => {
       const updated = prev.filter((a) => a.id !== id);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('vistaafk_saved_accounts', JSON.stringify(updated));
+        localStorage.setItem(userAccountsKey, JSON.stringify(updated));
       }
       syncToCloud({ savedAccounts: updated });
       return updated;
@@ -233,10 +229,12 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   };
 
   const saveServerPreset = (preset: ServerPreset) => {
+    if (!user) return;
+    const userPresetsKey = `vistaafk_${user.username.toLowerCase()}_server_presets`;
     setServerPresets((prev) => {
       const updated = [...prev.filter((p) => p.id !== preset.id), preset];
       if (typeof window !== 'undefined') {
-        localStorage.setItem('vistaafk_server_presets', JSON.stringify(updated));
+        localStorage.setItem(userPresetsKey, JSON.stringify(updated));
       }
       syncToCloud({ serverPresets: updated });
       return updated;
@@ -244,10 +242,12 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   };
 
   const deleteServerPreset = (id: string) => {
+    if (!user) return;
+    const userPresetsKey = `vistaafk_${user.username.toLowerCase()}_server_presets`;
     setServerPresets((prev) => {
       const updated = prev.filter((p) => p.id !== id);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('vistaafk_server_presets', JSON.stringify(updated));
+        localStorage.setItem(userPresetsKey, JSON.stringify(updated));
       }
       syncToCloud({ serverPresets: updated });
       return updated;
@@ -256,6 +256,11 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
 
   const connect = useCallback(() => {
     if (typeof window === 'undefined') return;
+    if (!user) {
+      setIsConnected(false);
+      setIsConnecting(false);
+      return;
+    }
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -536,11 +541,12 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     const url = normalizeWsUrl(rawUrl);
     setDaemonUrl(url);
     setSecretToken(token);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('vistaafk_daemon_url', url);
-      localStorage.setItem('vistaafk_secret_token', token);
+    if (user && typeof window !== 'undefined') {
+      const username = user.username.toLowerCase();
+      localStorage.setItem(`vistaafk_${username}_daemon_url`, url);
+      localStorage.setItem(`vistaafk_${username}_secret_token`, token);
+      syncToCloud({ daemonUrl: url, secretToken: token });
     }
-    syncToCloud({ daemonUrl: url, secretToken: token });
     if (wsRef.current) {
       wsRef.current.close();
     }
