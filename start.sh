@@ -29,6 +29,12 @@ if [ -d "daemon" ]; then
   cd daemon
 fi
 
-# 5. Run the pre-compiled daemon directly (Zero compilation needed on mobile!)
+# 5. Ensure Bedrock protocol dependencies are installed
+if [ ! -d "node_modules/bedrock-protocol" ]; then
+  echo "📦 Installing Bedrock support (npm install --no-optional)..."
+  npm install --no-optional
+fi
+
+# 6. Run the pre-compiled daemon directly (Zero compilation needed on mobile!)
 echo "✅ Launching 24/7 VistaAFK Daemon on port 8080..."
 node dist/server.js

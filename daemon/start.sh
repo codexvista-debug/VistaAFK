@@ -18,6 +18,12 @@ else
   git pull origin main
 fi
 
-# 3. Run the pre-compiled daemon directly (Zero compilation needed on mobile!)
+# 3. Ensure Bedrock protocol dependencies are installed
+if [ ! -d "node_modules/bedrock-protocol" ]; then
+  echo "📦 Installing Bedrock support (npm install --no-optional)..."
+  npm install --no-optional
+fi
+
+# 4. Run the pre-compiled daemon directly (Zero compilation needed on mobile!)
 echo "✅ Launching 24/7 VistaAFK Daemon on port 8080..."
 node dist/server.js
