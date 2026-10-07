@@ -258,27 +258,48 @@ export class BotInstance {
 
     try {
       const bedrock = await import('bedrock-protocol');
+
+      // Patch Geyser 26.x protocol aliases so servers reporting 26.30-26.60 map to protocol 2193
+      try {
+        // @ts-ignore
+        const Options: any = (bedrock as any).Options || (await import('bedrock-protocol/src/options.js'));
+        if (Options.Versions) {
+          for (let i = 20; i <= 60; i++) {
+            Options.Versions[`26.${i}`] = 2193;
+            Options.Versions[`1.26.${i}`] = 2193;
+          }
+        }
+      } catch (e) {}
+
+      // Auto-detect target version: if FreshSMP or not set, use 1.26.51 (protocol 2193)
+      let targetVersion = this.config.version?.trim();
+      if (!targetVersion || targetVersion === '' || targetVersion.startsWith('26.')) {
+        targetVersion = '1.26.51';
+      }
+
       const client = (bedrock as any).createClient({
         host: this.config.host,
         port,
         username: this.config.name,
         offline: this.config.authType === 'offline',
         profilesFolder: tokenFolder,
-        version: this.config.version || undefined,
-        conLog: null,
+        version: targetVersion,
         onMsaCode: (data: any) => {
+          const userCode = data.user_code || data.userCode;
+          const verificationUri = userCode ? `https://www.microsoft.com/link?otc=${encodeURIComponent(userCode)}` : (data.verification_uri || 'https://microsoft.com/link');
           this.authCodeInfo = {
-            userCode: data.user_code || data.userCode,
-            verificationUri: data.verification_uri || data.verificationUri || 'https://microsoft.com/link',
+            userCode,
+            verificationUri,
             expiresIn: data.expires_in || data.expiresIn || 900,
           };
-          this.updateStatus('authenticating', `Device Code: ${this.authCodeInfo.userCode}`);
-          this.emitActivity('status', `Microsoft Auth Required: Visit ${this.authCodeInfo.verificationUri} (Code: ${this.authCodeInfo.userCode})`);
+          this.updateStatus('authenticating', `Device Code: ${userCode}`);
+          this.emitActivity('status', `🔑 Microsoft Auth Required for Bedrock: Visit ${verificationUri} (Code: ${userCode})`);
           this.callbacks.onNotification(
             'warn',
-            `Microsoft Auth required for Bedrock ${this.config.name}: Visit ${this.authCodeInfo.verificationUri} and enter code ${this.authCodeInfo.userCode}`,
+            `Microsoft Auth required for Bedrock ${this.config.name}: Visit ${verificationUri} and enter code ${userCode}`,
             this.config.id
           );
+          this.emitTelemetry();
         },
       });
 
@@ -331,7 +352,10 @@ export class BotInstance {
         this.emitActivity('status', `⚠️ Bedrock Error: ${err?.message || 'Connection failed'}`);
       });
     } catch (err: any) {
+      console.error(`[VistaAFK] Bedrock init error for ${this.config.name}:`, err.message);
       this.updateStatus('error', err?.message || 'Failed to initialize Bedrock client');
+      this.emitActivity('status', `⚠️ Bedrock Init Error: ${err?.message || 'Initialization failed'}`);
+      this.callbacks.onNotification('error', `[${this.config.name}] Bedrock error: ${err?.message}`, this.config.id);
       this.handleReconnect();
     }
   }
@@ -957,51 +981,65 @@ export class BotInstance {
     }
     if (!this.config.farming?.enabled || !this.bot || this.currentStatus !== 'online') return;
 
-    const swingInterval = Math.max(300, this.config.farming.swingIntervalMs || 900);
-    this.emitActivity('survival', `⚔️ Mob Farm active: Auto-swinging every ${(swingInterval / 1000).toFixed(1)}s (Auto-equip sword: ${this.config.farming.autoEquipSword ? 'ON' : 'OFF'})`);
+    // Safety grace period: Never swing within the first 8 seconds of connecting/spawning
+    // to prevent server-side lobby packet crash on Paper / GrimAC servers (e.g. FreshSMP)
+    const timeSinceConnect = this.connectStartTime ? Date.now() - this.connectStartTime : 0;
+    const initialDelay = timeSinceConnect < 8000 ? (8000 - timeSinceConnect) : 0;
 
-    this.farmingInterval = setInterval(async () => {
+    const baseInterval = Math.max(900, this.config.farming.swingIntervalMs || 1100);
+    this.emitActivity('survival', `⚔️ Mob Farm active: Auto-swinging every ${(baseInterval / 1000).toFixed(1)}s (Auto-equip sword: ${this.config.farming.autoEquipSword ? 'ON' : 'OFF'})`);
+
+    const runFarmingTick = async () => {
       if (!this.bot || !this.bot.entity || this.currentStatus !== 'online') return;
       if (this.isEatingFood) return; // Respect auto-eat priority
 
+      // Ensure bot has been alive and in world for at least 8 seconds
+      if (this.connectStartTime && (Date.now() - this.connectStartTime) < 8000) return;
+
       try {
-        // 1. Auto Pick & Equip Sword from any slot
-        if (this.config.farming?.autoEquipSword && Date.now() - this.lastSwordEquipCheck > 1500) {
+        // 1. Safe Sword Selection (Check Hotbar first, avoid inventory window desyncs)
+        if (this.config.farming?.autoEquipSword && Date.now() - this.lastSwordEquipCheck > 3000) {
           this.lastSwordEquipCheck = Date.now();
           const heldItem = this.bot.heldItem;
           const isHoldingSword = heldItem && (heldItem.name.endsWith('_sword') || heldItem.name.includes('sword'));
 
           if (!isHoldingSword && this.bot.inventory) {
-            const SWORD_PRIORITY = [
-              'netherite_sword',
-              'diamond_sword',
-              'iron_sword',
-              'golden_sword',
-              'stone_sword',
-              'wooden_sword',
-            ];
-            const items = this.bot.inventory.items();
-            let sword = items.find((i) => SWORD_PRIORITY.includes(i.name)) || items.find((i) => i.name.endsWith('_sword'));
+            const SWORD_NAMES = ['netherite_sword', 'diamond_sword', 'iron_sword', 'golden_sword', 'stone_sword', 'wooden_sword'];
+            // First check hotbar slots (36 to 44 in mineflayer inventory)
+            let hotbarSwordSlot: number | null = null;
+            for (let i = 0; i < 9; i++) {
+              const item = this.bot.inventory.slots[36 + i];
+              if (item && (SWORD_NAMES.includes(item.name) || item.name.endsWith('_sword'))) {
+                hotbarSwordSlot = i;
+                break;
+              }
+            }
 
-            if (sword) {
-              await this.bot.equip(sword, 'hand');
-              this.emitActivity('survival', `⚔️ Auto-Equipped ${sword.displayName || sword.name} from inventory for mob farming`);
-              this.emitTelemetry();
+            if (hotbarSwordSlot !== null) {
+              this.bot.setQuickBarSlot(hotbarSwordSlot);
+            } else {
+              // Not on hotbar, find in main inventory and equip safely
+              const items = this.bot.inventory.items();
+              const sword = items.find((i) => SWORD_NAMES.includes(i.name) || i.name.endsWith('_sword'));
+              if (sword) {
+                await this.bot.equip(sword, 'hand');
+                this.emitActivity('survival', `⚔️ Equipped ${sword.displayName || sword.name} from inventory`);
+              }
             }
           }
         }
 
-        // 2. Mob Attack / Grinder Swing
+        // 2. Mob Attack / Grinder Swing with GrimAC-safe reach & validation
         const targetMode = this.config.farming?.targetMode || 'continuous';
 
-        // Check for nearby hostile entities within attack reach (3.5 blocks)
+        // Check for nearby hostile entities within safe reach (<= 2.8 blocks, well within vanilla 3.0 limit)
         let targetEntity: any = null;
         if (this.bot.entities) {
           const entities = Object.values(this.bot.entities);
           targetEntity = entities.find((e: any) => {
-            if (!e || e === this.bot?.entity || !e.position) return false;
+            if (!e || e === this.bot?.entity || !e.position || !e.isValid) return false;
             const dist = this.bot!.entity.position.distanceTo(e.position);
-            if (dist > 3.5) return false;
+            if (dist > 2.8) return false;
             const name = (e.name || (e as any).displayName || '').toLowerCase();
             const type = (e.type || '').toLowerCase();
             return type === 'hostile' || type === 'mob' || [
@@ -1013,18 +1051,31 @@ export class BotInstance {
         }
 
         if (targetEntity) {
+          // Look gently at entity chest height (not snap force=true)
           try {
-            await this.bot.lookAt(targetEntity.position.offset(0, targetEntity.height ? targetEntity.height * 0.7 : 1, 0), true);
+            await this.bot.lookAt(targetEntity.position.offset(0, targetEntity.height ? targetEntity.height * 0.5 : 0.9, 0), false);
           } catch (e) {}
-          this.bot.attack(targetEntity);
+          if (targetEntity.isValid && this.bot.entity.position.distanceTo(targetEntity.position) <= 2.8) {
+            this.bot.attack(targetEntity);
+          }
         } else if (targetMode === 'continuous') {
-          // Continuously swing arm into drop chute (for 1-hit Enderman farms & XP grinders)
+          // In mob farm chute: swing arm into chute
           this.bot.swingArm('right');
         }
       } catch (err: any) {
         // Safe catch
       }
-    }, swingInterval);
+    };
+
+    if (initialDelay > 0) {
+      setTimeout(() => {
+        if (this.config.farming?.enabled && this.bot && this.currentStatus === 'online') {
+          this.farmingInterval = setInterval(runFarmingTick, baseInterval);
+        }
+      }, initialDelay);
+    } else {
+      this.farmingInterval = setInterval(runFarmingTick, baseInterval);
+    }
   }
 
   public async moveSlotItem(sourceSlot: number, targetSlot: number) {
