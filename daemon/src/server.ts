@@ -1,6 +1,8 @@
+import path from 'path';
 import { WebSocketServer, WebSocket } from 'ws';
 import { BotManager } from './botManager.js';
 import { ClientMessage, ServerMessage } from './types.js';
+import { discoverMicrosoftProfiles } from './accountDiscovery.js';
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const SECRET = process.env.VISTAAFK_SECRET || '';
@@ -122,6 +124,24 @@ wss.on('connection', (ws) => {
           break;
         case 'SET_QUICK_BAR_SLOT':
           botManager.setQuickBarSlot(msg.payload.botId, msg.payload.slot);
+          break;
+        case 'DISCOVER_MICROSOFT_ACCOUNT':
+          discoverMicrosoftProfiles(path.resolve(process.cwd(), 'tokens'), (codeData) => {
+            ws.send(JSON.stringify({
+              type: 'MICROSOFT_DEVICE_CODE',
+              payload: codeData,
+            } as ServerMessage));
+          }).then((profiles) => {
+            ws.send(JSON.stringify({
+              type: 'MICROSOFT_PROFILES_DISCOVERED',
+              payload: profiles,
+            } as ServerMessage));
+          }).catch((err) => {
+            ws.send(JSON.stringify({
+              type: 'MICROSOFT_DISCOVERY_ERROR',
+              payload: { message: err?.message || 'Failed to authenticate Microsoft account' },
+            } as ServerMessage));
+          });
           break;
       }
     } catch (err: any) {

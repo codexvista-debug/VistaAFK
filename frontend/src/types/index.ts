@@ -1,9 +1,13 @@
 export type AuthType = 'microsoft' | 'offline';
+export type MinecraftEdition = 'java' | 'bedrock';
 
 export interface SavedAccount {
   id: string;
   name: string;
   authType: AuthType;
+  edition?: MinecraftEdition;
+  gamertag?: string;
+  uuid?: string;
   notes?: string;
   createdAt: number;
 }
@@ -20,6 +24,7 @@ export interface BotConfig {
   id: string;
   name: string;
   authType: AuthType;
+  edition?: MinecraftEdition;
   host: string;
   port: number;
   version?: string;

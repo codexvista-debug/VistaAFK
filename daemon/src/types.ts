@@ -4,6 +4,7 @@ export interface BotConfig {
   id: string;
   name: string;
   authType: AuthType;
+  edition?: 'java' | 'bedrock';
   host: string;
   port: number;
   version?: string; // Optional Minecraft version override, e.g. "1.20.4"
@@ -126,7 +127,9 @@ export type ClientMessage =
   | { type: 'TOGGLE_PATROL'; payload: { botId: string; enabled: boolean } }
   | { type: 'LOOK_AT'; payload: { botId: string; yaw: number; pitch: number } }
   | { type: 'MOVE_INVENTORY_ITEM'; payload: { botId: string; sourceSlot: number; targetSlot: number } }
-  | { type: 'SET_QUICK_BAR_SLOT'; payload: { botId: string; slot: number } };
+  | { type: 'SET_QUICK_BAR_SLOT'; payload: { botId: string; slot: number } }
+  | { type: 'DISCOVER_MICROSOFT_ACCOUNT' }
+  | { type: 'CANCEL_MICROSOFT_DISCOVERY' };
 
 export type ServerMessage =
   | { type: 'AUTH_SUCCESS' }
@@ -138,5 +141,8 @@ export type ServerMessage =
   | { type: 'TELEMETRY_UPDATE'; payload: BotTelemetry }
   | { type: 'CHAT_MESSAGE'; payload: ChatMessage }
   | { type: 'ACTIVITY_LOG'; payload: ActivityLog }
-  | { type: 'NOTIFICATION'; payload: { level: 'info' | 'warn' | 'error' | 'success'; message: string; botId?: string } };
+  | { type: 'NOTIFICATION'; payload: { level: 'info' | 'warn' | 'error' | 'success'; message: string; botId?: string } }
+  | { type: 'MICROSOFT_DEVICE_CODE'; payload: { userCode: string; verificationUri: string; expiresIn: number } }
+  | { type: 'MICROSOFT_PROFILES_DISCOVERED'; payload: { java?: { name: string; uuid: string }; bedrock?: { gamertag: string; xuid?: string } } }
+  | { type: 'MICROSOFT_DISCOVERY_ERROR'; payload: { message: string } };
 

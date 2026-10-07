@@ -63,6 +63,12 @@ export interface VistaWebSocketContextType {
   setQuickBarSlot: (botId: string, slot: number) => void;
   dismissNotification: (id: string) => void;
   clearNotifications: () => void;
+  discoveryDeviceCode: { userCode: string; verificationUri: string; expiresIn: number } | null;
+  discoveryStatus: 'idle' | 'waiting_code' | 'waiting_approval' | 'success' | 'error';
+  discoveryProfiles: { java?: { name: string; uuid: string }; bedrock?: { gamertag: string; xuid?: string } } | null;
+  discoveryError: string | null;
+  discoverMicrosoftAccount: () => void;
+  resetDiscovery: () => void;
 }
 
 const VistaWebSocketContext = createContext<VistaWebSocketContextType | null>(null);
@@ -80,9 +86,14 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const [activityLogs, setActivityLogs] = useState<Record<string, ActivityLog[]>>({});
   const [notifications, setNotifications] = useState<VistaNotification[]>([]);
 
-  // Persistent Accounts & Server Vault
   const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
   const [serverPresets, setServerPresets] = useState<ServerPreset[]>(DEFAULT_SERVER_PRESETS);
+
+  // Microsoft OAuth Discovery State
+  const [discoveryDeviceCode, setDiscoveryDeviceCode] = useState<{ userCode: string; verificationUri: string; expiresIn: number } | null>(null);
+  const [discoveryStatus, setDiscoveryStatus] = useState<'idle' | 'waiting_code' | 'waiting_approval' | 'success' | 'error'>('idle');
+  const [discoveryProfiles, setDiscoveryProfiles] = useState<{ java?: { name: string; uuid: string }; bedrock?: { gamertag: string; xuid?: string } } | null>(null);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -307,6 +318,62 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
               setNotifications((prev) => [notif, ...prev.slice(0, 19)]);
               break;
             }
+
+            case 'MICROSOFT_DEVICE_CODE': {
+              setDiscoveryDeviceCode(msg.payload);
+              setDiscoveryStatus('waiting_approval');
+              break;
+            }
+
+            case 'MICROSOFT_PROFILES_DISCOVERED': {
+              const profiles = msg.payload;
+              setDiscoveryProfiles(profiles);
+              setDiscoveryStatus('success');
+
+              const newlyAdded: string[] = [];
+              if (profiles.java?.name) {
+                const javaAccount: SavedAccount = {
+                  id: `msa-java-${profiles.java.name.toLowerCase()}`,
+                  name: profiles.java.name,
+                  authType: 'microsoft',
+                  edition: 'java',
+                  uuid: profiles.java.uuid,
+                  createdAt: Date.now(),
+                };
+                saveAccount(javaAccount);
+                newlyAdded.push(`${profiles.java.name} (Java)`);
+              }
+
+              if (profiles.bedrock?.gamertag) {
+                const bedrockAccount: SavedAccount = {
+                  id: `msa-bedrock-${profiles.bedrock.gamertag.toLowerCase()}`,
+                  name: profiles.bedrock.gamertag,
+                  gamertag: profiles.bedrock.gamertag,
+                  authType: 'microsoft',
+                  edition: 'bedrock',
+                  createdAt: Date.now(),
+                };
+                saveAccount(bedrockAccount);
+                newlyAdded.push(`${profiles.bedrock.gamertag} (Bedrock)`);
+              }
+
+              if (newlyAdded.length > 0) {
+                const notif: VistaNotification = {
+                  id: Math.random().toString(36).substring(2, 9),
+                  timestamp: Date.now(),
+                  level: 'success',
+                  message: `🎮 Linked Microsoft Account: ${newlyAdded.join(' & ')} added to Vault!`,
+                };
+                setNotifications((prev) => [notif, ...prev.slice(0, 19)]);
+              }
+              break;
+            }
+
+            case 'MICROSOFT_DISCOVERY_ERROR': {
+              setDiscoveryError(msg.payload.message);
+              setDiscoveryStatus('error');
+              break;
+            }
           }
         } catch (e) {
           console.error('[VistaAFK WS Provider] Parse error:', e);
@@ -402,6 +469,20 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const dismissNotification = (id: string) =>
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   const clearNotifications = () => setNotifications([]);
+  const discoverMicrosoftAccount = () => {
+    setDiscoveryStatus('waiting_code');
+    setDiscoveryDeviceCode(null);
+    setDiscoveryProfiles(null);
+    setDiscoveryError(null);
+    send({ type: 'DISCOVER_MICROSOFT_ACCOUNT' });
+  };
+
+  const resetDiscovery = () => {
+    setDiscoveryStatus('idle');
+    setDiscoveryDeviceCode(null);
+    setDiscoveryProfiles(null);
+    setDiscoveryError(null);
+  };
 
   // Deploy a saved account to a specific server instance
   const deployAccountToServer = (
@@ -410,13 +491,16 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   ) => {
     // DonutSMP is strictly sensitive to non-idle actions; default anti-actions to OFF for safety
     const isDonut = server.host.toLowerCase().includes('donut');
+    const edition = account.edition || 'java';
+    const port = edition === 'bedrock' && server.port === 25565 ? 19132 : server.port;
 
     const newBotConfig: BotConfig = {
       id: `${account.id}-${server.host.replace(/[^a-zA-Z0-9]/g, '')}`,
       name: account.name,
       authType: account.authType,
+      edition,
       host: server.host,
-      port: server.port,
+      port,
       version: (server.version && server.version.trim() !== '') ? server.version.trim() : undefined,
       autoReconnect: true,
       reconnectDelayMs: 5000,
@@ -477,6 +561,12 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         setQuickBarSlot,
         dismissNotification,
         clearNotifications,
+        discoveryDeviceCode,
+        discoveryStatus,
+        discoveryProfiles,
+        discoveryError,
+        discoverMicrosoftAccount,
+        resetDiscovery,
       }}
     >
       {children}

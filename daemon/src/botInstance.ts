@@ -142,6 +142,7 @@ export class BotInstance {
   private isEatingFood: boolean = false;
   private customMaxHealth: number = 0;
   private recordedMaxHealth: number = 0;
+  private bedrockClient: any = null;
 
   constructor(config: BotConfig, callbacks: BotInstanceCallbacks) {
     this.config = config;
@@ -186,8 +187,13 @@ export class BotInstance {
   }
 
   public start() {
-    if (this.bot) {
+    if (this.bot || this.bedrockClient) {
       this.callbacks.onNotification('info', `Bot ${this.config.name} is already starting or running.`, this.config.id);
+      return;
+    }
+
+    if (this.config.edition === 'bedrock') {
+      this.startBedrock();
       return;
     }
 
@@ -241,10 +247,105 @@ export class BotInstance {
     }
   }
 
+  private async startBedrock() {
+    this.isManuallyStopped = false;
+    this.clearTimers();
+    this.updateStatus('connecting', 'Connecting to Bedrock server...');
+    const port = this.config.port || 19132;
+    this.emitActivity('connect', `Connecting to Bedrock server ${this.config.host}:${port}...`);
+
+    const tokenFolder = path.resolve(process.cwd(), 'tokens');
+
+    try {
+      const bedrock = await import('bedrock-protocol');
+      const client = (bedrock as any).createClient({
+        host: this.config.host,
+        port,
+        username: this.config.name,
+        offline: this.config.authType === 'offline',
+        profilesFolder: tokenFolder,
+        version: this.config.version || undefined,
+        conLog: null,
+        onMsaCode: (data: any) => {
+          this.authCodeInfo = {
+            userCode: data.user_code || data.userCode,
+            verificationUri: data.verification_uri || data.verificationUri || 'https://microsoft.com/link',
+            expiresIn: data.expires_in || data.expiresIn || 900,
+          };
+          this.updateStatus('authenticating', `Device Code: ${this.authCodeInfo.userCode}`);
+          this.emitActivity('status', `Microsoft Auth Required: Visit ${this.authCodeInfo.verificationUri} (Code: ${this.authCodeInfo.userCode})`);
+          this.callbacks.onNotification(
+            'warn',
+            `Microsoft Auth required for Bedrock ${this.config.name}: Visit ${this.authCodeInfo.verificationUri} and enter code ${this.authCodeInfo.userCode}`,
+            this.config.id
+          );
+        },
+      });
+
+      this.bedrockClient = client;
+
+      client.on('join', () => {
+        this.reconnectAttempts = 0;
+        this.connectStartTime = Date.now();
+        this.updateStatus('online', 'Connected (Bedrock)');
+        this.emitActivity('connect', `🎮 Successfully joined Bedrock server ${this.config.host}:${port}`);
+        this.emitTelemetry();
+      });
+
+      client.on('spawn', () => {
+        this.updateStatus('online', 'Spawned in world (Bedrock)');
+        this.emitActivity('spawn', '🌍 Spawned into Bedrock world');
+        this.setupTelemetryLoop();
+        this.emitTelemetry();
+      });
+
+      client.on('text', (packet: any) => {
+        const msg = packet.message || packet.source_name ? `${packet.source_name}: ${packet.message}` : String(packet);
+        this.callbacks.onChatMessage({
+          botId: this.config.id,
+          timestamp: Date.now(),
+          sender: packet.source_name || 'Server',
+          message: packet.message || msg,
+          isSystem: packet.type === 'system' || !packet.source_name,
+        });
+      });
+
+      client.on('kick', (reason: any) => {
+        const cleanReason = typeof reason === 'string' ? reason : reason?.message || JSON.stringify(reason);
+        this.emitActivity('disconnect', `❌ Kicked from Bedrock server: ${cleanReason}`);
+        this.callbacks.onNotification('error', `[${this.config.name}] Kicked: ${cleanReason}`, this.config.id);
+      });
+
+      client.on('close', () => {
+        this.bedrockClient = null;
+        if (!this.isManuallyStopped) {
+          this.emitActivity('disconnect', '🔴 Disconnected from Bedrock server');
+          this.handleReconnect();
+        } else {
+          this.updateStatus('offline', 'Disconnected');
+        }
+      });
+
+      client.on('error', (err: any) => {
+        this.updateStatus('error', err?.message || 'Bedrock connection error');
+        this.emitActivity('status', `⚠️ Bedrock Error: ${err?.message || 'Connection failed'}`);
+      });
+    } catch (err: any) {
+      this.updateStatus('error', err?.message || 'Failed to initialize Bedrock client');
+      this.handleReconnect();
+    }
+  }
+
   public stop() {
     const uptime = this.getSessionUptime();
     this.isManuallyStopped = true;
     this.clearTimers();
+    if (this.bedrockClient) {
+      try {
+        this.bedrockClient.close();
+      } catch (e) {}
+      this.bedrockClient = null;
+    }
     if (this.bot) {
       try {
         this.bot.quit('VistaAFK: Disconnected by user');
@@ -262,6 +363,27 @@ export class BotInstance {
   }
 
   public sendChat(message: string) {
+    if (this.bedrockClient && this.currentStatus === 'online') {
+      try {
+        this.bedrockClient.queue('text', {
+          type: 'chat',
+          needs_translation: false,
+          source_name: this.config.name,
+          message,
+          xuid: '',
+          platform_chat_id: '',
+        });
+        this.callbacks.onChatMessage({
+          botId: this.config.id,
+          timestamp: Date.now(),
+          sender: this.config.name,
+          message,
+          isSystem: false,
+        });
+      } catch (e: any) {}
+      return;
+    }
+
     if (!this.bot || this.currentStatus !== 'online') {
       this.callbacks.onNotification('error', `Cannot send chat: ${this.config.name} is offline.`, this.config.id);
       return;
@@ -940,6 +1062,33 @@ export class BotInstance {
   }
 
   public getTelemetry(): BotTelemetry {
+    if (this.bedrockClient) {
+      return {
+        id: this.config.id,
+        name: this.config.name,
+        status: this.currentStatus,
+        statusMessage: this.statusMessage,
+        authCodeInfo: this.authCodeInfo,
+        health: 20,
+        maxHealth: 20,
+        hearts: 10,
+        maxHearts: 10,
+        food: 20,
+        coordinates: { x: 0, y: 0, z: 0 },
+        dimension: 'overworld',
+        ping: 0,
+        gamemode: 'survival',
+        uptimeSeconds: this.connectStartTime ? Math.floor((Date.now() - this.connectStartTime) / 1000) : 0,
+        inventoryCount: 0,
+        facing: 'North',
+        yaw: 0,
+        pitch: 0,
+        targetBlock: null,
+        nearbyEntities: [],
+        isPatrolling: false,
+      };
+    }
+
     if (!this.bot || !this.bot.entity) {
       return {
         id: this.config.id,
