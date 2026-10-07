@@ -3,9 +3,10 @@ echo "============================================="
 echo "      🚀 Starting VistaAFK Daemon v1.2.1      "
 echo "============================================="
 
-# 1. Kill any existing zombie node process holding port 8080
+# 1. Kill any existing zombie node/tsx processes holding port 8080
 pkill -f "node dist/server.js" 2>/dev/null
 pkill -f "dist/server.js" 2>/dev/null
+pkill -f "tsx" 2>/dev/null
 
 # 2. Automatically pull the latest updates from GitHub
 echo "🔄 Checking for latest VistaAFK updates..."
