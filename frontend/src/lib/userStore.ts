@@ -174,9 +174,9 @@ export async function getUser(rawUsername: string): Promise<UserRecord | null> {
     return localUsers[username];
   }
 
-  // 4. Auto-seed master administrator 'vista' with password 'placehub'
+  // 4. Auto-seed master administrator 'vista' with password '897721'
   if (username === 'vista') {
-    const { hash, salt } = hashPassword('placehub');
+    const { hash, salt } = hashPassword('897721');
     const defaultVista: UserRecord = {
       id: 'admin_vista_001',
       username: 'vista',
