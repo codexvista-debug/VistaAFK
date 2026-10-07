@@ -24,7 +24,9 @@ bots.json
 
 # Logs
 *.log
-logs/
+/logs/
+daemon/logs/
+!frontend/src/app/logs/
 
 # OS metadata
 .DS_Store
