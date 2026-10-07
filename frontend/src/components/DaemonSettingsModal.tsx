@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Server, Key, Terminal, Smartphone, Monitor, Copy, Check, ExternalLink, BatteryCharging, Zap } from 'lucide-react';
+import { X, Server, Key, Terminal, Smartphone, Monitor, Copy, Check, ExternalLink, BatteryCharging, Zap, ShieldCheck } from 'lucide-react';
+import { useAuth } from '../context/VistaAuthContext';
+import { normalizeWsUrl } from '../context/VistaWebSocketContext';
 
 interface DaemonSettingsModalProps {
   onClose: () => void;
@@ -16,10 +18,15 @@ export const DaemonSettingsModal: React.FC<DaemonSettingsModalProps> = ({
   currentToken,
   onSave,
 }) => {
+  const { user, token: authToken } = useAuth();
   const [url, setUrl] = useState(currentUrl);
   const [token, setToken] = useState(currentToken);
   const [activeTab, setActiveTab] = useState<'connection' | 'termux' | 'pc'>('connection');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const termuxCommand = user?.username
+    ? `pkg update -y && pkg install -y git nodejs cloudflared && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh ${user.username} ${authToken || ''}`
+    : `pkg update -y && pkg install -y git nodejs cloudflared && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh`;
 
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -29,7 +36,7 @@ export const DaemonSettingsModal: React.FC<DaemonSettingsModalProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(url.trim(), token.trim());
+    onSave(normalizeWsUrl(url), token.trim());
     onClose();
   };
 
@@ -98,69 +105,153 @@ export const DaemonSettingsModal: React.FC<DaemonSettingsModalProps> = ({
         <div className="p-6 overflow-y-auto max-h-[65vh] space-y-4">
           {/* TAB 1: Connection Settings */}
           {activeTab === 'connection' && (
-            <form onSubmit={handleSave} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                  WebSocket Daemon URL
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="wss://your-cloudflared-link.trycloudflare.com or ws://localhost:8080"
-                  className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-600 focus:bg-white transition font-mono font-bold"
-                />
-                <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-                  • <strong>On Online Vercel:</strong> Paste your Cloudflare tunnel link (e.g. <code className="text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded font-mono font-bold">wss://your-name.trycloudflare.com</code>).<br />
-                  • <strong>On Local PC:</strong> Use <code className="text-slate-800 bg-slate-100 px-1 py-0.5 rounded font-mono">ws://localhost:8080</code>.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                  Secret Token <span className="text-slate-400 font-normal">(optional, if VISTAAFK_SECRET is configured)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="password"
-                    value={token}
-                    onChange={(e) => setToken(e.target.value)}
-                    placeholder="Leave blank if no secret configured on daemon"
-                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-600 focus:bg-white transition font-mono"
-                  />
-                  <Key className="h-4 w-4 text-slate-400 absolute right-3.5 top-3" />
+            <div className="space-y-4">
+              {/* 1-Click Termux Launch Section */}
+              <div className="p-4 bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100/60 border-2 border-emerald-300 rounded-2xl space-y-3 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center space-x-2">
+                    <Terminal className="h-4 w-4 text-emerald-700 shrink-0" />
+                    <span className="font-black text-slate-900 text-xs uppercase tracking-wide">
+                      {user ? `⚡ 1-Click Termux Command for @${user.username}` : '⚡ 1-Click Termux Setup Command'}
+                    </span>
+                  </div>
+                  {user && (
+                    <span className="inline-flex items-center space-x-1 text-[10px] font-bold text-emerald-700 bg-white/80 border border-emerald-300 px-2 py-0.5 rounded-full shrink-0">
+                      <ShieldCheck className="h-3 w-3 text-emerald-600" />
+                      <span>Authenticated</span>
+                    </span>
+                  )}
                 </div>
-              </div>
 
-              {/* Action buttons */}
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('termux')}
-                  className="text-emerald-600 hover:text-emerald-700 text-xs font-bold flex items-center space-x-1"
-                >
-                  <Smartphone className="h-4 w-4" />
-                  <span>How to setup on Phone (Termux)? ➔</span>
-                </button>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  Run this single command in <strong>Termux</strong> on your phone. It installs all packages, launches the bot, and prints your instant access link:
+                </p>
 
-                <div className="flex items-center space-x-2">
+                {/* Command Box with 1-Click Copy */}
+                <div className="flex items-center justify-between bg-slate-900 text-emerald-400 p-3 rounded-xl font-mono text-[11px] shadow-inner gap-2">
+                  <code className="break-all select-all leading-relaxed line-clamp-3">
+                    {termuxCommand}
+                  </code>
                   <button
                     type="button"
-                    onClick={onClose}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+                    onClick={() => copyToClipboard(termuxCommand, 'quickCommand')}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shrink-0 transition flex items-center space-x-1 shadow-sm"
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/25 transition"
-                  >
-                    Save & Reconnect
+                    {copiedKey === 'quickCommand' ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-white" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5 text-white" />
+                        <span>Copy</span>
+                      </>
+                    )}
                   </button>
                 </div>
+
+                {/* Termux App Download Links */}
+                <div className="pt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
+                  <span className="font-bold text-slate-700">Need Termux?</span>
+                  <a
+                    href="https://play.google.com/store/apps/details?id=com.termux"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center space-x-1 px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-lg font-bold shadow-xs transition"
+                  >
+                    <span>Google Play Store</span>
+                    <ExternalLink className="h-3 w-3 text-slate-400" />
+                  </a>
+                  <a
+                    href="https://f-droid.org/en/packages/com.termux/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center space-x-1 px-2.5 py-1 bg-white hover:bg-slate-50 text-emerald-700 border border-emerald-300 rounded-lg font-bold shadow-xs transition"
+                    title="Recommended if Google Play has repository issues"
+                  >
+                    <span>F-Droid (Recommended APK)</span>
+                    <ExternalLink className="h-3 w-3 text-emerald-600" />
+                  </a>
+                </div>
               </div>
-            </form>
+
+              {/* URL Form */}
+              <form onSubmit={handleSave} className="space-y-4 pt-1">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-800">
+                      WebSocket Daemon URL
+                    </label>
+                    <span className="text-[10px] text-slate-500">Auto-cleans website & tunnel links</span>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={url}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val.includes('trycloudflare.com') || val.includes('connect=')) {
+                        setUrl(normalizeWsUrl(val));
+                      } else {
+                        setUrl(val);
+                      }
+                    }}
+                    onBlur={() => setUrl(normalizeWsUrl(url))}
+                    placeholder="wss://your-name.trycloudflare.com or ws://localhost:8080"
+                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-600 focus:bg-white transition font-mono font-bold"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                    • <strong>Paste any link:</strong> Paste your Cloudflare tunnel link or full 1-click link (e.g. <code className="text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded font-mono font-bold">wss://xxxx.trycloudflare.com</code>).<br />
+                    • <strong>On Local PC:</strong> Use <code className="text-slate-800 bg-slate-100 px-1 py-0.5 rounded font-mono">ws://localhost:8080</code>.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Secret Token <span className="text-slate-400 font-normal">(optional, if VISTAAFK_SECRET is configured)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      value={token}
+                      onChange={(e) => setToken(e.target.value)}
+                      placeholder="Leave blank if no secret configured on daemon"
+                      className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-600 focus:bg-white transition font-mono"
+                    />
+                    <Key className="h-4 w-4 text-slate-400 absolute right-3.5 top-3" />
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('termux')}
+                    className="text-emerald-600 hover:text-emerald-700 text-xs font-bold flex items-center space-x-1"
+                  >
+                    <Smartphone className="h-4 w-4" />
+                    <span>Termux 24/7 Setup Guide ➔</span>
+                  </button>
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/25 transition"
+                    >
+                      Save & Reconnect
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
           )}
 
           {/* TAB 2: In-Depth Android / Termux 24/7 Setup Guide */}

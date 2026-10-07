@@ -48,8 +48,8 @@ if [ "$1" == "--login" ] || [ "$1" == "-l" ] || [ "$1" == "--reset" ]; then
   echo "🧹 Reset account credentials."
 elif [ -n "$1" ] && [ -n "$2" ]; then
   AUTH_USER="$1"
-  AUTH_PASS="$2"
-  echo "{\"username\":\"$AUTH_USER\",\"password\":\"$AUTH_PASS\",\"cloudUrl\":\"https://vista-afk.vercel.app\"}" > user_auth.json
+  AUTH_SECRET="$2"
+  echo "{\"username\":\"$AUTH_USER\",\"token\":\"$AUTH_SECRET\",\"password\":\"$AUTH_SECRET\",\"cloudUrl\":\"https://vista-afk.vercel.app\"}" > user_auth.json
   cp user_auth.json ../user_auth.json 2>/dev/null
   echo "✅ Credentials auto-configured for '$AUTH_USER'!"
 fi

@@ -7,30 +7,54 @@ import {
   validateUsername,
   validatePassword,
   hashPassword,
+  verifySessionToken,
   UserRecord,
 } from '../../../../lib/userStore';
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { username, password, daemonUrl, secretToken, accounts, bots } = body;
+    const { username, password, token, daemonUrl, secretToken, accounts, bots } = body;
 
     const uVal = validateUsername(username);
     if (!uVal.valid) {
       return NextResponse.json({ error: uVal.error }, { status: 400 });
     }
 
-    const pVal = validatePassword(password);
-    if (!pVal.valid) {
-      return NextResponse.json({ error: pVal.error }, { status: 400 });
-    }
-
     const cleanUsername = username.trim().toLowerCase();
     let user = await getUser(cleanUsername);
 
-    // If user doesn't exist yet and daemon connects, auto-register them
+    // Verify authentication via either token or password
+    let isAuthorized = false;
+
+    if (token) {
+      const verifiedUsername = verifySessionToken(token);
+      if (verifiedUsername === cleanUsername) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized && password) {
+      if (user) {
+        isAuthorized = verifyPassword(password, user.passwordHash, user.salt);
+      } else {
+        const pVal = validatePassword(password);
+        if (pVal.valid) {
+          isAuthorized = true;
+        }
+      }
+    }
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { error: 'Invalid authentication credentials (token or password)' },
+        { status: 401 }
+      );
+    }
+
+    // If user doesn't exist yet and daemon connects with password, auto-register them
     if (!user) {
-      const { hash, salt } = hashPassword(password);
+      const { hash, salt } = hashPassword(password || crypto.randomBytes(16).toString('hex'));
       user = {
         id: crypto.randomUUID(),
         username: cleanUsername,
@@ -51,15 +75,6 @@ export async function POST(req: Request) {
         message: `Daemon auto-registered and linked to new account "${cleanUsername}"`,
         daemonUrl,
       });
-    }
-
-    // Verify existing password
-    const isMatch = verifyPassword(password, user.passwordHash, user.salt);
-    if (!isMatch) {
-      return NextResponse.json(
-        { error: 'Invalid password for this VistaAFK account' },
-        { status: 401 }
-      );
     }
 
     // Update daemon connection & heartbeat

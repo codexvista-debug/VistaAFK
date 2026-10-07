@@ -13,7 +13,7 @@ const SECRET = process.env.VISTAAFK_SECRET || '';
 const HOST = process.env.HOST || '0.0.0.0';
 
 // Cloud Account Linking & Tunnel Auto-discovery
-function getAuthCredentials(): { username: string; password?: string; cloudUrl?: string } | null {
+function getAuthCredentials(): { username: string; password?: string; token?: string; cloudUrl?: string } | null {
   const paths = [
     path.resolve(process.cwd(), 'user_auth.json'),
     path.resolve(process.cwd(), '..', 'user_auth.json'),
@@ -23,7 +23,7 @@ function getAuthCredentials(): { username: string; password?: string; cloudUrl?:
       try {
         const raw = fs.readFileSync(p, 'utf8');
         const parsed = JSON.parse(raw);
-        if (parsed.username && parsed.password) {
+        if (parsed.username && (parsed.password || parsed.token)) {
           return parsed;
         }
       } catch (e) {}
@@ -247,11 +247,11 @@ function sendInitialState(ws: WebSocket) {
 
 async function sendCloudHeartbeat() {
   const creds = getAuthCredentials();
-  if (!creds || !creds.username || !creds.password) return;
+  if (!creds || !creds.username || (!creds.password && !creds.token)) return;
 
   const detectedTunnel = getDetectedTunnelUrl();
   const tunnelUrl = process.env.DAEMON_PUBLIC_URL || detectedTunnel || `ws://localhost:${PORT}`;
-  const cloudUrl = creds.cloudUrl || process.env.VISTAAFK_CLOUD_URL || 'https://afkvista.vercel.app';
+  const cloudUrl = creds.cloudUrl || process.env.VISTAAFK_CLOUD_URL || 'https://vista-afk.vercel.app';
 
   try {
     const res = await fetch(`${cloudUrl}/api/daemon/heartbeat`, {
@@ -260,6 +260,7 @@ async function sendCloudHeartbeat() {
       body: JSON.stringify({
         username: creds.username,
         password: creds.password,
+        token: creds.token,
         daemonUrl: tunnelUrl,
         secretToken: SECRET,
         bots: botManager.getAllConfigs(),

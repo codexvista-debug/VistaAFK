@@ -24,7 +24,7 @@ function getAuthCredentials() {
             try {
                 const raw = fs_1.default.readFileSync(p, 'utf8');
                 const parsed = JSON.parse(raw);
-                if (parsed.username && parsed.password) {
+                if (parsed.username && (parsed.password || parsed.token)) {
                     return parsed;
                 }
             }
@@ -231,11 +231,11 @@ function sendInitialState(ws) {
 }
 async function sendCloudHeartbeat() {
     const creds = getAuthCredentials();
-    if (!creds || !creds.username || !creds.password)
+    if (!creds || !creds.username || (!creds.password && !creds.token))
         return;
     const detectedTunnel = getDetectedTunnelUrl();
     const tunnelUrl = process.env.DAEMON_PUBLIC_URL || detectedTunnel || `ws://localhost:${PORT}`;
-    const cloudUrl = creds.cloudUrl || process.env.VISTAAFK_CLOUD_URL || 'https://afkvista.vercel.app';
+    const cloudUrl = creds.cloudUrl || process.env.VISTAAFK_CLOUD_URL || 'https://vista-afk.vercel.app';
     try {
         const res = await fetch(`${cloudUrl}/api/daemon/heartbeat`, {
             method: 'POST',
@@ -243,6 +243,7 @@ async function sendCloudHeartbeat() {
             body: JSON.stringify({
                 username: creds.username,
                 password: creds.password,
+                token: creds.token,
                 daemonUrl: tunnelUrl,
                 secretToken: SECRET,
                 bots: botManager.getAllConfigs(),

@@ -13,6 +13,27 @@ const DEFAULT_SERVER_PRESETS: ServerPreset[] = [
 export function normalizeWsUrl(raw: string): string {
   let url = (raw || '').trim();
   if (!url) return 'ws://localhost:8080';
+
+  // 1. If someone pasted a full website URL containing ?connect= or ?daemon=, extract the inner tunnel URL
+  if (url.includes('connect=')) {
+    const match = url.match(/[?&]connect=([^&#\s]+)/);
+    if (match && match[1]) {
+      url = decodeURIComponent(match[1]).trim();
+    }
+  } else if (url.includes('daemon=')) {
+    const match = url.match(/[?&]daemon=([^&#\s]+)/);
+    if (match && match[1]) {
+      url = decodeURIComponent(match[1]).trim();
+    }
+  }
+
+  // 2. If it contains a trycloudflare.com domain anywhere, clean and return wss:// domain
+  const cfMatch = url.match(/([a-zA-Z0-9-]+\.trycloudflare\.com)/i);
+  if (cfMatch && cfMatch[1]) {
+    return `wss://${cfMatch[1]}`;
+  }
+
+  // 3. Normal protocol conversions
   if (url.startsWith('https://')) {
     url = 'wss://' + url.slice('https://'.length);
   } else if (url.startsWith('http://')) {
@@ -20,12 +41,15 @@ export function normalizeWsUrl(raw: string): string {
   } else if (!url.startsWith('ws://') && !url.startsWith('wss://')) {
     url = 'wss://' + url;
   }
-  // Strip trailing slashes
+
+  // 4. Strip trailing slashes
   url = url.replace(/\/+$/, '');
-  // If user pasted trycloudflare.com with :8080, strip :8080
+
+  // 5. If user pasted trycloudflare.com with :8080, strip :8080
   if (url.includes('trycloudflare.com') && url.includes(':8080')) {
     url = url.replace(':8080', '');
   }
+
   return url;
 }
 
