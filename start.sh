@@ -87,7 +87,15 @@ if command -v cloudflared &>/dev/null; then
   echo "🌐 Starting secure Cloudflare tunnel..."
   rm -f cloudflared.log 2>/dev/null
   cloudflared tunnel --url http://localhost:8080 > cloudflared.log 2>&1 &
-  sleep 2
+  sleep 3
+  TUNNEL_URL=$(grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare\.com' cloudflared.log 2>/dev/null | tail -n 1)
+  if [ -n "$TUNNEL_URL" ]; then
+    WSS_URL=$(echo "$TUNNEL_URL" | sed 's/https:\/\//wss:\/\//')
+    echo "============================================="
+    echo "  🌐 Remote Access Link for PC:"
+    echo "     $WSS_URL"
+    echo "============================================="
+  fi
 fi
 
 # 9. Run the pre-compiled daemon directly (Zero compilation needed on mobile!)
