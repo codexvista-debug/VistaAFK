@@ -128,7 +128,7 @@ export type ClientMessage =
   | { type: 'LOOK_AT'; payload: { botId: string; yaw: number; pitch: number } }
   | { type: 'MOVE_INVENTORY_ITEM'; payload: { botId: string; sourceSlot: number; targetSlot: number } }
   | { type: 'SET_QUICK_BAR_SLOT'; payload: { botId: string; slot: number } }
-  | { type: 'DISCOVER_MICROSOFT_ACCOUNT' }
+  | { type: 'DISCOVER_MICROSOFT_ACCOUNT'; payload?: { email?: string } }
   | { type: 'CANCEL_MICROSOFT_DISCOVERY' };
 
 export type ServerMessage =

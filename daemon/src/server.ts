@@ -125,13 +125,18 @@ wss.on('connection', (ws) => {
         case 'SET_QUICK_BAR_SLOT':
           botManager.setQuickBarSlot(msg.payload.botId, msg.payload.slot);
           break;
-        case 'DISCOVER_MICROSOFT_ACCOUNT':
-          discoverMicrosoftProfiles(path.resolve(process.cwd(), 'tokens'), (codeData) => {
-            ws.send(JSON.stringify({
-              type: 'MICROSOFT_DEVICE_CODE',
-              payload: codeData,
-            } as ServerMessage));
-          }).then((profiles) => {
+        case 'DISCOVER_MICROSOFT_ACCOUNT': {
+          const reqEmail = (msg as any).payload?.email;
+          discoverMicrosoftProfiles(
+            path.resolve(process.cwd(), 'tokens'),
+            (codeData) => {
+              ws.send(JSON.stringify({
+                type: 'MICROSOFT_DEVICE_CODE',
+                payload: codeData,
+              } as ServerMessage));
+            },
+            reqEmail
+          ).then((profiles) => {
             ws.send(JSON.stringify({
               type: 'MICROSOFT_PROFILES_DISCOVERED',
               payload: profiles,
@@ -143,6 +148,7 @@ wss.on('connection', (ws) => {
             } as ServerMessage));
           });
           break;
+        }
       }
     } catch (err: any) {
       console.error('[VistaAFK Daemon] Error processing message:', err.message);

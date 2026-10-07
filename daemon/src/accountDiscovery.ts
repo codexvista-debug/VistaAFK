@@ -41,10 +41,11 @@ export interface DiscoveredProfiles {
 
 export async function discoverMicrosoftProfiles(
   tokenFolder: string,
-  onDeviceCode: (data: { userCode: string; verificationUri: string; expiresIn: number }) => void
+  onDeviceCode: (data: { userCode: string; verificationUri: string; expiresIn: number }) => void,
+  email?: string
 ): Promise<DiscoveredProfiles> {
-  const accountId = 'msa_discovery_' + Date.now();
-  console.log('[VistaAFK Discovery] Initiating Microsoft OAuth device code flow...');
+  const accountId = (email && email.trim()) ? email.trim() : ('msa_discovery_' + Date.now());
+  console.log(`[VistaAFK Discovery] Initiating Microsoft OAuth device code flow for ${email || 'account'}...`);
 
   const flow = new Authflow(
     accountId,
@@ -56,7 +57,10 @@ export async function discoverMicrosoftProfiles(
     (codeData: any) => {
       const userCode = codeData.user_code || codeData.userCode;
       const baseUri = codeData.verification_uri || codeData.verificationUri || 'https://www.microsoft.com/link';
-      const directUri = userCode ? `https://www.microsoft.com/link?otc=${encodeURIComponent(userCode)}` : baseUri;
+      let directUri = userCode ? `https://www.microsoft.com/link?otc=${encodeURIComponent(userCode)}` : baseUri;
+      if (email && email.trim()) {
+        directUri += `&login_hint=${encodeURIComponent(email.trim())}`;
+      }
 
       console.log(`[VistaAFK Discovery] Received Device Code: ${userCode} (Link: ${directUri})`);
       onDeviceCode({

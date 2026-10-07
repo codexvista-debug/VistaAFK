@@ -67,7 +67,7 @@ export interface VistaWebSocketContextType {
   discoveryStatus: 'idle' | 'waiting_code' | 'waiting_approval' | 'success' | 'error';
   discoveryProfiles: { java?: { name: string; uuid: string }; bedrock?: { gamertag: string; xuid?: string } } | null;
   discoveryError: string | null;
-  discoverMicrosoftAccount: () => void;
+  discoverMicrosoftAccount: (email?: string) => void;
   resetDiscovery: () => void;
 }
 
@@ -487,7 +487,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const dismissNotification = (id: string) =>
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   const clearNotifications = () => setNotifications([]);
-  const discoverMicrosoftAccount = () => {
+  const discoverMicrosoftAccount = (email?: string) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       setDiscoveryError('VistaAFK daemon is not connected. Please ensure your local daemon terminal is running.');
       setDiscoveryStatus('error');
@@ -497,7 +497,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     setDiscoveryDeviceCode(null);
     setDiscoveryProfiles(null);
     setDiscoveryError(null);
-    send({ type: 'DISCOVER_MICROSOFT_ACCOUNT' });
+    send({ type: 'DISCOVER_MICROSOFT_ACCOUNT', payload: email ? { email } : undefined });
   };
 
   const resetDiscovery = () => {
