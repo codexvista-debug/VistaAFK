@@ -120,6 +120,25 @@ async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email, editi
                     console.warn('[VistaAFK Discovery] Xbox profile settings endpoint lookup failed:', e.message);
                 }
             }
+            // 3. Fallback: Query official Bedrock Minecraft token exchange
+            if (!gamertag && typeof flow.getMinecraftBedrockToken === 'function') {
+                try {
+                    const keyPair = crypto_1.default.generateKeyPairSync('ec', { namedCurve: 'secp384r1' });
+                    const clientX509 = keyPair.publicKey.export({ format: 'der', type: 'spki' }).toString('base64');
+                    const loginData = await flow.getMinecraftBedrockToken(clientX509);
+                    if (Array.isArray(loginData?.chain) && loginData.chain.length > 1) {
+                        const jwt = loginData.chain[1];
+                        const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64').toString());
+                        if (payload?.extraData?.displayName) {
+                            gamertag = payload.extraData.displayName;
+                            xuid = payload.extraData.XUID || xuid;
+                        }
+                    }
+                }
+                catch (e) {
+                    console.warn('[VistaAFK Discovery] Bedrock token discovery fallback error:', e.message);
+                }
+            }
             if (gamertag) {
                 result.bedrock = {
                     gamertag,
