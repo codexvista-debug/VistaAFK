@@ -3,6 +3,12 @@ echo "============================================="
 echo "      🚀 Starting VistaAFK Daemon v1.2.3      "
 echo "============================================="
 
+# 0. Automatically acquire Termux Wake Lock so Android OS never sleeps or throttles daemon
+if command -v termux-wake-lock &>/dev/null; then
+  termux-wake-lock 2>/dev/null || true
+  echo "🔒 Android wake lock acquired (24/7 background mode active)"
+fi
+
 # 1. Kill any existing zombie processes
 pkill -f "node dist/server.js" 2>/dev/null
 pkill -f "dist/server.js" 2>/dev/null
@@ -69,7 +75,7 @@ fi
 if command -v cloudflared &>/dev/null; then
   echo "🌐 Starting secure Cloudflare tunnel..."
   rm -f cloudflared.log 2>/dev/null
-  cloudflared tunnel --url http://localhost:8080 > cloudflared.log 2>&1 &
+  cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080 > cloudflared.log 2>&1 &
   
   # Wait up to 10 seconds for the tunnel to establish
   TUNNEL_URL=""

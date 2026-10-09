@@ -444,13 +444,13 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         // Authenticate immediately upon connection
         ws.send(JSON.stringify({ type: 'AUTH', payload: { token: secretToken || undefined, username } }));
 
-        // Start client keepalive ping every 10 seconds to keep connection rock solid
+        // Start client keepalive ping every 8 seconds to keep connection rock solid without data bloat
         if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
         keepAliveIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'GET_STATE' }));
+            ws.send(JSON.stringify({ type: 'PING' }));
           }
-        }, 10000);
+        }, 8000);
       };
 
       ws.onmessage = (event) => {
@@ -602,20 +602,24 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
 
-        // Auto reconnect: attempt one retry after 4s (in case of momentary Wi-Fi blip)
-        // If that fails, pause cleanly to keep UI completely stable and prevent blinking!
+        // Reset telemetry status to offline and uptime to 0 so UI never shows stale online status or ticking uptime
+        setTelemetry((prev) => {
+          const updated: Record<string, BotTelemetry> = {};
+          for (const [id, t] of Object.entries(prev)) {
+            updated[id] = { ...t, status: 'offline', uptimeSeconds: 0 };
+          }
+          return updated;
+        });
+
+        // Resilient background reconnect: attempts at 3s, 6s, 10s, then background pulses every 15s
         if (username) {
           retryCountRef.current += 1;
           setConnectionAttempts(retryCountRef.current);
 
-          if (retryCountRef.current === 1) {
-            reconnectTimeoutRef.current = setTimeout(() => {
-              connect();
-            }, 4000);
-          } else {
-            console.log(`[VistaAFK WS Provider] Daemon offline at ${targetUrl}. Pausing reconnect to keep UI stable.`);
-            setIsConnecting(false);
-          }
+          const delay = retryCountRef.current === 1 ? 3000 : retryCountRef.current === 2 ? 6000 : retryCountRef.current === 3 ? 10000 : 15000;
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connect(true);
+          }, delay);
         }
       };
 

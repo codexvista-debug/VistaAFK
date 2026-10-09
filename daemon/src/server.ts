@@ -348,3 +348,13 @@ process.on('SIGTERM', () => {
   botManager.stopAll();
   process.exit(0);
 });
+
+// Resilient crash prevention on mobile & termux background execution
+process.on('uncaughtException', (err) => {
+  console.error('[VistaAFK Daemon] ⚠️ Caught uncaught exception (kept daemon running):', err?.message || err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[VistaAFK Daemon] ⚠️ Caught unhandled rejection (kept daemon running):', reason);
+});
+

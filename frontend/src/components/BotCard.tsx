@@ -22,6 +22,7 @@ import {
   ChevronUp,
   Package,
   Swords,
+  Key,
 } from 'lucide-react';
 import { BotConfig, BotTelemetry, ChatMessage, ActivityLog } from '../types';
 
@@ -30,6 +31,7 @@ interface BotCardProps {
   telemetry?: BotTelemetry;
   activityLogs?: ActivityLog[];
   logs?: ChatMessage[];
+  isDaemonConnected?: boolean;
   onStart: (id: string) => void;
   onStop: (id: string) => void;
   onDelete: (id: string) => void;
@@ -44,6 +46,7 @@ export const BotCard: React.FC<BotCardProps> = ({
   telemetry,
   activityLogs = [],
   logs = [],
+  isDaemonConnected = true,
   onStart,
   onStop,
   onDelete,
@@ -55,10 +58,11 @@ export const BotCard: React.FC<BotCardProps> = ({
   const [copiedCode, setCopiedCode] = useState(false);
   const [isLogsExpanded, setIsLogsExpanded] = useState(true);
 
-  const status = telemetry?.status || 'offline';
-  const isOnline = status === 'online';
-  const isAuthenticating = status === 'authenticating';
-  const isConnecting = status === 'connecting' || status === 'reconnecting';
+  const rawStatus = telemetry?.status || 'offline';
+  const isOnline = isDaemonConnected && rawStatus === 'online';
+  const isAuthenticating = isDaemonConnected && rawStatus === 'authenticating';
+  const isConnecting = isDaemonConnected && (rawStatus === 'connecting' || rawStatus === 'reconnecting');
+  const statusDisplay = !isDaemonConnected ? 'Daemon Offline' : rawStatus;
 
   const health = telemetry?.health ?? 0;
   const rawHearts = telemetry?.hearts !== undefined ? telemetry.hearts : Math.round((health / 2) * 10) / 10;
@@ -122,19 +126,21 @@ export const BotCard: React.FC<BotCardProps> = ({
     }
   }, [displayLogs, isLogsExpanded]);
 
+  const isBedrock = config.edition === 'bedrock' || config.port === 19132 || config.id.includes('bedrock');
+
   return (
     <div className="bg-white border-2 border-slate-200/90 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
       <div className="p-5">
         {/* Card Header: Avatar & Server Info */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="relative">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center space-x-3 min-w-0">
+            <div className="relative shrink-0">
               <img
                 src={`https://mc-heads.net/avatar/${config.name}/48`}
                 alt={config.name}
-                className="h-11 w-11 rounded-xl bg-slate-100 border-2 border-slate-300 shadow-sm"
+                className="h-11 w-11 shrink-0 rounded-xl bg-slate-100 border-2 border-slate-300 shadow-sm object-cover aspect-square"
                 onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
+                  (e.target as HTMLImageElement).src = 'https://mc-heads.net/avatar/MHF_Steve/48';
                 }}
               />
               <span
@@ -149,38 +155,50 @@ export const BotCard: React.FC<BotCardProps> = ({
                 }`}
               />
             </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h3 className="font-black text-sm text-slate-900 tracking-tight">{config.name}</h3>
+            <div className="min-w-0">
+              <div className="flex items-center space-x-1.5">
+                <h3 className="font-black text-sm text-slate-900 tracking-tight truncate max-w-[110px] sm:max-w-[170px]" title={config.name}>
+                  {config.name}
+                </h3>
+                {/* Compact Edition Icon Button */}
                 <button
                   type="button"
                   onClick={() => {
-                    const isCurrentBedrock = config.edition === 'bedrock' || config.port === 19132 || config.id.includes('bedrock');
-                    const nextEdition = isCurrentBedrock ? 'java' : 'bedrock';
+                    const nextEdition = isBedrock ? 'java' : 'bedrock';
                     const nextPort = nextEdition === 'bedrock' ? 19132 : 25565;
                     onEdit({ ...config, edition: nextEdition, port: nextPort });
                   }}
-                  title={`Currently ${config.edition === 'bedrock' || config.port === 19132 ? 'Bedrock' : 'Java'}. Click to switch to ${config.edition === 'bedrock' || config.port === 19132 ? 'Java' : 'Bedrock'}`}
-                  className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border uppercase transition hover:scale-105 cursor-pointer ${
-                    (config.edition === 'bedrock' || config.port === 19132 || config.id.includes('bedrock'))
+                  title={`Currently ${isBedrock ? 'Bedrock Edition' : 'Java Edition'}. Click to switch to ${isBedrock ? 'Java' : 'Bedrock'}.`}
+                  className={`px-1.5 py-0.5 rounded-md border text-xs font-bold transition hover:scale-105 cursor-pointer shrink-0 flex items-center justify-center ${
+                    isBedrock
                       ? 'bg-sky-50 text-sky-700 border-sky-300 hover:bg-sky-100'
                       : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
                   }`}
                 >
-                  {(config.edition === 'bedrock' || config.port === 19132 || config.id.includes('bedrock')) ? '🧱 Bedrock' : '☕ Java'}
+                  <span role="img" aria-label={isBedrock ? 'Bedrock' : 'Java'}>
+                    {isBedrock ? '🧱' : '☕'}
+                  </span>
                 </button>
-                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 uppercase">
-                  {config.authType === 'microsoft' ? 'MS OAuth' : 'Offline'}
+                {/* Compact Auth Type Icon Badge */}
+                <span
+                  title={config.authType === 'microsoft' ? 'Microsoft Account' : 'Offline / Cracked'}
+                  className="p-1 rounded-md bg-slate-100 text-slate-600 border border-slate-200 shrink-0 flex items-center justify-center"
+                >
+                  {config.authType === 'microsoft' ? (
+                    <Key className="h-3 w-3 text-sky-600" />
+                  ) : (
+                    <Shield className="h-3 w-3 text-slate-400" />
+                  )}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-mono mt-0.5 font-medium">
+              <p className="text-xs text-slate-500 font-mono mt-0.5 font-medium truncate">
                 {config.host}:{config.port}
               </p>
             </div>
           </div>
 
           {/* Status Badge */}
-          <div className="text-right">
+          <div className="text-right shrink-0">
             <span
               className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold capitalize ${
                 isOnline
@@ -192,7 +210,7 @@ export const BotCard: React.FC<BotCardProps> = ({
                   : 'bg-slate-100 text-slate-600 border border-slate-200'
               }`}
             >
-              {status}
+              {statusDisplay}
             </span>
             {isOnline && ping > 0 && (
               <span className="block text-[10px] font-mono text-slate-400 mt-1 font-semibold">{ping}ms</span>

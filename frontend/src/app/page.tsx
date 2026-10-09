@@ -75,7 +75,7 @@ export default function Dashboard() {
     dismissNotification(id);
   };
 
-  const onlineCount = Object.values(telemetry).filter((t) => t.status === 'online').length;
+  const onlineCount = isConnected ? Object.values(telemetry).filter((t) => t.status === 'online').length : 0;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f8fafc] text-slate-800">
@@ -112,7 +112,7 @@ export default function Dashboard() {
 
 
         {/* Stats Overview */}
-        <StatsOverview configs={configs} telemetry={telemetry} savedAccountsCount={savedAccounts.length} />
+        <StatsOverview configs={configs} telemetry={telemetry} savedAccountsCount={savedAccounts.length} isDaemonConnected={isConnected} />
 
         {/* Server Fleet Deployments Section */}
         <div className="space-y-4">
@@ -263,6 +263,7 @@ export default function Dashboard() {
                   telemetry={telemetry[cfg.id]}
                   activityLogs={activityLogs[cfg.id] || []}
                   logs={chatLogs[cfg.id] || []}
+                  isDaemonConnected={isConnected}
                   onStart={startBot}
                   onStop={stopBot}
                   onDelete={removeBot}

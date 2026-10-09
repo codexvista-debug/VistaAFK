@@ -8,16 +8,28 @@ interface StatsOverviewProps {
   configs: BotConfig[];
   telemetry: Record<string, BotTelemetry>;
   savedAccountsCount?: number;
+  isDaemonConnected?: boolean;
 }
 
-export const StatsOverview: React.FC<StatsOverviewProps> = ({ configs, telemetry, savedAccountsCount }) => {
+export const StatsOverview: React.FC<StatsOverviewProps> = ({
+  configs,
+  telemetry,
+  savedAccountsCount,
+  isDaemonConnected = true,
+}) => {
   const totalBots = configs.length;
-  const onlineBots = Object.values(telemetry).filter((t) => t.status === 'online').length;
-  const authenticatingBots = Object.values(telemetry).filter((t) => t.status === 'authenticating').length;
-  
-  const onlinePings = Object.values(telemetry)
-    .filter((t) => t.status === 'online' && t.ping > 0)
-    .map((t) => t.ping);
+  const onlineBots = isDaemonConnected
+    ? Object.values(telemetry).filter((t) => t.status === 'online').length
+    : 0;
+  const authenticatingBots = isDaemonConnected
+    ? Object.values(telemetry).filter((t) => t.status === 'authenticating').length
+    : 0;
+
+  const onlinePings = isDaemonConnected
+    ? Object.values(telemetry)
+        .filter((t) => t.status === 'online' && t.ping > 0)
+        .map((t) => t.ping)
+    : [];
   const avgPing = onlinePings.length > 0 ? Math.round(onlinePings.reduce((a, b) => a + b, 0) / onlinePings.length) : 0;
 
   return (
