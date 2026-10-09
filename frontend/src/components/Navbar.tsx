@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Play, Square, Plus, Settings, Wifi, WifiOff, Box, Server, Users, User, LogOut, ShieldCheck, ChevronDown, Lock, Menu } from 'lucide-react';
+import { Play, Square, Plus, Settings, Wifi, WifiOff, Box, Server, Users, User, LogOut, ShieldCheck, ChevronDown, Lock, Menu, Layers } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/VistaAuthContext';
@@ -10,7 +10,7 @@ interface NavbarProps {
   isConnected: boolean;
   isConnecting: boolean;
   onOpenAddModal: () => void;
-  onOpenSettingsModal: () => void;
+  onOpenSettingsModal?: () => void;
   onRetryConnection?: () => void;
   onStartAll?: () => void;
   onStopAll?: () => void;
@@ -103,6 +103,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             )}
           </Link>
+
+          <Link
+            href="/versions"
+            className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-xs font-black transition-all border ${
+              pathname === '/versions'
+                ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30'
+                : 'bg-[#1b2637]/70 text-slate-300 hover:text-white hover:bg-[#1b2637] border-slate-700'
+            }`}
+            title="Supported Minecraft Versions"
+          >
+            <Layers className="h-4 w-4 stroke-[2.5]" />
+            <span className="hidden sm:inline">Versions</span>
+          </Link>
         </nav>
 
         {/* Right Section: Single Unified Dropdown Menu (Only when Logged In) */}
@@ -177,19 +190,40 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => {
-                        setIsUserMenuOpen(false);
-                        onOpenSettingsModal();
-                      }}
-                      className="w-full py-2 px-3 bg-slate-700/60 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1.5 border border-slate-600/50"
+                    <Link
+                      href="/settings"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className={`w-full py-2 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 border text-xs font-bold ${
+                        pathname === '/settings'
+                          ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30'
+                          : 'bg-slate-700/60 hover:bg-slate-700 text-slate-200 border-slate-600/50'
+                      }`}
                     >
                       <Settings className="h-3.5 w-3.5 text-emerald-400" />
-                      <span>Connection Settings &amp; Termux</span>
-                    </button>
+                      <span>Daemon Connection &amp; Settings</span>
+                    </Link>
                   </div>
 
-                  {/* 2. Admin Control Panel (for user vista) */}
+                  {/* 2. Navigation Links inside dropdown */}
+                  <div className="space-y-1.5">
+                    <Link
+                      href="/versions"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className={`flex items-center justify-between p-2.5 rounded-xl border transition ${
+                        pathname === '/versions'
+                          ? 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40 font-bold'
+                          : 'bg-slate-800/60 hover:bg-slate-800 text-slate-300 border-slate-700/60'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Layers className="h-4 w-4 text-cyan-400 shrink-0" />
+                        <span>Supported Minecraft Versions</span>
+                      </div>
+                      <span className="text-[10px] text-cyan-400/80 font-mono">1.7 - 26.x</span>
+                    </Link>
+                  </div>
+
+                  {/* 3. Admin Control Panel (for user vista) */}
                   {isVista && (
                     <Link
                       href="/control-panel"
@@ -213,7 +247,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </Link>
                   )}
 
-                  {/* 3. User Session / Auth Section */}
+                  {/* 4. User Session / Auth Section */}
                   <div className="pt-2 border-t border-slate-800 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2.5">

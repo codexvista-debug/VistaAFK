@@ -8,21 +8,16 @@ import { BotCard } from '../components/BotCard';
 import { AddBotModal } from '../components/AddBotModal';
 import { DeployServerModal } from '../components/DeployServerModal';
 import { LiveChatTerminal } from '../components/LiveChatTerminal';
-import { DaemonSettingsModal } from '../components/DaemonSettingsModal';
 import { NotificationToast } from '../components/NotificationToast';
 import { BotVisualControlModal } from '../components/BotVisualControlModal';
 import { BotInventoryModal } from '../components/BotInventoryModal';
 import { BotConfig, SavedAccount } from '../types';
-import { Plus, Server, AlertTriangle, RefreshCw, Layers, Users, Play, Smartphone, Copy, Check, ExternalLink, Terminal } from 'lucide-react';
+import { Plus, Server, AlertTriangle, RefreshCw, Layers, Users, Play } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '../context/VistaAuthContext';
 
 export default function Dashboard() {
-  const { user, token: authToken, openAuthModal } = useAuth();
-  const [copiedTermux, setCopiedTermux] = useState(false);
-  const termuxCommand = user?.username
-    ? `pkg update -y && pkg install -y git nodejs cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh ${user.username} ${authToken || ''}`
-    : '';
+  const { user, openAuthModal } = useAuth();
   const {
     daemonUrl,
     secretToken,
@@ -55,7 +50,6 @@ export default function Dashboard() {
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
   const [isAddBotModalOpen, setIsAddBotModalOpen] = useState(false);
   const [editingBot, setEditingBot] = useState<BotConfig | null>(null);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [chatBotId, setChatBotId] = useState<string | null>(null);
   const [sightModalBot, setSightModalBot] = useState<BotConfig | null>(null);
   const [inventoryModalBot, setInventoryModalBot] = useState<BotConfig | null>(null);
@@ -90,7 +84,6 @@ export default function Dashboard() {
         isConnected={isConnected}
         isConnecting={isConnecting}
         onOpenAddModal={() => setIsDeployModalOpen(true)}
-        onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
         onRetryConnection={retryConnection}
         botCount={configs.length}
         onlineCount={onlineCount}
@@ -106,102 +99,17 @@ export default function Dashboard() {
               <AlertTriangle className="h-4 w-4 text-rose-600" />
               <span className="font-medium">Authentication Error: {authError}</span>
             </div>
-            <button
-              onClick={() => setIsSettingsModalOpen(true)}
+            <Link
+              href="/settings"
               className="font-bold underline hover:text-rose-900"
             >
-              Configure Token
-            </button>
+              Open Settings
+            </Link>
           </div>
         )}
 
 
-        {/* Termux Daemon Quick Start Banner for Logged-In User with Offline Daemon */}
-        {user && !isConnected && (
-          <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white border-2 border-emerald-500/40 shadow-xl space-y-3.5">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
-              <div className="flex items-start sm:items-center space-x-3">
-                <div className="p-2 sm:p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30 shrink-0 mt-0.5 sm:mt-0">
-                  <Smartphone className="h-5 w-5 sm:h-6 sm:w-6" />
-                </div>
-                <div>
-                  <h3 className="font-black text-sm sm:text-base tracking-tight text-white flex flex-wrap items-center gap-1.5 sm:gap-2">
-                    <span>Step 1: Start your 24/7 Bot Daemon</span>
-                    <span className="text-[10px] font-mono uppercase bg-emerald-400/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-400/30 shrink-0">Termux</span>
-                  </h3>
-                  <p className="text-xs text-slate-300 font-medium mt-0.5 leading-snug">
-                    Paste this command into Termux on your phone to connect your 24/7 bots and authenticate Minecraft accounts.
-                  </p>
-                </div>
-              </div>
 
-              {/* Action buttons with clean mobile wrapping */}
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={retryConnection}
-                  disabled={isConnecting}
-                  className="w-24 sm:w-28 px-3 py-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 disabled:opacity-75"
-                  title="Retry connecting to daemon"
-                >
-                  <RefreshCw className={`h-3 w-3 ${isConnecting ? 'animate-spin text-emerald-400' : ''}`} />
-                  <span>{isConnecting ? 'Connecting...' : 'Retry'}</span>
-                </button>
-                <button
-                  onClick={() => setIsSettingsModalOpen(true)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 rounded-xl text-xs font-bold transition flex items-center space-x-1"
-                >
-                  <span>Settings</span>
-                </button>
-                <a
-                  href="https://play.google.com/store/apps/details?id=com.termux"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-600/80 rounded-xl text-[11px] font-semibold transition flex items-center space-x-1"
-                >
-                  <span>Google Play</span>
-                  <ExternalLink className="h-3 w-3 text-slate-400" />
-                </a>
-                <a
-                  href="https://f-droid.org/en/packages/com.termux/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-2.5 py-1.5 bg-emerald-700/80 hover:bg-emerald-600 text-white rounded-xl text-[11px] font-semibold transition flex items-center space-x-1"
-                >
-                  <span>F-Droid APK</span>
-                  <ExternalLink className="h-3 w-3 text-emerald-200" />
-                </a>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between bg-black/60 border border-slate-700 p-2.5 sm:p-3 rounded-xl font-mono text-[11px] gap-2">
-              <code className="text-emerald-400 break-all select-all line-clamp-2">
-                {termuxCommand}
-              </code>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(termuxCommand);
-                  setCopiedTermux(true);
-                  setTimeout(() => setCopiedTermux(false), 2500);
-                }}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shrink-0 transition flex items-center space-x-1.5 shadow-sm active:scale-95"
-              >
-                {copiedTermux ? (
-                  <>
-                    <Check className="h-4 w-4 text-white" />
-                    <span>Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4 text-white" />
-                    <span>Copy Command</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Stats Overview */}
         <StatsOverview configs={configs} telemetry={telemetry} savedAccountsCount={savedAccounts.length} />
@@ -423,15 +331,7 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Daemon Settings Modal */}
-      {isSettingsModalOpen && (
-        <DaemonSettingsModal
-          onClose={() => setIsSettingsModalOpen(false)}
-          currentUrl={daemonUrl}
-          currentToken={secretToken}
-          onSave={updateDaemonConfig}
-        />
-      )}
+
 
       {/* Live Toast Notifications */}
       <NotificationToast

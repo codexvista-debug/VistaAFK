@@ -34,3 +34,4 @@ daemon/logs/
 Thumbs.db
 .vscode/
 .idea/
+*.tsbuildinfo
