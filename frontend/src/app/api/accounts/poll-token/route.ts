@@ -19,10 +19,235 @@ const XBOX_ERROR_MESSAGES: Record<number, string> = {
   2148916238: 'Child account (under 18): must be added to a Microsoft Family to play online.',
 };
 
+async function discoverBedrock(
+  userToken: string,
+  userHash: string
+): Promise<{ profile?: { gamertag: string; xuid?: string }; diagnosticError?: string }> {
+  try {
+    // 1. Request XSTS for Bedrock Multiplayer
+    const bedrockXstsRes = await fetch('https://xsts.auth.xboxlive.com/xsts/authorize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent': 'MCPE/UWP',
+        'x-xbl-contract-version': '1',
+      },
+      body: JSON.stringify({
+        Properties: {
+          SandboxId: 'RETAIL',
+          UserTokens: [userToken],
+        },
+        RelyingParty: 'https://multiplayer.minecraft.net/',
+        TokenType: 'JWT',
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (bedrockXstsRes.ok) {
+      const bedrockXstsData = await bedrockXstsRes.json();
+      const bUhs = bedrockXstsData?.DisplayClaims?.xui?.[0]?.uhs || userHash;
+      const bToken = bedrockXstsData.Token;
+      let bGtg = bedrockXstsData?.DisplayClaims?.xui?.[0]?.gtg || '';
+      let bXuid = bedrockXstsData?.DisplayClaims?.xui?.[0]?.xid || '';
+
+      // If gamertag not in claims directly, query Bedrock token chain
+      if (!bGtg && bToken) {
+        try {
+          const keyPair = crypto.generateKeyPairSync('ec', { namedCurve: 'secp384r1' });
+          const publicKeyDER = keyPair.publicKey.export({ format: 'der', type: 'spki' });
+          const clientPublicKey = publicKeyDER.toString('base64');
+
+          const mcpeRes = await fetch('https://multiplayer.minecraft.net/authentication', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': 'MCPE/UWP',
+              Authorization: `XBL3.0 x=${bUhs};${bToken}`,
+            },
+            body: JSON.stringify({ identityPublicKey: clientPublicKey }),
+            signal: AbortSignal.timeout(5000),
+          });
+
+          if (mcpeRes.ok) {
+            const mcpeData = await mcpeRes.json();
+            if (Array.isArray(mcpeData.chain) && mcpeData.chain.length > 1) {
+              const jwtPayload = JSON.parse(Buffer.from(mcpeData.chain[1].split('.')[1], 'base64').toString());
+              if (jwtPayload?.extraData?.displayName) {
+                bGtg = jwtPayload.extraData.displayName;
+                bXuid = jwtPayload.extraData.XUID || bXuid;
+              }
+            }
+          }
+        } catch (e: any) {
+          console.warn('[PollToken API] Bedrock authentication token chain query:', e?.message);
+        }
+      }
+
+      if (bGtg) {
+        return { profile: { gamertag: bGtg, xuid: bXuid } };
+      }
+    } else {
+      const errJson = await bedrockXstsRes.json().catch(() => ({}));
+      if (errJson.XErr && XBOX_ERROR_MESSAGES[errJson.XErr]) {
+        return { diagnosticError: XBOX_ERROR_MESSAGES[errJson.XErr] };
+      }
+    }
+  } catch (err: any) {
+    console.warn('[PollToken API] Bedrock multiplayer XSTS error:', err?.message);
+  }
+
+  // Fallback: Query xboxlive.com relying party for Gamertag
+  try {
+    const xstsRes = await fetch('https://xsts.auth.xboxlive.com/xsts/authorize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'x-xbl-contract-version': '1',
+      },
+      body: JSON.stringify({
+        Properties: {
+          SandboxId: 'RETAIL',
+          UserTokens: [userToken],
+        },
+        RelyingParty: 'http://xboxlive.com',
+        TokenType: 'JWT',
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (xstsRes.ok) {
+      const xstsData = await xstsRes.json();
+      let gamertag = xstsData?.DisplayClaims?.xui?.[0]?.gtg || '';
+      let xuid = xstsData?.DisplayClaims?.xui?.[0]?.xid || '';
+      const xstsUhs = xstsData?.DisplayClaims?.xui?.[0]?.uhs || userHash;
+      const xstsToken = xstsData.Token;
+
+      if (!gamertag && xstsUhs && xstsToken) {
+        try {
+          const profRes = await fetch('https://profile.xboxlive.com/users/me/profile/settings?settings=Gamertag', {
+            headers: {
+              'x-xbl-contract-version': '2',
+              Authorization: `XBL3.0 x=${xstsUhs};${xstsToken}`,
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+              Accept: 'application/json',
+            },
+            signal: AbortSignal.timeout(5000),
+          });
+          if (profRes.ok) {
+            const profData = await profRes.json();
+            const gtgSetting = profData?.profileUsers?.[0]?.settings?.find((s: any) => s.id === 'Gamertag');
+            if (gtgSetting?.value) {
+              gamertag = gtgSetting.value;
+            }
+            if (!xuid && profData?.profileUsers?.[0]?.id) {
+              xuid = profData.profileUsers[0].id;
+            }
+          }
+        } catch (e: any) {
+          console.warn('[PollToken API] Xbox profile settings fallback error:', e?.message);
+        }
+      }
+
+      if (gamertag) {
+        return { profile: { gamertag, xuid } };
+      }
+    } else {
+      const errJson = await xstsRes.json().catch(() => ({}));
+      if (errJson.XErr && XBOX_ERROR_MESSAGES[errJson.XErr]) {
+        return { diagnosticError: XBOX_ERROR_MESSAGES[errJson.XErr] };
+      }
+    }
+  } catch (err: any) {
+    console.warn('[PollToken API] Xbox fallback error:', err?.message);
+  }
+
+  return {};
+}
+
+async function discoverJava(
+  userToken: string,
+  userHash: string
+): Promise<{ profile?: { name: string; uuid: string }; diagnosticError?: string }> {
+  try {
+    const javaXstsRes = await fetch('https://xsts.auth.xboxlive.com/xsts/authorize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent': 'MinecraftLauncher/2.2.10675',
+        'x-xbl-contract-version': '1',
+      },
+      body: JSON.stringify({
+        Properties: {
+          SandboxId: 'RETAIL',
+          UserTokens: [userToken],
+        },
+        RelyingParty: 'rp://api.minecraftservices.com/',
+        TokenType: 'JWT',
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (javaXstsRes.ok) {
+      const javaXstsData = await javaXstsRes.json();
+      const javaUhs = javaXstsData?.DisplayClaims?.xui?.[0]?.uhs || userHash;
+      const javaXstsToken = javaXstsData.Token;
+
+      const mcLoginRes = await fetch('https://api.minecraftservices.com/authentication/login_with_xbox', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'User-Agent': 'MinecraftLauncher/2.2.10675',
+        },
+        body: JSON.stringify({
+          identityToken: `XBL3.0 x=${javaUhs};${javaXstsToken}`,
+        }),
+        signal: AbortSignal.timeout(6000),
+      });
+
+      if (mcLoginRes.ok) {
+        const mcLoginData = await mcLoginRes.json();
+        const mcToken = mcLoginData.access_token;
+
+        const mcProfileRes = await fetch('https://api.minecraftservices.com/minecraft/profile', {
+          headers: {
+            Authorization: `Bearer ${mcToken}`,
+            'User-Agent': 'MinecraftLauncher/2.2.10675',
+            Accept: 'application/json',
+          },
+          signal: AbortSignal.timeout(6000),
+        });
+
+        if (mcProfileRes.ok) {
+          const mcProfile = await mcProfileRes.json();
+          if (mcProfile?.name) {
+            return { profile: { name: mcProfile.name, uuid: mcProfile.id } };
+          }
+        } else if (mcProfileRes.status === 404) {
+          console.log('[PollToken API] Account has no Java profile name created yet (404)');
+        }
+      }
+    } else {
+      const errJson = await javaXstsRes.json().catch(() => ({}));
+      if (errJson.XErr && XBOX_ERROR_MESSAGES[errJson.XErr]) {
+        return { diagnosticError: XBOX_ERROR_MESSAGES[errJson.XErr] };
+      }
+    }
+  } catch (err: any) {
+    console.warn('[PollToken API] Java discovery error:', err?.message);
+  }
+
+  return {};
+}
+
 export async function POST(req: Request) {
   try {
     const body: PollRequestBody = await req.json();
-    const { deviceCode, editionFilter = 'both' } = body;
+    const { deviceCode } = body;
 
     if (!deviceCode) {
       return NextResponse.json({ error: 'deviceCode is required' }, { status: 400 });
@@ -73,35 +298,69 @@ export async function POST(req: Request) {
     }
 
     // 1. Authenticate with Xbox Live User Token
-    const xblRes = await fetch('https://user.auth.xboxlive.com/user/authenticate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'User-Agent': 'MinecraftLauncher/2.2.10675',
-      },
-      body: JSON.stringify({
-        Properties: {
-          AuthMethod: 'RPS',
-          SiteName: 'user.auth.xboxlive.com',
-          RpsTicket: `d=${accessToken}`,
-        },
-        RelyingParty: 'http://auth.xboxlive.com',
-        TokenType: 'JWT',
-      }),
-    });
+    // Try prefixes 't=' (standard for Live/consumer tokens), then 'd=' (Azure AD), then ''
+    let userToken = '';
+    let userHash = '';
+    let lastXblErrorText = '';
 
-    if (!xblRes.ok) {
-      console.warn('[PollToken API] Xbox Live user authenticate failed:', xblRes.status);
+    for (const prefix of ['t=', 'd=', '']) {
+      try {
+        const xblRes = await fetch('https://user.auth.xboxlive.com/user/authenticate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'User-Agent': 'MinecraftLauncher/2.2.10675',
+            'x-xbl-contract-version': '1',
+          },
+          body: JSON.stringify({
+            Properties: {
+              AuthMethod: 'RPS',
+              SiteName: 'user.auth.xboxlive.com',
+              RpsTicket: `${prefix}${accessToken}`,
+            },
+            RelyingParty: 'http://auth.xboxlive.com',
+            TokenType: 'JWT',
+          }),
+          signal: AbortSignal.timeout(6000),
+        });
+
+        if (xblRes.ok) {
+          const xblData = await xblRes.json();
+          userToken = xblData.Token;
+          userHash = xblData.DisplayClaims?.xui?.[0]?.uhs || '';
+          if (userToken) break;
+        } else {
+          lastXblErrorText = await xblRes.text();
+          console.warn(`[PollToken API] Xbox Live user authenticate attempt (${prefix}) returned ${xblRes.status}:`, lastXblErrorText);
+        }
+      } catch (err: any) {
+        console.warn(`[PollToken API] Xbox Live user authenticate network error (${prefix}):`, err?.message);
+      }
+    }
+
+    if (!userToken) {
+      console.warn('[PollToken API] All Xbox Live user authenticate attempts failed:', lastXblErrorText);
+      let errMsg = 'Xbox Live authentication failed. Please ensure your Microsoft account has an active Xbox profile at xbox.com.';
+      try {
+        const parsed = JSON.parse(lastXblErrorText);
+        if (parsed.XErr && XBOX_ERROR_MESSAGES[parsed.XErr]) {
+          errMsg = XBOX_ERROR_MESSAGES[parsed.XErr];
+        } else if (parsed.Message) {
+          errMsg = parsed.Message;
+        }
+      } catch {}
       return NextResponse.json({
         status: 'error',
-        error: 'Xbox Live authentication failed. Please ensure your Microsoft account has an active Xbox profile at xbox.com.',
+        error: errMsg,
       });
     }
 
-    const xblData = await xblRes.json();
-    const userToken: string = xblData.Token;
-    const userHash: string = xblData.DisplayClaims?.xui?.[0]?.uhs || '';
+    // 2. Concurrently discover Bedrock & Java profiles
+    const [bedrockResult, javaResult] = await Promise.allSettled([
+      discoverBedrock(userToken, userHash),
+      discoverJava(userToken, userHash),
+    ]);
 
     const profiles: {
       java?: { name: string; uuid: string };
@@ -110,215 +369,25 @@ export async function POST(req: Request) {
 
     let diagnosticError: string | null = null;
 
-    // 2. Discover Bedrock Edition (Xbox Live Gamertag & Multiplayer Profile)
-    try {
-      // First attempt: Request XSTS for Bedrock Multiplayer
-      const bedrockXstsRes = await fetch('https://xsts.auth.xboxlive.com/xsts/authorize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          'User-Agent': 'MCPE/UWP',
-        },
-        body: JSON.stringify({
-          Properties: {
-            SandboxId: 'RETAIL',
-            UserTokens: [userToken],
-          },
-          RelyingParty: 'https://multiplayer.minecraft.net/',
-          TokenType: 'JWT',
-        }),
-      });
-
-      if (bedrockXstsRes.ok) {
-        const bedrockXstsData = await bedrockXstsRes.json();
-        const bUhs = bedrockXstsData?.DisplayClaims?.xui?.[0]?.uhs || userHash;
-        const bToken = bedrockXstsData.Token;
-        let bGtg = bedrockXstsData?.DisplayClaims?.xui?.[0]?.gtg || '';
-        let bXuid = bedrockXstsData?.DisplayClaims?.xui?.[0]?.xid || '';
-
-        // Query official Bedrock authentication chain using an EC public key
-        if (!bGtg && bToken) {
-          try {
-            const keyPair = crypto.generateKeyPairSync('ec', { namedCurve: 'secp384r1' });
-            const publicKeyDER = keyPair.publicKey.export({ format: 'der', type: 'spki' });
-            const clientPublicKey = publicKeyDER.toString('base64');
-
-            const mcpeRes = await fetch('https://multiplayer.minecraft.net/authentication', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'User-Agent': 'MCPE/UWP',
-                Authorization: `XBL3.0 x=${bUhs};${bToken}`,
-              },
-              body: JSON.stringify({ identityPublicKey: clientPublicKey }),
-            });
-
-            if (mcpeRes.ok) {
-              const mcpeData = await mcpeRes.json();
-              if (Array.isArray(mcpeData.chain) && mcpeData.chain.length > 1) {
-                const jwtPayload = JSON.parse(Buffer.from(mcpeData.chain[1].split('.')[1], 'base64').toString());
-                if (jwtPayload?.extraData?.displayName) {
-                  bGtg = jwtPayload.extraData.displayName;
-                  bXuid = jwtPayload.extraData.XUID || bXuid;
-                }
-              }
-            }
-          } catch (e: any) {
-            console.warn('[PollToken API] Bedrock authentication token error:', e?.message);
-          }
-        }
-
-        if (bGtg) {
-          profiles.bedrock = { gamertag: bGtg, xuid: bXuid };
-        }
-      } else {
-        const errJson = await bedrockXstsRes.json().catch(() => ({}));
-        if (errJson.XErr && XBOX_ERROR_MESSAGES[errJson.XErr]) {
-          diagnosticError = XBOX_ERROR_MESSAGES[errJson.XErr];
-        }
+    if (bedrockResult.status === 'fulfilled') {
+      if (bedrockResult.value.profile) {
+        profiles.bedrock = bedrockResult.value.profile;
       }
-    } catch (err: any) {
-      console.warn('[PollToken API] Bedrock discovery error:', err?.message);
-    }
-
-    // Fallback: If Bedrock gamertag not found yet, query Xbox Live profile endpoint
-    if (!profiles.bedrock) {
-      try {
-        const xstsRes = await fetch('https://xsts.auth.xboxlive.com/xsts/authorize', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-          },
-          body: JSON.stringify({
-            Properties: {
-              SandboxId: 'RETAIL',
-              UserTokens: [userToken],
-            },
-            RelyingParty: 'http://xboxlive.com',
-            TokenType: 'JWT',
-          }),
-        });
-
-        if (xstsRes.ok) {
-          const xstsData = await xstsRes.json();
-          let gamertag = xstsData?.DisplayClaims?.xui?.[0]?.gtg || '';
-          let xuid = xstsData?.DisplayClaims?.xui?.[0]?.xid || '';
-          const xstsUhs = xstsData?.DisplayClaims?.xui?.[0]?.uhs || userHash;
-          const xstsToken = xstsData.Token;
-
-          if (!gamertag && xstsUhs && xstsToken) {
-            try {
-              const profRes = await fetch('https://profile.xboxlive.com/users/me/profile/settings?settings=Gamertag', {
-                headers: {
-                  'x-xbl-contract-version': '2',
-                  Authorization: `XBL3.0 x=${xstsUhs};${xstsToken}`,
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-                  Accept: 'application/json',
-                },
-              });
-              if (profRes.ok) {
-                const profData = await profRes.json();
-                const gtgSetting = profData?.profileUsers?.[0]?.settings?.find((s: any) => s.id === 'Gamertag');
-                if (gtgSetting?.value) {
-                  gamertag = gtgSetting.value;
-                }
-                if (!xuid && profData?.profileUsers?.[0]?.id) {
-                  xuid = profData.profileUsers[0].id;
-                }
-              }
-            } catch (e: any) {
-              console.warn('[PollToken API] Profile endpoint fallback error:', e?.message);
-            }
-          }
-
-          if (gamertag) {
-            profiles.bedrock = { gamertag, xuid };
-          }
-        } else {
-          const errJson = await xstsRes.json().catch(() => ({}));
-          if (errJson.XErr && XBOX_ERROR_MESSAGES[errJson.XErr]) {
-            diagnosticError = XBOX_ERROR_MESSAGES[errJson.XErr];
-          }
-        }
-      } catch (err: any) {
-        console.warn('[PollToken API] Xbox gamertag fallback error:', err?.message);
+      if (bedrockResult.value.diagnosticError) {
+        diagnosticError = bedrockResult.value.diagnosticError;
       }
     }
 
-    // 3. Discover Java Edition Profile
-    try {
-      const javaXstsRes = await fetch('https://xsts.auth.xboxlive.com/xsts/authorize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          'User-Agent': 'MinecraftLauncher/2.2.10675',
-        },
-        body: JSON.stringify({
-          Properties: {
-            SandboxId: 'RETAIL',
-            UserTokens: [userToken],
-          },
-          RelyingParty: 'rp://api.minecraftservices.com/',
-          TokenType: 'JWT',
-        }),
-      });
-
-      if (javaXstsRes.ok) {
-        const javaXstsData = await javaXstsRes.json();
-        const javaUhs = javaXstsData?.DisplayClaims?.xui?.[0]?.uhs || userHash;
-        const javaXstsToken = javaXstsData.Token;
-
-        const mcLoginRes = await fetch('https://api.minecraftservices.com/authentication/login_with_xbox', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'User-Agent': 'MinecraftLauncher/2.2.10675',
-          },
-          body: JSON.stringify({
-            identityToken: `XBL3.0 x=${javaUhs};${javaXstsToken}`,
-          }),
-        });
-
-        if (mcLoginRes.ok) {
-          const mcLoginData = await mcLoginRes.json();
-          const mcToken = mcLoginData.access_token;
-
-          const mcProfileRes = await fetch('https://api.minecraftservices.com/minecraft/profile', {
-            headers: {
-              Authorization: `Bearer ${mcToken}`,
-              'User-Agent': 'MinecraftLauncher/2.2.10675',
-              Accept: 'application/json',
-            },
-          });
-
-          if (mcProfileRes.ok) {
-            const mcProfile = await mcProfileRes.json();
-            if (mcProfile?.name) {
-              profiles.java = {
-                name: mcProfile.name,
-                uuid: mcProfile.id,
-              };
-            }
-          } else if (mcProfileRes.status === 404) {
-            console.log('[PollToken API] Account has no Java profile name created yet (404)');
-          }
-        }
-      } else {
-        const errJson = await javaXstsRes.json().catch(() => ({}));
-        if (errJson.XErr && XBOX_ERROR_MESSAGES[errJson.XErr]) {
-          diagnosticError = XBOX_ERROR_MESSAGES[errJson.XErr];
-        }
+    if (javaResult.status === 'fulfilled') {
+      if (javaResult.value.profile) {
+        profiles.java = javaResult.value.profile;
       }
-    } catch (err: any) {
-      console.warn('[PollToken API] Java profile discovery error:', err?.message);
+      if (javaResult.value.diagnosticError) {
+        diagnosticError = javaResult.value.diagnosticError;
+      }
     }
 
-    // 4. Final Validation: If no custom Mojang Java name found, provide Bedrock gamer profile so user is never blocked
+    // 3. Final Validation: If no Java or Bedrock profile was found
     if (!profiles.java && !profiles.bedrock) {
       if (diagnosticError) {
         return NextResponse.json({
@@ -327,6 +396,7 @@ export async function POST(req: Request) {
         });
       }
 
+      // Provide fallback gamer profile so user is never blocked
       const fallbackName = 'Player_' + (userHash ? userHash.slice(-6) : Math.random().toString(36).substring(2, 8));
       profiles.bedrock = {
         gamertag: fallbackName,
