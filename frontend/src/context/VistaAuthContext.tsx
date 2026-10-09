@@ -69,10 +69,25 @@ export const VistaAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (res.ok) {
         const data = await res.json();
         if (data.user) {
-          setUser(data.user);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('vistaafk_auth_user', JSON.stringify(data.user));
-          }
+          setUser((prev) => {
+            if (!prev) return data.user;
+            const isUnchanged =
+              prev.id === data.user.id &&
+              prev.username === data.user.username &&
+              prev.daemonUrl === data.user.daemonUrl &&
+              prev.secretToken === data.user.secretToken &&
+              (prev.savedAccounts?.length || 0) === (data.user.savedAccounts?.length || 0) &&
+              (prev.serverPresets?.length || 0) === (data.user.serverPresets?.length || 0) &&
+              (prev.botConfigs?.length || 0) === (data.user.botConfigs?.length || 0);
+
+            if (isUnchanged) {
+              return prev; // Same reference, 0 re-renders
+            }
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('vistaafk_auth_user', JSON.stringify(data.user));
+            }
+            return data.user;
+          });
         }
       } else if (res.status === 401) {
         // Token expired

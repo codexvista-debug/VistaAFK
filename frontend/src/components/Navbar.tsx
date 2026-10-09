@@ -62,11 +62,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           </Link>
         </div>
 
-        {/* Primary Page Navigation: Just Icons + Badge */}
+        {/* Primary Page Navigation: Icons on Mobile, Text + Icons on PC */}
         <nav className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
           <Link
             href="/"
-            className={`flex items-center space-x-1.5 p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-black transition-all border ${
+            className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-xs font-black transition-all border ${
               pathname === '/'
                 ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30'
                 : 'bg-[#1b2637]/70 text-slate-300 hover:text-white hover:bg-[#1b2637] border-slate-700'
@@ -74,8 +74,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             title="Server Fleet"
           >
             <Server className="h-4 w-4 stroke-[2.5]" />
+            <span className="hidden sm:inline">Server Fleet</span>
             {botCount > 0 && (
-              <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold ${
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
                 pathname === '/' ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-800 text-slate-300'
               }`}>
                 {botCount}
@@ -85,7 +86,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <Link
             href="/accounts"
-            className={`flex items-center space-x-1.5 p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-black transition-all border ${
+            className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-xs font-black transition-all border ${
               pathname === '/accounts'
                 ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30'
                 : 'bg-[#1b2637]/70 text-slate-300 hover:text-white hover:bg-[#1b2637] border-slate-700'
@@ -93,8 +94,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             title="Accounts Vault"
           >
             <Users className="h-4 w-4 stroke-[2.5]" />
+            <span className="hidden sm:inline">Accounts Vault</span>
             {typeof savedAccountCount === 'number' && savedAccountCount > 0 && (
-              <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold ${
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
                 pathname === '/accounts' ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-800 text-slate-300'
               }`}>
                 {savedAccountCount}

@@ -237,31 +237,32 @@ export default function AccountsPage() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Termux Daemon Quick Start Banner for Logged-In User with Offline Daemon (Stable without flashing) */}
+        {/* Termux Daemon Quick Start Banner for Logged-In User with Offline Daemon */}
         {user && !isConnected && (
-          <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white border-2 border-emerald-500/40 shadow-xl space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center space-x-3">
-                <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30 shrink-0">
-                  <Smartphone className="h-6 w-6" />
+          <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white border-2 border-emerald-500/40 shadow-xl space-y-3.5">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
+              <div className="flex items-start sm:items-center space-x-3">
+                <div className="p-2 sm:p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30 shrink-0 mt-0.5 sm:mt-0">
+                  <Smartphone className="h-5 w-5 sm:h-6 sm:w-6" />
                 </div>
                 <div>
-                  <h3 className="font-black text-sm sm:text-base tracking-tight text-white flex items-center space-x-2">
+                  <h3 className="font-black text-sm sm:text-base tracking-tight text-white flex flex-wrap items-center gap-1.5 sm:gap-2">
                     <span>Step 1: Start your 24/7 Bot Daemon</span>
-                    <span className="text-[10px] font-mono uppercase bg-emerald-400/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-400/30">Termux</span>
+                    <span className="text-[10px] font-mono uppercase bg-emerald-400/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-400/30 shrink-0">Termux</span>
                   </h3>
-                  <p className="text-xs text-slate-300 font-medium mt-0.5">
+                  <p className="text-xs text-slate-300 font-medium mt-0.5 leading-snug">
                     Paste this command into Termux on your phone to connect your 24/7 bots and authenticate Minecraft accounts.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2 shrink-0">
+              {/* Action buttons with clean mobile wrapping */}
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={retryConnection}
                   disabled={isConnecting}
-                  className="px-3 py-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold transition flex items-center space-x-1 disabled:opacity-50"
+                  className="w-24 sm:w-28 px-3 py-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 disabled:opacity-75"
                   title="Retry connecting to daemon"
                 >
                   <RefreshCw className={`h-3 w-3 ${isConnecting ? 'animate-spin text-emerald-400' : ''}`} />
@@ -277,7 +278,7 @@ export default function AccountsPage() {
                   href="https://play.google.com/store/apps/details?id=com.termux"
                   target="_blank"
                   rel="noreferrer"
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 rounded-xl text-xs font-bold transition flex items-center space-x-1"
+                  className="px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-600/80 rounded-xl text-[11px] font-semibold transition flex items-center space-x-1"
                 >
                   <span>Google Play</span>
                   <ExternalLink className="h-3 w-3 text-slate-400" />
@@ -286,7 +287,7 @@ export default function AccountsPage() {
                   href="https://f-droid.org/en/packages/com.termux/"
                   target="_blank"
                   rel="noreferrer"
-                  className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1"
+                  className="px-2.5 py-1.5 bg-emerald-700/80 hover:bg-emerald-600 text-white rounded-xl text-[11px] font-semibold transition flex items-center space-x-1"
                 >
                   <span>F-Droid APK</span>
                   <ExternalLink className="h-3 w-3 text-emerald-200" />

@@ -485,11 +485,11 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
                 botId: msg.payload.botId,
               };
               setNotifications((prev) => {
-                // Reject duplicate notification arriving within 5 seconds
-                if (prev.some((n) => n.message === notif.message && Math.abs(Date.now() - n.timestamp) < 5000)) {
+                // Reject duplicate notification arriving within 15 seconds to prevent spam
+                if (prev.some((n) => n.message === notif.message && Math.abs(Date.now() - n.timestamp) < 15000)) {
                   return prev;
                 }
-                return [notif, ...prev.slice(0, 19)];
+                return [notif, ...prev.slice(0, 14)];
               });
               break;
             }
@@ -608,19 +608,19 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
 
-        // Auto reconnect up to 3 attempts with increasing delay only if user is logged in
+        // Auto reconnect: attempt one retry after 4s (in case of momentary Wi-Fi blip)
+        // If that fails, pause cleanly to keep UI completely stable and prevent blinking!
         if (username) {
           retryCountRef.current += 1;
           setConnectionAttempts(retryCountRef.current);
 
-          if (retryCountRef.current < 3) {
-            const delay = retryCountRef.current === 1 ? 3000 : 6000;
-            console.log(`[VistaAFK WS Provider] Reconnecting in ${delay}ms (attempt ${retryCountRef.current + 1}/3)...`);
+          if (retryCountRef.current === 1) {
             reconnectTimeoutRef.current = setTimeout(() => {
               connect();
-            }, delay);
+            }, 4000);
           } else {
-            console.warn(`[VistaAFK WS Provider] Stopped auto-reconnect after 3 failed attempts to ${targetUrl}. Pausing to prevent UI flashing.`);
+            console.log(`[VistaAFK WS Provider] Daemon offline at ${targetUrl}. Pausing reconnect to keep UI stable.`);
+            setIsConnecting(false);
           }
         }
       };
@@ -726,9 +726,10 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     send({ type: 'MOVE_INVENTORY_ITEM', payload: { botId, sourceSlot, targetSlot } });
   const setQuickBarSlot = (botId: string, slot: number) =>
     send({ type: 'SET_QUICK_BAR_SLOT', payload: { botId, slot } });
-  const dismissNotification = (id: string) =>
+  const dismissNotification = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-  const clearNotifications = () => setNotifications([]);
+  }, []);
+  const clearNotifications = useCallback(() => setNotifications([]), []);
   const discoverMicrosoftAccount = (email?: string, editionFilter: 'both' | 'java' | 'bedrock' = 'both') => {
     discoveryFilterRef.current = editionFilter;
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
