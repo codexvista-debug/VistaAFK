@@ -237,24 +237,6 @@ export default function AccountsPage() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Sign In Required Notice */}
-        {!user && (
-          <div className="mb-6 p-4 rounded-2xl bg-white border-2 border-emerald-300 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
-            <div className="flex items-center space-x-2.5 text-slate-700">
-              <Users className="h-4 w-4 text-emerald-600 shrink-0" />
-              <span>
-                <strong>Sign In Required:</strong> Please sign in to save your Minecraft accounts and sync them across all your devices.
-              </span>
-            </div>
-            <button
-              onClick={openAuthModal}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm text-center shrink-0 transition"
-            >
-              Sign In / Register
-            </button>
-          </div>
-        )}
-
         {/* Termux Daemon Quick Start Banner for Logged-In User with Offline Daemon (Stable without flashing) */}
         {user && !isConnected && (
           <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white border-2 border-emerald-500/40 shadow-xl space-y-3">

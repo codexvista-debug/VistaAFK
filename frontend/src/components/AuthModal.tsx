@@ -18,19 +18,28 @@ export const AuthModal: React.FC = () => {
   const cleanUsername = username.trim();
   const isUsernameValid = cleanUsername.length >= 4 && /^[a-zA-Z0-9_-]+$/.test(cleanUsername);
   const isPasswordValid = password.length >= 4;
-  const canSubmit = isUsernameValid && isPasswordValid && !loading;
+  const canSubmit = mode === 'register'
+    ? isUsernameValid && isPasswordValid && !loading
+    : cleanUsername.length > 0 && password.length > 0 && !loading;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!isUsernameValid) {
-      setError('Username must be at least 4 characters long (letters, numbers, hyphens, underscores).');
-      return;
-    }
-    if (!isPasswordValid) {
-      setError('Password must be at least 4 characters long.');
-      return;
+    if (mode === 'register') {
+      if (!isUsernameValid) {
+        setError('Username must be at least 4 characters long (letters, numbers, hyphens, underscores).');
+        return;
+      }
+      if (!isPasswordValid) {
+        setError('Password must be at least 4 characters long.');
+        return;
+      }
+    } else {
+      if (!cleanUsername || !password) {
+        setError('Please enter your username and password.');
+        return;
+      }
     }
 
     setLoading(true);
@@ -129,7 +138,9 @@ export const AuthModal: React.FC = () => {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-800">Username</label>
-              <span className="text-[10px] text-slate-500 font-medium">Min. 4 characters</span>
+              {mode === 'register' && (
+                <span className="text-[10px] text-slate-500 font-medium">Min. 4 characters</span>
+              )}
             </div>
             <div className="relative">
               <input
@@ -138,17 +149,17 @@ export const AuthModal: React.FC = () => {
                 autoFocus
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g. sayan, kjchris"
+                placeholder="Enter your username"
                 className={`w-full pl-10 pr-9 py-2.5 bg-slate-50 border-2 rounded-xl text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white transition ${
-                  username.length > 0 && isUsernameValid
+                  username.length > 0 && (mode === 'register' ? isUsernameValid : true)
                     ? 'border-emerald-500 focus:border-emerald-600'
-                    : username.length > 0
+                    : username.length > 0 && mode === 'register'
                     ? 'border-rose-300 focus:border-rose-500'
                     : 'border-slate-200 focus:border-emerald-600'
                 }`}
               />
               <User className="h-4 w-4 text-slate-400 absolute left-3.5 top-3" />
-              {username.length > 0 && isUsernameValid && (
+              {username.length > 0 && isUsernameValid && mode === 'register' && (
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 absolute right-3 top-3" />
               )}
             </div>
@@ -158,7 +169,9 @@ export const AuthModal: React.FC = () => {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-800">Password</label>
-              <span className="text-[10px] text-slate-500 font-medium">Min. 4 characters</span>
+              {mode === 'register' && (
+                <span className="text-[10px] text-slate-500 font-medium">Min. 4 characters</span>
+              )}
             </div>
             <div className="relative">
               <input
@@ -166,11 +179,11 @@ export const AuthModal: React.FC = () => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 4 characters"
+                placeholder={mode === 'register' ? 'At least 4 characters' : 'Enter your password'}
                 className={`w-full pl-10 pr-10 py-2.5 bg-slate-50 border-2 rounded-xl text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white transition ${
-                  password.length > 0 && isPasswordValid
+                  password.length > 0 && (mode === 'register' ? isPasswordValid : true)
                     ? 'border-emerald-500 focus:border-emerald-600'
-                    : password.length > 0
+                    : password.length > 0 && mode === 'register'
                     ? 'border-rose-300 focus:border-rose-500'
                     : 'border-slate-200 focus:border-emerald-600'
                 }`}

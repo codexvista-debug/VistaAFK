@@ -115,32 +115,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Sign In Required / Sync Notice when logged out */}
-        {!user && (
-          <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-white border-2 border-emerald-300 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start sm:items-center space-x-3.5">
-              <div className="p-2.5 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl shrink-0">
-                <Users className="h-5 w-5 stroke-[2.2]" />
-              </div>
-              <div>
-                <h3 className="font-black text-slate-900 text-sm tracking-tight">
-                  Sign In to Access Your Fleet &amp; Sync Across Devices
-                </h3>
-                <p className="text-xs text-slate-600 mt-0.5 leading-relaxed font-medium">
-                  Log in to your VistaAFK account to link your 24/7 mobile daemon, deploy Minecraft accounts, and sync your bot fleet across all your devices.
-                </p>
-              </div>
-            </div>
-            <div className="shrink-0">
-              <button
-                onClick={openAuthModal}
-                className="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-sm transition active:scale-95 text-center"
-              >
-                Sign In / Register
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Termux Daemon Quick Start Banner for Logged-In User with Offline Daemon (Stable without flashing) */}
         {user && !isConnected && (
