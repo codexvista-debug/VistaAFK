@@ -68,17 +68,19 @@ function broadcast(msg) {
         }
     }
 }
-// 15-second keepalive ping to maintain uninterrupted connection across Wi-Fi and mobile
+// 5-second active JSON heartbeat to maintain uninterrupted connection across Cloudflare tunnels, Wi-Fi and mobile
 setInterval(() => {
+    const pingData = JSON.stringify({ type: 'PONG', payload: { timestamp: Date.now() } });
     for (const client of clients) {
         if (client.readyState === ws_1.WebSocket.OPEN) {
             try {
+                client.send(pingData);
                 client.ping();
             }
             catch (e) { }
         }
     }
-}, 15000);
+}, 5000);
 const initialCreds = getAuthCredentials();
 const botManager = new botManager_js_1.BotManager({
     onTelemetryUpdate: (telemetry) => {
@@ -133,7 +135,7 @@ wss.on('connection', (ws) => {
             switch (msg.type) {
                 case 'PING':
                     try {
-                        ws.send(JSON.stringify({ type: 'PONG' }));
+                        ws.send(JSON.stringify({ type: 'PONG', payload: { timestamp: Date.now() } }));
                     }
                     catch (e) { }
                     break;

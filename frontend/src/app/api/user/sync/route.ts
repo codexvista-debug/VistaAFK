@@ -48,7 +48,17 @@ export async function POST(req: Request) {
       user.botConfigs = botConfigs;
     }
     if (daemonUrl !== undefined) {
-      user.daemonUrl = daemonUrl;
+      let cleanUrl = String(daemonUrl).trim();
+      const cfMatch = cleanUrl.match(/([a-zA-Z0-9-]+\.trycloudflare\.com)/i);
+      if (cfMatch && cfMatch[1]) {
+        cleanUrl = `wss://${cfMatch[1]}`;
+      } else {
+        cleanUrl = cleanUrl.replace(/^(wss?):\/+/i, '$1://');
+        if (cleanUrl.startsWith('https://')) cleanUrl = 'wss://' + cleanUrl.slice('https://'.length);
+        if (cleanUrl.startsWith('http://')) cleanUrl = 'ws://' + cleanUrl.slice('http://'.length);
+        if (!cleanUrl.startsWith('ws://') && !cleanUrl.startsWith('wss://')) cleanUrl = 'wss://' + cleanUrl;
+      }
+      user.daemonUrl = cleanUrl;
     }
     if (secretToken !== undefined) {
       user.secretToken = secretToken;

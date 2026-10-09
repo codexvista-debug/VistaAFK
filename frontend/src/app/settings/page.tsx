@@ -15,9 +15,11 @@ import {
   ArrowRight,
   ShieldCheck,
   Terminal,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import { Navbar } from '../../components/Navbar';
-import { useVistaWebSocket } from '../../hooks/useVistaWebSocket';
+import { useVistaWebSocket, normalizeWsUrl } from '../../hooks/useVistaWebSocket';
 import { useAuth } from '../../context/VistaAuthContext';
 
 export default function SettingsPage() {
@@ -31,6 +33,8 @@ export default function SettingsPage() {
     configs,
     telemetry,
     savedAccounts,
+    isConnectionLocked,
+    toggleConnectionLock,
   } = useVistaWebSocket();
 
   const [inputUrl, setInputUrl] = useState(daemonUrl);
@@ -48,7 +52,9 @@ export default function SettingsPage() {
   const handleSaveUrl = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputUrl.trim()) return;
-    updateDaemonConfig(inputUrl.trim(), '');
+    const cleanUrl = normalizeWsUrl(inputUrl.trim());
+    setInputUrl(cleanUrl);
+    updateDaemonConfig(cleanUrl, '');
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2500);
   };
@@ -237,6 +243,62 @@ export default function SettingsPage() {
                 <span>Retry</span>
               </button>
             </div>
+          </div>
+
+          {/* Persistent Connection Lock Card */}
+          <div className="p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-start sm:items-center space-x-3">
+              <div
+                className={`p-2 sm:p-2.5 rounded-xl border shrink-0 mt-0.5 sm:mt-0 ${
+                  isConnectionLocked
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600'
+                    : 'bg-slate-200 border-slate-300 text-slate-500'
+                }`}
+              >
+                {isConnectionLocked ? <Lock className="h-4 w-4 sm:h-5 sm:w-5" /> : <Unlock className="h-4 w-4 sm:h-5 sm:w-5" />}
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight">
+                    Persistent 24/7 Connection Lock
+                  </span>
+                  <span
+                    className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                      isConnectionLocked
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-slate-200 text-slate-600'
+                    }`}
+                  >
+                    {isConnectionLocked ? 'ACTIVE LOCK' : 'PAUSED'}
+                  </span>
+                </div>
+                <p className="text-[11px] sm:text-xs text-slate-500 font-medium mt-0.5">
+                  Relentlessly reconnects every 1.2s whenever network hiccups or Termux restarts. Never pauses or times out.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => toggleConnectionLock()}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 shrink-0 ${
+                isConnectionLocked
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                  : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+              }`}
+            >
+              {isConnectionLocked ? (
+                <>
+                  <Lock className="h-3.5 w-3.5" />
+                  <span>Lock Enabled (Auto)</span>
+                </>
+              ) : (
+                <>
+                  <Unlock className="h-3.5 w-3.5" />
+                  <span>Lock Disabled</span>
+                </>
+              )}
+            </button>
           </div>
 
           {/* Form to view / update WebSocket Daemon URL */}

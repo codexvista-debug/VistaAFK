@@ -33,7 +33,10 @@ export function normalizeWsUrl(raw: string): string {
     return `wss://${cfMatch[1]}`;
   }
 
-  // 3. Normal protocol conversions
+  // 3. Remove any multiple slashes after ws: or wss: (e.g. wss://// -> wss://)
+  url = url.replace(/^(wss?):\/+/i, '$1://');
+
+  // 4. Normal protocol conversions
   if (url.startsWith('https://')) {
     url = 'wss://' + url.slice('https://'.length);
   } else if (url.startsWith('http://')) {
@@ -42,10 +45,10 @@ export function normalizeWsUrl(raw: string): string {
     url = 'wss://' + url;
   }
 
-  // 4. Strip trailing slashes
+  // 5. Strip trailing slashes
   url = url.replace(/\/+$/, '');
 
-  // 5. If user pasted trycloudflare.com with :8080, strip :8080
+  // 6. If user pasted trycloudflare.com with :8080, strip :8080
   if (url.includes('trycloudflare.com') && url.includes(':8080')) {
     url = url.replace(':8080', '');
   }
@@ -96,6 +99,8 @@ export interface VistaWebSocketContextType {
   resetDiscovery: () => void;
   retryConnection: () => void;
   connectionAttempts: number;
+  isConnectionLocked: boolean;
+  toggleConnectionLock: (locked?: boolean) => void;
 }
 
 const VistaWebSocketContext = createContext<VistaWebSocketContextType | null>(null);
@@ -136,6 +141,28 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const keepAliveIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastPingReceivedRef = useRef<number>(Date.now());
+  const [isConnectionLocked, setIsConnectionLocked] = useState<boolean>(true);
+
+  // Load connection lock preference
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('vistaafk_connection_locked');
+      if (saved !== null) {
+        setIsConnectionLocked(saved === 'true');
+      }
+    }
+  }, []);
+
+  const toggleConnectionLock = useCallback((locked?: boolean) => {
+    setIsConnectionLocked((prev) => {
+      const next = locked !== undefined ? locked : !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('vistaafk_connection_locked', next ? 'true' : 'false');
+      }
+      return next;
+    });
+  }, []);
 
   // Check for URL parameters ?connect=wss://... or ?daemon=... on mount
   useEffect(() => {
@@ -415,7 +442,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     if (force) {
       retryCountRef.current = 0;
       setConnectionAttempts(0);
-    } else if (retryCountRef.current >= 3) {
+    } else if (!isConnectionLocked && retryCountRef.current >= 3) {
       console.log(`[VistaAFK WS Provider] Max retries reached (3) for ${targetUrl}. Pausing auto-reconnect.`);
       setIsConnecting(false);
       return;
@@ -440,20 +467,24 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         setIsConnected(true);
         setIsConnecting(false);
         setAuthError(null);
+        lastPingReceivedRef.current = Date.now();
 
         // Authenticate immediately upon connection
         ws.send(JSON.stringify({ type: 'AUTH', payload: { token: secretToken || undefined, username } }));
 
-        // Start client keepalive ping every 8 seconds to keep connection rock solid without data bloat
+        // Start client keepalive ping every 5 seconds to keep connection rock solid without data bloat
         if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
         keepAliveIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'PING' }));
+            try {
+              ws.send(JSON.stringify({ type: 'PING' }));
+            } catch (e) {}
           }
-        }, 8000);
+        }, 5000);
       };
 
       ws.onmessage = (event) => {
+        lastPingReceivedRef.current = Date.now();
         try {
           const msg = JSON.parse(event.data);
 
@@ -611,12 +642,20 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
           return updated;
         });
 
-        // Resilient background reconnect: attempts at 3s, 6s, 10s, then background pulses every 15s
+        // Resilient background reconnect: relentless 1.2s reconnect when connection is locked
         if (username) {
           retryCountRef.current += 1;
           setConnectionAttempts(retryCountRef.current);
 
-          const delay = retryCountRef.current === 1 ? 3000 : retryCountRef.current === 2 ? 6000 : retryCountRef.current === 3 ? 10000 : 15000;
+          const delay = isConnectionLocked
+            ? 1200
+            : retryCountRef.current === 1
+            ? 3000
+            : retryCountRef.current === 2
+            ? 6000
+            : retryCountRef.current === 3
+            ? 10000
+            : 15000;
           reconnectTimeoutRef.current = setTimeout(() => {
             connect(true);
           }, delay);
@@ -633,7 +672,26 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       console.error('[VistaAFK WS Provider] Connect exception:', e);
       setIsConnecting(false);
     }
-  }, [username, daemonUrl, secretToken]);
+  }, [username, daemonUrl, secretToken, isConnectionLocked]);
+
+  // Active connection watchdog: verifies that messages/heartbeats are flowing; if connection goes silently dead (Cloudflare tunnel drop), immediately force-reconnects
+  useEffect(() => {
+    if (!username) return;
+
+    const watchdog = setInterval(() => {
+      if (isConnected && wsRef.current) {
+        const timeSinceLastPing = Date.now() - lastPingReceivedRef.current;
+        if (timeSinceLastPing > 14000) {
+          console.warn(`[VistaAFK WS Provider] Watchdog detected silent socket drop (${Math.round(timeSinceLastPing / 1000)}s silent). Reconnecting now...`);
+          try {
+            wsRef.current.close();
+          } catch (e) {}
+        }
+      }
+    }, 3000);
+
+    return () => clearInterval(watchdog);
+  }, [username, isConnected]);
 
   // Main connection lifecycle
   useEffect(() => {
@@ -658,14 +716,14 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     };
   }, [username, daemonUrl, secretToken, connect]);
 
-  // Active daemon tunnel detection: polls cloud every 3.5s while disconnected so Termux links sync automatically
+  // Active daemon tunnel detection: polls cloud every 2.5s while disconnected so Termux links sync automatically
   useEffect(() => {
     if (!username || isConnected) return;
 
     refreshProfile();
     const pollInterval = setInterval(() => {
       refreshProfile();
-    }, 3500);
+    }, 2500);
 
     return () => clearInterval(pollInterval);
   }, [username, isConnected, refreshProfile]);
@@ -931,6 +989,8 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         resetDiscovery,
         retryConnection,
         connectionAttempts,
+        isConnectionLocked,
+        toggleConnectionLock,
       }}
     >
       {children}
