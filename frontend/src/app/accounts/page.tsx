@@ -103,6 +103,25 @@ export default function AccountsPage() {
     }
   }, [discoveryStatus]);
 
+  // Global Escape key handler to close active popups
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isAddAccountModalOpen) {
+          if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
+          setIsAddAccountModalOpen(false);
+          resetDiscovery();
+        }
+        if (isDeployModalOpen) {
+          setIsDeployModalOpen(false);
+          setSelectedAccountForDeploy(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isAddAccountModalOpen, isDeployModalOpen, resetDiscovery]);
+
   // Deploy to Server Form State
   const [targetServerHost, setTargetServerHost] = useState('play.freshsmp.fun');
   const [targetServerPort, setTargetServerPort] = useState(25565);
@@ -127,12 +146,12 @@ export default function AccountsPage() {
     setIsAddAccountModalOpen(true);
   };
 
-  const handleAddAccountSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const val = accountInput.trim();
-    if (!val) return;
+  const handleAddAccountSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
 
     if (accountType === 'offline') {
+      const val = accountInput.trim();
+      if (!val) return;
       const account: SavedAccount = {
         id: `offline-${offlineEdition}-${Math.random().toString(36).substring(2, 9)}`,
         name: val,
@@ -146,7 +165,7 @@ export default function AccountsPage() {
       return;
     }
 
-    // Open popup immediately synchronously on user click to prevent popup blockers
+    // Direct Microsoft Connect: No email required!
     const popup = window.open('about:blank', 'ms_oauth_popup', 'width=520,height=680,scrollbars=yes,resizable=yes');
     if (popup) {
       try {
@@ -167,7 +186,7 @@ export default function AccountsPage() {
             <body>
               <div class="spinner"></div>
               <h2>Connecting to Microsoft Identity...</h2>
-              <p>Preparing authentication for <strong>${val}</strong>.<br>Redirecting you to Microsoft login in a moment...</p>
+              <p>Redirecting you to Microsoft login in a moment...</p>
             </body>
           </html>
         `);
@@ -175,7 +194,7 @@ export default function AccountsPage() {
       popupRef.current = popup;
     }
 
-    discoverMicrosoftAccount(val, accountType);
+    discoverMicrosoftAccount(accountInput.trim() || undefined, accountType);
   };
 
   const handleOpenDeploy = (account: SavedAccount) => {
@@ -385,14 +404,26 @@ export default function AccountsPage() {
 
       {/* Add Account Modal (MinecraftAFK style) */}
       {isAddAccountModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl w-full max-w-md p-5 sm:p-6 shadow-2xl my-auto max-h-[92vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
+              setIsAddAccountModalOpen(false);
+              resetDiscovery();
+            }
+          }}
+        >
+          <div
+            className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl w-full max-w-md p-5 sm:p-6 shadow-2xl my-auto max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
-            <div className="flex items-start justify-between pb-3.5 border-b-2 border-slate-200">
+            <div className="flex items-start justify-between pb-3.5 border-b-2 border-slate-200 gap-2">
               <div>
                 <h3 className="font-black text-slate-900 text-base">Add an account</h3>
                 <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                  Add a Minecraft account so you can use it on your server profiles.
+                  Link an official Microsoft account or add an offline profile.
                 </p>
               </div>
               <button
@@ -401,9 +432,10 @@ export default function AccountsPage() {
                   setIsAddAccountModalOpen(false);
                   resetDiscovery();
                 }}
-                className="text-slate-400 hover:text-slate-700 transition"
+                className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200 active:scale-95 transition shrink-0"
+                title="Close (Esc)"
               >
-                <X className="h-5 w-5" />
+                <X className="h-5 w-5 stroke-[2.5]" />
               </button>
             </div>
 
@@ -590,8 +622,8 @@ export default function AccountsPage() {
                 </div>
               </div>
             ) : (
-              /* Form View (MinecraftAFK Screenshot 2) */
-              <form onSubmit={handleAddAccountSubmit} className="mt-4 space-y-4">
+              /* Form View */
+              <div className="mt-4 space-y-4">
                 {/* Account Type dropdown */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
@@ -602,79 +634,111 @@ export default function AccountsPage() {
                     onChange={(e) => setAccountType(e.target.value as any)}
                     className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-600"
                   >
-                    <option value="both">Java/bedrock</option>
-                    <option value="java">Java</option>
-                    <option value="bedrock">Bedrock</option>
-                    <option value="offline">Offline / Cracked</option>
+                    <option value="both">Java & Bedrock (Official Microsoft)</option>
+                    <option value="java">Java Edition Only (Official Microsoft)</option>
+                    <option value="bedrock">Bedrock Edition Only (Xbox Live)</option>
+                    <option value="offline">Offline / Cracked (Custom Username)</option>
                   </select>
                 </div>
 
-                {/* Email or Username */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    {accountType === 'offline' ? 'Username' : 'Email'}
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      {accountType === 'offline' ? <User className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+                {accountType !== 'offline' ? (
+                  /* Direct 1-Click Microsoft Connect: Zero Email Required */
+                  <div className="space-y-4 pt-1">
+                    <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl text-xs text-emerald-800 font-medium leading-relaxed">
+                      ✨ <strong>Direct Microsoft Sign-In:</strong> No need to enter an email. Clicking below generates your secure Microsoft code and links your Minecraft account automatically.
                     </div>
-                    <input
-                      type={accountType === 'offline' ? 'text' : 'email'}
-                      required
-                      placeholder={accountType === 'offline' ? 'Player123' : 'name@example.com'}
-                      value={accountInput}
-                      onChange={(e) => setAccountInput(e.target.value)}
-                      className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-600 placeholder:text-slate-400"
-                    />
-                  </div>
-                </div>
 
-                {accountType === 'offline' && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Edition</label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleAddAccountSubmit()}
+                      className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-700/25 flex items-center justify-center space-x-2 transition"
+                    >
+                      <ShieldCheck className="h-5 w-5" />
+                      <span>Connect Microsoft Account</span>
+                    </button>
+
+                    <div className="flex items-center justify-end pt-2 border-t border-slate-200">
                       <button
                         type="button"
-                        onClick={() => setOfflineEdition('java')}
-                        className={`p-2.5 rounded-xl border-2 text-center text-xs font-bold transition ${
-                          offlineEdition === 'java' ? 'bg-emerald-50 border-emerald-600 text-emerald-950' : 'bg-slate-50 border-slate-200 text-slate-600'
-                        }`}
+                        onClick={() => {
+                          if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
+                          setIsAddAccountModalOpen(false);
+                          resetDiscovery();
+                        }}
+                        className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
                       >
-                        ☕ Java Edition
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setOfflineEdition('bedrock')}
-                        className={`p-2.5 rounded-xl border-2 text-center text-xs font-bold transition ${
-                          offlineEdition === 'bedrock' ? 'bg-emerald-50 border-emerald-600 text-emerald-950' : 'bg-slate-50 border-slate-200 text-slate-600'
-                        }`}
-                      >
-                        🧱 Bedrock Edition
+                        Cancel
                       </button>
                     </div>
                   </div>
+                ) : (
+                  /* Offline / Cracked Username Form */
+                  <form onSubmit={handleAddAccountSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Username
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <User className="h-4 w-4" />
+                        </div>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Player123"
+                          value={accountInput}
+                          onChange={(e) => setAccountInput(e.target.value)}
+                          className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-600 placeholder:text-slate-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Edition</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setOfflineEdition('java')}
+                          className={`p-2.5 rounded-xl border-2 text-center text-xs font-bold transition ${
+                            offlineEdition === 'java' ? 'bg-emerald-50 border-emerald-600 text-emerald-950' : 'bg-slate-50 border-slate-200 text-slate-600'
+                          }`}
+                        >
+                          ☕ Java Edition
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOfflineEdition('bedrock')}
+                          className={`p-2.5 rounded-xl border-2 text-center text-xs font-bold transition ${
+                            offlineEdition === 'bedrock' ? 'bg-emerald-50 border-emerald-600 text-emerald-950' : 'bg-slate-50 border-slate-200 text-slate-600'
+                          }`}
+                        >
+                          🧱 Bedrock Edition
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Footer Buttons */}
+                    <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddAccountModalOpen(false);
+                          resetDiscovery();
+                        }}
+                        className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center space-x-1.5"
+                      >
+                        <span>Add Account</span>
+                      </button>
+                    </div>
+                  </form>
                 )}
-
-                {/* Footer Buttons */}
-                <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAddAccountModalOpen(false);
-                      resetDiscovery();
-                    }}
-                    className="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center space-x-1.5"
-                  >
-                    <span>Add Account</span>
-                  </button>
-                </div>
-              </form>
+              </div>
             )}
           </div>
         </div>
@@ -682,18 +746,29 @@ export default function AccountsPage() {
 
       {/* Deploy Account to Server Modal */}
       {isDeployModalOpen && selectedAccountForDeploy && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl w-full max-w-lg p-4 sm:p-6 shadow-2xl my-auto max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b-2 border-slate-200">
-              <div className="flex items-center space-x-2.5">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsDeployModalOpen(false);
+              setSelectedAccountForDeploy(null);
+            }
+          }}
+        >
+          <div
+            className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl w-full max-w-lg p-4 sm:p-6 shadow-2xl my-auto max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b-2 border-slate-200 gap-2">
+              <div className="flex items-center space-x-2.5 min-w-0">
                 <img
                   src={`https://mc-heads.net/avatar/${selectedAccountForDeploy.name}/48`}
                   alt=""
-                  className="w-8 h-8 rounded-lg border border-slate-300"
+                  className="w-8 h-8 rounded-lg border border-slate-300 shrink-0"
                 />
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center space-x-2">
-                    <h3 className="font-black text-slate-900 text-base">
+                    <h3 className="font-black text-slate-900 text-base truncate">
                       Deploy <span className="text-emerald-700">{selectedAccountForDeploy.name}</span>
                     </h3>
                     <button
@@ -705,7 +780,7 @@ export default function AccountsPage() {
                         if (newEd === 'java' && targetServerPort === 19132) setTargetServerPort(25565);
                       }}
                       title="Click to toggle between Bedrock and Java"
-                      className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border transition hover:scale-105 cursor-pointer ${
+                      className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border transition hover:scale-105 cursor-pointer shrink-0 ${
                         selectedAccountForDeploy.edition === 'bedrock'
                           ? 'bg-sky-50 text-sky-700 border-sky-300 hover:bg-sky-100'
                           : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
@@ -717,8 +792,15 @@ export default function AccountsPage() {
                   <p className="text-[11px] text-slate-500 font-medium">Select a server to launch this bot instance</p>
                 </div>
               </div>
-              <button onClick={() => setIsDeployModalOpen(false)} className="text-slate-400 hover:text-slate-700">
-                <X className="h-5 w-5" />
+              <button
+                onClick={() => {
+                  setIsDeployModalOpen(false);
+                  setSelectedAccountForDeploy(null);
+                }}
+                className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200 active:scale-95 transition shrink-0"
+                title="Close (Esc)"
+              >
+                <X className="h-5 w-5 stroke-[2.5]" />
               </button>
             </div>
 

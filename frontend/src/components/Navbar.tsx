@@ -119,32 +119,39 @@ export const Navbar: React.FC<NavbarProps> = ({
         </nav>
 
         {/* Right Section: Single Unified Dropdown Menu (Only when Logged In) */}
-        {user && (
+        {user ? (
           <div className="relative shrink-0">
             <button
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-              className="flex items-center space-x-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-[#1b2637]/90 hover:bg-[#253449] border border-slate-700 hover:border-emerald-500/80 text-xs font-bold transition shadow-sm active:scale-95 text-slate-200"
-              title="Menu & Controls"
+              className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full sm:rounded-xl text-xs font-black transition-all shadow-md active:scale-95 border-2 ${
+                isConnected
+                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white border-emerald-400 shadow-emerald-950/40'
+                  : isConnecting
+                  ? 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white border-amber-400 shadow-amber-950/40'
+                  : 'bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white border-rose-400 shadow-rose-950/40'
+              }`}
+              title={`@${user.username} - Bot Daemon: ${isConnected ? 'Connected' : isConnecting ? 'Connecting...' : 'Disconnected'}`}
             >
-              {/* Live Indicator Dot for Daemon Status */}
-              <span className="relative flex h-2.5 w-2.5 shrink-0">
+              {/* Status Indicator Dot */}
+              <span className="relative flex h-2 sm:h-2.5 w-2 sm:w-2.5 shrink-0">
                 {isConnected ? (
                   <>
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-80" />
+                    <span className="relative inline-flex rounded-full h-2 sm:h-2.5 w-2 sm:w-2.5 bg-white shadow-xs" />
                   </>
                 ) : isConnecting ? (
-                  <span className="inline-flex rounded-full h-2.5 w-2.5 bg-amber-400 animate-pulse" />
+                  <span className="animate-pulse inline-flex rounded-full h-2 sm:h-2.5 w-2 sm:w-2.5 bg-white shadow-xs" />
                 ) : (
-                  <span className="inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
+                  <span className="inline-flex rounded-full h-2 sm:h-2.5 w-2 sm:w-2.5 bg-white/90 shadow-xs" />
                 )}
               </span>
 
-              <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black uppercase shrink-0">
-                {user.username.charAt(0)}
-              </div>
+              {/* Username */}
+              <span className="font-black text-xs tracking-tight text-white max-w-[85px] sm:max-w-[130px] truncate">
+                {user.username}
+              </span>
 
-              <Menu className="h-4 w-4 text-slate-300 shrink-0" />
+              <Menu className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white/90 shrink-0" />
             </button>
 
             {/* Unified Dropdown Panel */}
@@ -286,6 +293,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               </>
             )}
           </div>
+        ) : (
+          <button
+            onClick={openAuthModal}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full sm:rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-md shadow-emerald-600/30 border border-emerald-400 shrink-0"
+          >
+            <User className="h-3.5 w-3.5" />
+            <span>Login</span>
+          </button>
         )}
       </div>
     </header>

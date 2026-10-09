@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Shield, Sparkles, Package, Info, Swords, ArrowRight, ArrowLeftRight, Check } from 'lucide-react';
 import { BotConfig, BotTelemetry, InventoryItem } from '../types';
 import { useVistaWebSocket } from '../hooks/useVistaWebSocket';
@@ -28,6 +28,14 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
     }
     return map;
   }, [inventory]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   // Selected item to display in the Lore & Details inspector
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number | null>(
@@ -205,29 +213,37 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/65 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
-      <div className="bg-white border-2 border-slate-300 rounded-3xl w-full max-w-3xl flex flex-col shadow-2xl overflow-hidden my-auto max-h-[94vh]">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/65 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="bg-white border-2 border-slate-300 rounded-3xl w-full max-w-3xl flex flex-col shadow-2xl overflow-hidden my-auto max-h-[94vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="px-5 py-4 border-b-2 border-slate-200 flex items-center justify-between bg-slate-100/80">
-          <div className="flex items-center space-x-3">
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b-2 border-slate-200 flex items-center justify-between bg-slate-100/80 gap-2">
+          <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
             <img
               src={`https://mc-heads.net/avatar/${config.name}/48`}
               alt={config.name}
-              className="h-10 w-10 rounded-xl bg-slate-200 border-2 border-slate-300 shadow-xs"
+              className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-slate-200 border-2 border-slate-300 shadow-xs shrink-0"
               onError={(e) => {
                 (e.target as HTMLElement).style.display = 'none';
               }}
             />
-            <div>
-              <div className="flex items-center space-x-2">
-                <h2 className="text-base font-black text-slate-900 uppercase tracking-tight">
+            <div className="min-w-0">
+              <div className="flex items-center space-x-1.5 sm:space-x-2">
+                <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight truncate">
                   {config.name}&apos;s Live Inventory
                 </h2>
-                <span className="px-2 py-0.5 text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-md">
+                <span className="px-1.5 sm:px-2 py-0.5 text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-md shrink-0">
                   {telemetry?.inventoryCount ?? 0} Stacks
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-mono font-medium">
+              <p className="text-[11px] sm:text-xs text-slate-500 font-mono font-medium truncate">
                 {config.host}:{config.port} &bull; Drag & drop or click items to move
               </p>
             </div>
@@ -235,9 +251,10 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition"
+            className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-200 active:scale-95 transition shrink-0"
+            title="Close (Esc)"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5 stroke-[2.5]" />
           </button>
         </div>
 

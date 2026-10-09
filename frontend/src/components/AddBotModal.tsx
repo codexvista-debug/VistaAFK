@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Bot, Server, Zap, Heart, Bell, Terminal, ShieldCheck, Swords } from 'lucide-react';
 import { BotConfig } from '../types';
 
@@ -79,24 +79,44 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
     onClose();
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 bg-slate-900/65 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white border-2 border-slate-300 rounded-3xl w-full max-w-xl flex flex-col shadow-2xl overflow-hidden my-auto max-h-[92vh]">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 bg-slate-900/65 backdrop-blur-sm overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="bg-white border-2 border-slate-300 rounded-3xl w-full max-w-xl flex flex-col shadow-2xl overflow-hidden my-auto max-h-[92vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="px-6 py-4.5 border-b-2 border-slate-200 flex items-center justify-between bg-slate-100/90">
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-xl bg-emerald-100 border-2 border-emerald-300 text-emerald-800">
+        <div className="px-5 sm:px-6 py-4 border-b-2 border-slate-200 flex items-center justify-between bg-slate-100/90 gap-2">
+          <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-100 border-2 border-emerald-300 text-emerald-800 shrink-0">
               <Bot className="h-5 w-5 stroke-[2.5]" />
             </div>
-            <div>
-              <h2 className="text-base font-black text-slate-900 uppercase tracking-tight">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight truncate">
                 {initialConfig ? 'Edit Bot Account' : 'Add Minecraft AFK Account'}
               </h2>
-              <p className="text-xs text-slate-500 font-medium">Configure connection and autonomous survival routines</p>
+              <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">Configure connection & survival routines</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition">
-            <X className="h-5 w-5" />
+          <button
+            onClick={onClose}
+            className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-200 active:scale-95 transition shrink-0"
+            title="Close (Esc)"
+          >
+            <X className="h-5 w-5 stroke-[2.5]" />
           </button>
         </div>
 
