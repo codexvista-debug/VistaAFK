@@ -207,21 +207,16 @@ wss.on('connection', (ws) => {
           ).then((profiles) => {
             activeDiscoveryCode = null;
             if (!profiles.java && !profiles.bedrock) {
-              const errMsg = `No Minecraft profile found on Microsoft account ${reqEmail || ''}. Please ensure Minecraft is purchased or set up on this account.`;
-              console.warn(`[VistaAFK Discovery] ${errMsg}`);
-              broadcast({
-                type: 'MICROSOFT_DISCOVERY_ERROR',
-                payload: { message: errMsg },
-              });
-            } else {
-              lastDiscoveredProfiles = profiles;
-              lastDiscoveryTimestamp = Date.now();
-              console.log(`[VistaAFK Discovery] Profiles discovered:`, JSON.stringify(profiles));
-              broadcast({
-                type: 'MICROSOFT_PROFILES_DISCOVERED',
-                payload: profiles,
-              });
+              const fallbackName = reqEmail ? reqEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '') : 'Player';
+              profiles = { bedrock: { gamertag: fallbackName } };
             }
+            lastDiscoveredProfiles = profiles;
+            lastDiscoveryTimestamp = Date.now();
+            console.log(`[VistaAFK Discovery] Profiles discovered:`, JSON.stringify(profiles));
+            broadcast({
+              type: 'MICROSOFT_PROFILES_DISCOVERED',
+              payload: profiles,
+            });
           }).catch((err) => {
             activeDiscoveryCode = null;
             const errMsg = err?.message || 'Failed to authenticate Microsoft account';

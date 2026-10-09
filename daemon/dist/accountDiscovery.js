@@ -87,56 +87,28 @@ async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email, editi
             console.warn('[VistaAFK Discovery] Java profile fetch error:', err.message);
         }
     }
-    // 2. Discover Minecraft: Bedrock Edition / Xbox Live Gamertag (if requested)
-    if (editionFilter === 'both' || editionFilter === 'bedrock') {
+    // 2. Discover Minecraft: Bedrock Edition / Xbox Live Gamertag
+    if (editionFilter === 'both' || editionFilter === 'bedrock' || !result.java) {
         try {
-            const xsts = await flow.getXboxToken('http://xboxlive.com');
-            let gamertag = xsts?.DisplayClaims?.xui?.[0]?.gtg || xsts?.gamertag || '';
-            let xuid = xsts?.userXUID || xsts?.DisplayClaims?.xui?.[0]?.xid || '';
-            if (!gamertag && xsts?.userHash && xsts?.XSTSToken) {
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 6000);
-                    const resp = await fetch('https://profile.xboxlive.com/users/me/profile/settings?settings=Gamertag', {
-                        signal: controller.signal,
-                        headers: {
-                            'x-xbl-contract-version': '2',
-                            'Authorization': `XBL3.0 x=${xsts.userHash};${xsts.XSTSToken}`,
-                        },
-                    });
-                    clearTimeout(timeoutId);
-                    if (resp.ok) {
-                        const json = await resp.json();
-                        const gtgSetting = json?.profileUsers?.[0]?.settings?.find((s) => s.id === 'Gamertag');
-                        if (gtgSetting?.value) {
-                            gamertag = gtgSetting.value;
-                        }
-                        if (!xuid && json?.profileUsers?.[0]?.id) {
-                            xuid = json.profileUsers[0].id;
-                        }
-                    }
-                }
-                catch (e) {
-                    console.warn('[VistaAFK Discovery] Xbox profile settings endpoint lookup failed:', e.message);
-                }
-            }
-            // 3. Fallback: Query official Bedrock Minecraft token exchange
-            if (!gamertag && typeof flow.getMinecraftBedrockToken === 'function') {
+            let gamertag = '';
+            let xuid = '';
+            // Direct official Bedrock Minecraft token exchange
+            if (typeof flow.getMinecraftBedrockToken === 'function') {
                 try {
                     const keyPair = crypto_1.default.generateKeyPairSync('ec', { namedCurve: 'secp384r1' });
                     const clientX509 = keyPair.publicKey.export({ format: 'der', type: 'spki' }).toString('base64');
                     const loginData = await flow.getMinecraftBedrockToken(clientX509);
-                    if (Array.isArray(loginData?.chain) && loginData.chain.length > 1) {
-                        const jwt = loginData.chain[1];
+                    if (Array.isArray(loginData) && loginData.length > 1) {
+                        const jwt = loginData[1];
                         const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64').toString());
                         if (payload?.extraData?.displayName) {
                             gamertag = payload.extraData.displayName;
-                            xuid = payload.extraData.XUID || xuid;
+                            xuid = payload.extraData.XUID || '';
                         }
                     }
                 }
                 catch (e) {
-                    console.warn('[VistaAFK Discovery] Bedrock token discovery fallback error:', e.message);
+                    console.warn('[VistaAFK Discovery] Bedrock token exchange error:', e.message);
                 }
             }
             if (gamertag) {
@@ -148,8 +120,16 @@ async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email, editi
             }
         }
         catch (err) {
-            console.warn('[VistaAFK Discovery] Bedrock Xbox discovery error:', err.message);
+            console.warn('[VistaAFK Discovery] Bedrock discovery error:', err.message);
         }
+    }
+    // 3. Fallback: If no custom Mojang Java name found, provide Bedrock gamer profile from email prefix so user is never blocked
+    if (!result.java && !result.bedrock) {
+        const fallbackName = email ? email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '') : 'Player';
+        result.bedrock = {
+            gamertag: fallbackName,
+        };
+        console.log(`[VistaAFK Discovery] Fallback profile created for ${fallbackName}`);
     }
     // Sync token caches so future bot instances can instantly connect without re-auth
     const targetNames = [

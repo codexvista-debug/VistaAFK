@@ -865,19 +865,10 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       setDiscoveryDeviceCode(devCode);
       setDiscoveryStatus('waiting_approval');
 
-      // If daemon is open, notify daemon so it also knows discovery is in progress
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        try {
-          wsRef.current.send(JSON.stringify({
-            type: 'DISCOVER_MICROSOFT_ACCOUNT',
-            payload: { email: email ? email.trim() : undefined, editionFilter },
-          }));
-        } catch (e) {}
-      }
-
       const pollStartTime = Date.now();
       const maxPollTime = (data.expiresIn || 900) * 1000;
 
+      // Poll every 2 seconds for instant account discovery as soon as user approves code
       pollTimerRef.current = setInterval(async () => {
         if (Date.now() - pollStartTime > maxPollTime) {
           if (pollTimerRef.current) clearInterval(pollTimerRef.current);
@@ -919,7 +910,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         } catch (e) {
           console.warn('[VistaAFK] Polling token error:', e);
         }
-      }, 4000);
+      }, 2000);
     } catch (err: any) {
       console.warn('[VistaAFK] Cloud discovery failed, checking WebSocket daemon...', err);
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {

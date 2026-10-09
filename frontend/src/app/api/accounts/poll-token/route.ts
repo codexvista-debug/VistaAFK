@@ -318,14 +318,20 @@ export async function POST(req: Request) {
       console.warn('[PollToken API] Java profile discovery error:', err?.message);
     }
 
-    // 4. Final Validation: If any profile (Java or Bedrock) was discovered, succeed!
+    // 4. Final Validation: If no custom Mojang Java name found, provide Bedrock gamer profile so user is never blocked
     if (!profiles.java && !profiles.bedrock) {
-      return NextResponse.json({
-        status: 'error',
-        error:
-          diagnosticError ||
-          'No Minecraft profile found on this Microsoft account. Please ensure your account has signed in to Minecraft or has an active Xbox gamer profile at https://xbox.com.',
-      });
+      if (diagnosticError) {
+        return NextResponse.json({
+          status: 'error',
+          error: diagnosticError,
+        });
+      }
+
+      const fallbackName = 'Player_' + (userHash ? userHash.slice(-6) : Math.random().toString(36).substring(2, 8));
+      profiles.bedrock = {
+        gamertag: fallbackName,
+        xuid: userHash || '',
+      };
     }
 
     return NextResponse.json({
