@@ -295,8 +295,7 @@ class BotInstance {
             }
             // Patch Geyser 26.x protocol aliases so servers reporting 26.30-26.60 map to protocol 2193, and 2193 maps to 1.26.51
             try {
-                // @ts-ignore
-                const Options = bedrock.Options || (await import('bedrock-protocol/src/options.js'));
+                const Options = (eval('require'))('bedrock-protocol/src/options.js');
                 if (Options?.Versions) {
                     for (let i = 20; i <= 60; i++) {
                         Options.Versions[`26.${i}`] = 2193;
@@ -328,7 +327,7 @@ class BotInstance {
                 port,
                 username: this.config.name,
                 offline: this.config.authType === 'offline',
-                skipPing: true,
+                skipPing: false,
                 useRaknetWorkers: false,
                 profilesFolder: tokenFolder,
                 version: targetVersion,
@@ -424,6 +423,11 @@ class BotInstance {
             client.on('close', () => {
                 this.bedrockClient = null;
                 if (!this.isManuallyStopped) {
+                    // If the bot is currently authenticating (waiting for the user to approve the device code on microsoft.com/link), do not aggressively auto-reconnect
+                    if (this.currentStatus === 'authenticating' && this.authCodeInfo) {
+                        this.emitActivity('status', `⏳ Awaiting Microsoft authorization: Visit ${this.authCodeInfo.verificationUri} and enter ${this.authCodeInfo.userCode}`);
+                        return;
+                    }
                     this.emitActivity('disconnect', '🔴 Disconnected from Bedrock server');
                     this.handleReconnect();
                 }

@@ -27,6 +27,7 @@ import {
   Mail,
   User,
   Terminal,
+  Activity,
 } from 'lucide-react';
 import { BotInventoryModal } from '../../components/BotInventoryModal';
 import { BotConfig } from '../../types';
@@ -66,6 +67,7 @@ export default function AccountsPage() {
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
   const [selectedAccountForDeploy, setSelectedAccountForDeploy] = useState<SavedAccount | null>(null);
   const [inventoryModalBot, setInventoryModalBot] = useState<BotConfig | null>(null);
+  const [isDiagnosticsModalOpen, setIsDiagnosticsModalOpen] = useState(false);
 
   // New Account Form State (MinecraftAFK style)
   const [accountType, setAccountType] = useState<'both' | 'java' | 'bedrock' | 'offline'>('both');
@@ -259,6 +261,14 @@ export default function AccountsPage() {
           </div>
 
           <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setIsDiagnosticsModalOpen(true)}
+              className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border-2 border-slate-300 shadow-sm transition flex items-center space-x-1.5"
+              title="Bedrock & Account Diagnostics"
+            >
+              <Activity className="h-4 w-4 text-emerald-600" />
+              <span>Bedrock Diagnostics</span>
+            </button>
             <button
               onClick={handleOpenAddModal}
               className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center space-x-2"
@@ -924,6 +934,121 @@ export default function AccountsPage() {
           telemetry={telemetry[inventoryModalBot.id]}
           onClose={() => setInventoryModalBot(null)}
         />
+      )}
+
+      {/* Bedrock & Fleet Diagnostics Modal */}
+      {isDiagnosticsModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsDiagnosticsModalOpen(false);
+          }}
+        >
+          <div
+            className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl w-full max-w-2xl p-5 sm:p-6 shadow-2xl my-auto max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3.5 border-b-2 border-slate-200">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  <Activity className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-base">Bedrock & Account Diagnostics</h3>
+                  <p className="text-[11px] text-slate-500 font-medium">Real-time connection details, RakNet handshake, and protocol status</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsDiagnosticsModalOpen(false)}
+                className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200 active:scale-95 transition shrink-0"
+                title="Close (Esc)"
+              >
+                <X className="h-5 w-5 stroke-[2.5]" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-4 overflow-y-auto flex-1 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Daemon Status</span>
+                  <span className={`font-black text-sm ${isConnected ? 'text-emerald-700' : 'text-rose-600'}`}>
+                    {isConnected ? 'Connected' : 'Disconnected'}
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Saved Accounts</span>
+                  <span className="font-black text-sm text-slate-800">{savedAccounts.length}</span>
+                </div>
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Bedrock Deployed</span>
+                  <span className="font-black text-sm text-sky-700">
+                    {configs.filter((c) => c.edition === 'bedrock').length}
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Online Bots</span>
+                  <span className="font-black text-sm text-emerald-700">
+                    {Object.values(telemetry).filter((t) => t.status === 'online').length}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-black uppercase text-slate-700 mb-2">Live Deployments State</h4>
+                <div className="space-y-2">
+                  {configs.length === 0 ? (
+                    <p className="text-slate-500 text-xs italic">No active server deployments running.</p>
+                  ) : (
+                    configs.map((c) => {
+                      const tel = telemetry[c.id];
+                      return (
+                        <div key={c.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50/70 flex flex-col space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="font-black text-slate-900 text-sm flex items-center space-x-1.5">
+                              <span>{c.name}</span>
+                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-sky-100 text-sky-800 border border-sky-200 uppercase">
+                                {c.edition || 'java'}
+                              </span>
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                              tel?.status === 'online'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : tel?.status === 'authenticating'
+                                ? 'bg-amber-100 text-amber-800 animate-pulse'
+                                : 'bg-slate-200 text-slate-700'
+                            }`}>
+                              {tel?.status || 'offline'}
+                            </span>
+                          </div>
+                          <div className="text-[11px] font-mono text-slate-600 flex flex-wrap gap-x-4">
+                            <span>Target: {c.host}:{c.port}</span>
+                            <span>Version: {c.version || 'Auto-negotiated (1.26.51 / protocol 2193)'}</span>
+                            <span>Auth: {c.authType}</span>
+                          </div>
+                          {tel?.statusMessage && (
+                            <p className="text-[11px] text-amber-700 font-medium bg-amber-50/80 p-1.5 rounded-lg border border-amber-200">
+                              ℹ️ Status details: {tel.statusMessage}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsDiagnosticsModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+              >
+                Close Diagnostics
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Live Toast Notifications */}
