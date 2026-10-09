@@ -473,13 +473,25 @@ export default function AccountsPage() {
                       </button>
                     </div>
 
-                    <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-left space-y-1">
+                    <div className="p-3 bg-slate-100 border border-slate-300 rounded-xl text-left space-y-1.5 text-xs text-slate-800">
+                      <div className="font-bold text-[11px] text-slate-900 flex items-center space-x-1.5">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        <span>How Microsoft Device Authentication Works:</span>
+                      </div>
+                      <ol className="text-[10px] space-y-1 text-slate-700 list-decimal list-inside font-medium leading-relaxed">
+                        <li><strong>Step 1:</strong> On Microsoft, enter code <span className="font-mono font-bold text-slate-900 bg-slate-200 px-1 py-0.5 rounded">{discoveryDeviceCode.userCode}</span> and click Allow access.</li>
+                        <li><strong>Step 2:</strong> Microsoft will then ask you to sign in with your Minecraft email &amp; password.</li>
+                        <li><strong>Step 3:</strong> Once signed in, this window will detect your gamertag and save it permanently!</li>
+                      </ol>
+                    </div>
+
+                    <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-left space-y-1">
                       <div className="flex items-center space-x-1.5 text-amber-800 font-black text-[11px]">
                         <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-                        <span>Adding an Alt or Different Account?</span>
+                        <span>Adding an Alt or Second Account?</span>
                       </div>
                       <p className="text-[10px] text-amber-900/90 leading-relaxed font-medium">
-                        If your browser is currently signed into another Microsoft account, it will automatically link that account. To link a new or friend&apos;s account, click <strong>Copy for Incognito Tab</strong>, open a <strong>Private / Incognito Window</strong>, paste the link, and enter your alternate credentials!
+                        Click <strong>Copy for Incognito Tab</strong> and open a <strong>Private / Incognito window</strong>. Microsoft will prompt you for code first, then let you sign in with your other account!
                       </p>
                     </div>
                   </div>

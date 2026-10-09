@@ -147,6 +147,7 @@ export interface ActivityLog {
 
 export type ClientMessage =
   | { type: 'AUTH'; payload: { token?: string } }
+  | { type: 'PING' }
   | { type: 'GET_STATE' }
   | { type: 'ADD_BOT'; payload: BotConfig }
   | { type: 'UPDATE_BOT'; payload: BotConfig }
@@ -167,6 +168,7 @@ export type ClientMessage =
 
 export type ServerMessage =
   | { type: 'AUTH_SUCCESS' }
+  | { type: 'PONG' }
   | { type: 'AUTH_FAILED'; payload: { reason: string } }
   | { type: 'INIT_STATE'; payload: { configs: BotConfig[]; telemetry: Record<string, BotTelemetry>; activityLogs?: Record<string, ActivityLog[]> } }
   | { type: 'BOT_CONFIG_ADDED'; payload: BotConfig }

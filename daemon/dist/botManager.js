@@ -23,19 +23,34 @@ class BotManager {
     }
     initPaths() {
         const cleanUser = this.currentUser.replace(/[^a-z0-9_-]/g, '_');
-        if (cleanUser) {
-            this.storageFile = path_1.default.resolve(process.cwd(), `bots_${cleanUser}.json`);
-            this.tokenFolder = path_1.default.resolve(process.cwd(), 'tokens', cleanUser);
-        }
-        else {
-            this.storageFile = path_1.default.resolve(process.cwd(), 'bots.json');
-            this.tokenFolder = path_1.default.resolve(process.cwd(), 'tokens');
-        }
+        this.storageFile = cleanUser
+            ? path_1.default.resolve(process.cwd(), `bots_${cleanUser}.json`)
+            : path_1.default.resolve(process.cwd(), 'bots.json');
+        // Central tokens directory: all bots and discovery read from this location
+        this.tokenFolder = path_1.default.resolve(process.cwd(), 'tokens');
         if (!fs_1.default.existsSync(this.tokenFolder)) {
             try {
                 fs_1.default.mkdirSync(this.tokenFolder, { recursive: true });
             }
             catch (e) { }
+        }
+        // Auto-migrate any legacy user-subfolder tokens into the central tokenFolder
+        if (cleanUser) {
+            const userSubfolder = path_1.default.resolve(process.cwd(), 'tokens', cleanUser);
+            if (fs_1.default.existsSync(userSubfolder)) {
+                try {
+                    const files = fs_1.default.readdirSync(userSubfolder);
+                    for (const f of files) {
+                        const src = path_1.default.join(userSubfolder, f);
+                        const dst = path_1.default.join(this.tokenFolder, f);
+                        if (!fs_1.default.existsSync(dst) && fs_1.default.statSync(src).isFile()) {
+                            fs_1.default.copyFileSync(src, dst);
+                            console.log(`[VistaAFK Daemon] Migrated cached token: ${f} -> central tokens/`);
+                        }
+                    }
+                }
+                catch (e) { }
+            }
         }
     }
     getTokenFolder() {
@@ -46,13 +61,16 @@ class BotManager {
     }
     setUser(newUser) {
         const clean = (newUser || '').trim().toLowerCase();
-        if (clean === this.currentUser)
+        if (!clean || clean === this.currentUser)
             return;
-        console.log(`[VistaAFK Daemon] Switching user context: "${this.currentUser}" -> "${clean}"`);
-        this.stopAll();
-        this.bots.clear();
-        this.configs.clear();
-        this.activityLogs.clear();
+        console.log(`[VistaAFK Daemon] Setting user context: "${this.currentUser}" -> "${clean}"`);
+        // Only stop and clear bots if switching from one explicit user to another explicit user
+        if (this.currentUser !== '') {
+            this.stopAll();
+            this.bots.clear();
+            this.configs.clear();
+            this.activityLogs.clear();
+        }
         this.currentUser = clean;
         this.initPaths();
         this.loadConfigs();

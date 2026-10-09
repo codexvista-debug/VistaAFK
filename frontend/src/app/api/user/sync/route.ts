@@ -21,11 +21,26 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { savedAccounts, serverPresets, botConfigs, daemonUrl, secretToken } = body;
+    const { savedAccounts, serverPresets, botConfigs, daemonUrl, secretToken, deletedAccountId } = body;
 
-    if (Array.isArray(savedAccounts)) {
-      user.savedAccounts = savedAccounts;
+    // 1. Safe Saved Accounts Sync: Never wipe out existing accounts on empty payload
+    if (deletedAccountId) {
+      user.savedAccounts = (user.savedAccounts || []).filter((a) => a.id !== deletedAccountId);
+    } else if (Array.isArray(savedAccounts)) {
+      if (body.replaceAccounts === true) {
+        user.savedAccounts = savedAccounts;
+      } else {
+        // Merge: keep all existing accounts, update or append newly added accounts
+        const existingMap = new Map((user.savedAccounts || []).map((a) => [a.id, a]));
+        for (const acc of savedAccounts) {
+          if (acc && acc.id) {
+            existingMap.set(acc.id, acc);
+          }
+        }
+        user.savedAccounts = Array.from(existingMap.values());
+      }
     }
+
     if (Array.isArray(serverPresets)) {
       user.serverPresets = serverPresets;
     }

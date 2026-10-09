@@ -10,16 +10,29 @@ function getPrismarineHash(input: string): string {
 function syncTokenCaches(tokenFolder: string, sourceId: string, targetNames: string[]) {
   const sourceHash = getPrismarineHash(sourceId);
   const cacheIds = ['msal', 'live', 'sisu', 'xbl', 'bed', 'mca', 'mcs', 'pfb'];
+  
+  // Expand targetNames with lowercase, uppercase, and trimmed variants
+  const expandedTargets = new Set<string>();
+  for (const name of targetNames) {
+    if (!name) continue;
+    expandedTargets.add(name);
+    expandedTargets.add(name.toLowerCase());
+    expandedTargets.add(name.toUpperCase());
+    expandedTargets.add(name.trim());
+  }
+
   try {
-    for (const targetName of targetNames) {
-      if (!targetName) continue;
+    for (const targetName of expandedTargets) {
       const targetHash = getPrismarineHash(targetName);
       for (const cacheId of cacheIds) {
         const srcFile = path.join(tokenFolder, `${sourceHash}_${cacheId}-cache.json`);
         const dstFile = path.join(tokenFolder, `${targetHash}_${cacheId}-cache.json`);
         if (fs.existsSync(srcFile)) {
-          fs.copyFileSync(srcFile, dstFile);
-          console.log(`[VistaAFK Discovery] Cached token credentials ready for ${targetName} (${targetHash})`);
+          const stat = fs.statSync(srcFile);
+          if (stat.size > 2) {
+            fs.copyFileSync(srcFile, dstFile);
+            console.log(`[VistaAFK Discovery] Cached token credentials ready for ${targetName} (${targetHash}) [${cacheId}]`);
+          }
         }
       }
     }
@@ -142,7 +155,14 @@ export async function discoverMicrosoftProfiles(
   }
 
   // Sync token caches so future bot instances can instantly connect without re-auth
-  const targetNames = [result.java?.name, result.bedrock?.gamertag].filter(Boolean) as string[];
+  const targetNames = [
+    result.java?.name,
+    result.java?.uuid,
+    result.bedrock?.gamertag,
+    result.bedrock?.xuid,
+    email,
+  ].filter(Boolean) as string[];
+
   if (targetNames.length > 0) {
     syncTokenCaches(tokenFolder, accountId, targetNames);
   }

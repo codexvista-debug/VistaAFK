@@ -14,17 +14,28 @@ function getPrismarineHash(input) {
 function syncTokenCaches(tokenFolder, sourceId, targetNames) {
     const sourceHash = getPrismarineHash(sourceId);
     const cacheIds = ['msal', 'live', 'sisu', 'xbl', 'bed', 'mca', 'mcs', 'pfb'];
+    // Expand targetNames with lowercase, uppercase, and trimmed variants
+    const expandedTargets = new Set();
+    for (const name of targetNames) {
+        if (!name)
+            continue;
+        expandedTargets.add(name);
+        expandedTargets.add(name.toLowerCase());
+        expandedTargets.add(name.toUpperCase());
+        expandedTargets.add(name.trim());
+    }
     try {
-        for (const targetName of targetNames) {
-            if (!targetName)
-                continue;
+        for (const targetName of expandedTargets) {
             const targetHash = getPrismarineHash(targetName);
             for (const cacheId of cacheIds) {
                 const srcFile = path_1.default.join(tokenFolder, `${sourceHash}_${cacheId}-cache.json`);
                 const dstFile = path_1.default.join(tokenFolder, `${targetHash}_${cacheId}-cache.json`);
                 if (fs_1.default.existsSync(srcFile)) {
-                    fs_1.default.copyFileSync(srcFile, dstFile);
-                    console.log(`[VistaAFK Discovery] Cached token credentials ready for ${targetName} (${targetHash})`);
+                    const stat = fs_1.default.statSync(srcFile);
+                    if (stat.size > 2) {
+                        fs_1.default.copyFileSync(srcFile, dstFile);
+                        console.log(`[VistaAFK Discovery] Cached token credentials ready for ${targetName} (${targetHash}) [${cacheId}]`);
+                    }
                 }
             }
         }
@@ -122,7 +133,13 @@ async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email, editi
         }
     }
     // Sync token caches so future bot instances can instantly connect without re-auth
-    const targetNames = [result.java?.name, result.bedrock?.gamertag].filter(Boolean);
+    const targetNames = [
+        result.java?.name,
+        result.java?.uuid,
+        result.bedrock?.gamertag,
+        result.bedrock?.xuid,
+        email,
+    ].filter(Boolean);
     if (targetNames.length > 0) {
         syncTokenCaches(tokenFolder, accountId, targetNames);
     }

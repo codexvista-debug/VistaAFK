@@ -138,6 +138,11 @@ wss.on('connection', (ws) => {
       }
 
       switch (msg.type) {
+        case 'PING':
+          try {
+            ws.send(JSON.stringify({ type: 'PONG' }));
+          } catch (e) {}
+          break;
         case 'GET_STATE':
           sendInitialState(ws);
           break;

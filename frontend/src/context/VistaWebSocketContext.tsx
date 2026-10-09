@@ -273,7 +273,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         if (user) {
           const userAccountsKey = `vistaafk_${user.username.toLowerCase()}_saved_accounts`;
           localStorage.setItem(userAccountsKey, JSON.stringify(updated));
-          syncToCloud({ savedAccounts: updated });
+          syncToCloud({ savedAccounts: updated, deletedAccountId: id } as any);
         } else {
           localStorage.setItem('vistaafk_guest_saved_accounts', JSON.stringify(updated));
         }
