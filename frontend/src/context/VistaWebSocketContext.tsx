@@ -110,8 +110,6 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const [daemonUrl, setDaemonUrl] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const isLocalhostHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const lastKnown = localStorage.getItem('vistaafk_last_known_daemon_url');
-      if (lastKnown) return normalizeWsUrl(lastKnown);
       return isLocalhostHost ? 'ws://localhost:8080' : '';
     }
     return '';
@@ -177,14 +175,21 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const connectParam = params.get('connect') || params.get('daemon');
+    const targetUser = params.get('user');
+
     if (connectParam) {
       const norm = normalizeWsUrl(connectParam);
       if (norm) {
+        // If link was generated for a specific user, verify it matches active user
+        if (targetUser && user && user.username.toLowerCase() !== targetUser.trim().toLowerCase()) {
+          console.warn(`[VistaAFK WS] Connect link is for @${targetUser}, but current user is @${user.username}. Ignoring auto-sync.`);
+          return;
+        }
+
         setDaemonUrl(norm);
         retryCountRef.current = 0;
         failedUrlRef.current = '';
         setConnectionAttempts(0);
-        localStorage.setItem('vistaafk_last_known_daemon_url', norm);
         if (user) {
           const username = user.username.toLowerCase();
           localStorage.setItem(`vistaafk_${username}_daemon_url`, norm);
@@ -201,12 +206,20 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     if (typeof window === 'undefined') return;
 
     if (!user) {
-      // Logged out: reset state cleanly and do not connect to any daemon
+      // Logged out: reset state cleanly, disconnect and do not connect to any daemon
       setSavedAccounts([]);
       setConfigs([]);
       setTelemetry({});
+      setChatLogs({});
+      setActivityLogs({});
       setIsConnected(false);
       setIsConnecting(false);
+      setDaemonUrl('');
+      setSecretToken('');
+      if (wsRef.current) {
+        try { wsRef.current.close(); } catch (e) {}
+        wsRef.current = null;
+      }
       return;
     }
 
@@ -215,14 +228,13 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     const userAccountsKey = `vistaafk_${username}_saved_accounts`;
     const userPresetsKey = `vistaafk_${username}_server_presets`;
     const userDaemonKey = `vistaafk_${username}_daemon_url`;
-    const lastKnownDaemonKey = 'vistaafk_last_known_daemon_url';
     const userTokenKey = `vistaafk_${username}_secret_token`;
 
-    // 1. Daemon URL and Secret Token
-    const cachedUrl = typeof window !== 'undefined'
-      ? (localStorage.getItem(userDaemonKey) || localStorage.getItem(lastKnownDaemonKey))
+    // 1. Daemon URL and Secret Token (STRICTLY user-isolated: NEVER fall back to another user's daemon)
+    const cachedUserUrl = typeof window !== 'undefined'
+      ? localStorage.getItem(userDaemonKey)
       : null;
-    const activeDaemonUrl = user.daemonUrl || cachedUrl;
+    const activeDaemonUrl = user.daemonUrl || cachedUserUrl;
 
     if (activeDaemonUrl) {
       const norm = normalizeWsUrl(activeDaemonUrl);
@@ -240,9 +252,20 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         setConnectionAttempts(0);
         failedUrlRef.current = '';
       }
-      // If user.daemonUrl in Supabase was null, auto-sync this known working daemonUrl to Supabase immediately!
-      if (!user.daemonUrl && norm && !norm.includes('localhost')) {
+      // If user.daemonUrl in Supabase was null, auto-sync this user's known cached url
+      if (!user.daemonUrl && cachedUserUrl && norm && !norm.includes('localhost')) {
         syncToCloud({ daemonUrl: norm });
+      }
+    } else {
+      // This user has NO daemon configured yet: disconnect and reset to avoid inheriting previous user's connection!
+      if (daemonUrl && !daemonUrl.includes('localhost')) {
+        setDaemonUrl('');
+        setIsConnected(false);
+        setIsConnecting(false);
+        if (wsRef.current) {
+          try { wsRef.current.close(); } catch (e) {}
+          wsRef.current = null;
+        }
       }
     }
     const activeToken = user.secretToken !== undefined ? user.secretToken : (typeof window !== 'undefined' ? localStorage.getItem(userTokenKey) : null);
@@ -778,16 +801,21 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     setConnectionAttempts(0);
     failedUrlRef.current = '';
     if (typeof window !== 'undefined') {
-      if (url && !url.includes('localhost')) {
-        localStorage.setItem('vistaafk_last_known_daemon_url', url);
-      }
       if (user) {
         const username = user.username.toLowerCase();
-        localStorage.setItem(`vistaafk_${username}_daemon_url`, url);
+        if (url) {
+          localStorage.setItem(`vistaafk_${username}_daemon_url`, url);
+        } else {
+          localStorage.removeItem(`vistaafk_${username}_daemon_url`);
+        }
         localStorage.setItem(`vistaafk_${username}_secret_token`, token);
         syncToCloud({ daemonUrl: url, secretToken: token });
       } else {
-        localStorage.setItem('vistaafk_guest_daemon_url', url);
+        if (url) {
+          localStorage.setItem('vistaafk_guest_daemon_url', url);
+        } else {
+          localStorage.removeItem('vistaafk_guest_daemon_url');
+        }
         localStorage.setItem('vistaafk_guest_secret_token', token);
       }
     }

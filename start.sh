@@ -102,7 +102,11 @@ if command -v cloudflared &>/dev/null; then
     fi
     TARGET_CLOUD=$(echo "$TARGET_CLOUD" | sed 's:/*$::')
 
-    ONE_CLICK_URL="${TARGET_CLOUD}/?connect=$WSS_URL"
+    if [ -n "$CURRENT_USER" ]; then
+      ONE_CLICK_URL="${TARGET_CLOUD}/?user=${CURRENT_USER}&connect=$WSS_URL"
+    else
+      ONE_CLICK_URL="${TARGET_CLOUD}/?connect=$WSS_URL"
+    fi
 
     # Automatically notify VistaAFK cloud so web dashboard connects instantly without pasting!
     if [ -n "$CURRENT_USER" ]; then

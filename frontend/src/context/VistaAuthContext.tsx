@@ -96,7 +96,6 @@ export const VistaAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               if (data.user.daemonUrl) {
                 const uKey = `vistaafk_${data.user.username.toLowerCase()}_daemon_url`;
                 localStorage.setItem(uKey, data.user.daemonUrl);
-                localStorage.setItem('vistaafk_last_known_daemon_url', data.user.daemonUrl);
               }
             }
             return data.user;
@@ -141,7 +140,6 @@ export const VistaAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (data.user.daemonUrl) {
           const uKey = `vistaafk_${data.user.username.toLowerCase()}_daemon_url`;
           localStorage.setItem(uKey, data.user.daemonUrl);
-          localStorage.setItem('vistaafk_last_known_daemon_url', data.user.daemonUrl);
         }
         if (data.user.secretToken) {
           localStorage.setItem('vistaafk_secret_token', data.user.secretToken);
@@ -189,6 +187,7 @@ export const VistaAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (typeof window !== 'undefined') {
       localStorage.removeItem('vistaafk_auth_token');
       localStorage.removeItem('vistaafk_auth_user');
+      localStorage.removeItem('vistaafk_last_known_daemon_url');
     }
   };
 
