@@ -38,8 +38,7 @@ async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email, editi
     const accountId = 'msa_discovery_' + (email ? email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : 'acc') + '_' + Date.now();
     console.log(`[VistaAFK Discovery] Initiating Microsoft OAuth device code flow for ${email || 'new account'} (filter: ${editionFilter})...`);
     const flow = new prismarine_auth_1.Authflow(accountId, tokenFolder, {
-        authTitle: prismarine_auth_1.Titles.MinecraftNintendoSwitch,
-        deviceType: 'Nintendo',
+        authTitle: prismarine_auth_1.Titles.MinecraftJava,
         flow: 'live',
         forceRefresh: true,
     }, (codeData) => {

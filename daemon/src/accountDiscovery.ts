@@ -53,8 +53,7 @@ export async function discoverMicrosoftProfiles(
     accountId,
     tokenFolder,
     {
-      authTitle: Titles.MinecraftNintendoSwitch,
-      deviceType: 'Nintendo',
+      authTitle: Titles.MinecraftJava,
       flow: 'live',
       forceRefresh: true,
     },

@@ -72,6 +72,7 @@ export default function AccountsPage() {
   const [accountInput, setAccountInput] = useState('');
   const [offlineEdition, setOfflineEdition] = useState<'java' | 'bedrock'>('java');
   const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedIncognito, setCopiedIncognito] = useState(false);
   const popupRef = React.useRef<Window | null>(null);
 
   // Sync popup URL when discoveryDeviceCode arrives
@@ -446,18 +447,41 @@ export default function AccountsPage() {
                       </button>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => copyAndOpenMicrosoft(discoveryDeviceCode.userCode, discoveryDeviceCode.verificationUri)}
-                      className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center space-x-2"
-                    >
-                      <ExternalLink className="h-4 w-4 shrink-0" />
-                      <span>Open Microsoft Sign-In Page ↗</span>
-                    </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => copyAndOpenMicrosoft(discoveryDeviceCode.userCode, discoveryDeviceCode.verificationUri)}
+                        className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-black text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                        <span>Open Microsoft Sign-In ↗</span>
+                      </button>
 
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
-                      💡 Paste the code on Microsoft, approve access, then come back here. Your verified Minecraft gamertag will appear automatically!
-                    </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try {
+                            navigator.clipboard.writeText(discoveryDeviceCode.verificationUri);
+                            setCopiedIncognito(true);
+                            setTimeout(() => setCopiedIncognito(false), 3000);
+                          } catch (e) {}
+                        }}
+                        className="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 active:scale-[0.99] text-slate-200 border border-slate-700 font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1.5"
+                      >
+                        {copiedIncognito ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5 text-slate-300" />}
+                        <span>{copiedIncognito ? 'Copied Incognito Link!' : 'Copy for Incognito Tab'}</span>
+                      </button>
+                    </div>
+
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-left space-y-1">
+                      <div className="flex items-center space-x-1.5 text-amber-800 font-black text-[11px]">
+                        <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                        <span>Adding an Alt or Different Account?</span>
+                      </div>
+                      <p className="text-[10px] text-amber-900/90 leading-relaxed font-medium">
+                        If your browser is currently signed into another Microsoft account, it will automatically link that account. To link a new or friend&apos;s account, click <strong>Copy for Incognito Tab</strong>, open a <strong>Private / Incognito Window</strong>, paste the link, and enter your alternate credentials!
+                      </p>
+                    </div>
                   </div>
                 )}
 
