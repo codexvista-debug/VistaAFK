@@ -272,6 +272,8 @@ function sendInitialState(ws) {
                 type: 'MICROSOFT_PROFILES_DISCOVERED',
                 payload: lastDiscoveredProfiles,
             }));
+            // Clear after sending once to prevent loop on reconnect
+            lastDiscoveredProfiles = null;
         }
     }
 }
@@ -307,9 +309,11 @@ async function sendCloudHeartbeat() {
         // Retry quietly on network blips
     }
 }
-// Start cloud heartbeat routine
-setTimeout(sendCloudHeartbeat, 2500);
-setInterval(sendCloudHeartbeat, 25000);
+// Start cloud heartbeat routine: rapid initial pulses to capture freshly started tunnels immediately
+setTimeout(sendCloudHeartbeat, 1500);
+setTimeout(sendCloudHeartbeat, 4000);
+setTimeout(sendCloudHeartbeat, 8000);
+setInterval(sendCloudHeartbeat, 18000);
 process.on('SIGINT', () => {
     console.log('\n[VistaAFK Daemon] Stopping all bots and shutting down gracefully...');
     botManager.stopAll();

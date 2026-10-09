@@ -36,10 +36,13 @@ if [ ! -d "node_modules/bedrock-protocol" ]; then
   npm install bedrock-protocol --ignore-scripts --omit=optional
 fi
 
-# 6. Ensure Cloudflare Tunnel is available for remote PC/laptop connection
+# 6. Ensure Cloudflare Tunnel & curl are available for remote access
 if ! command -v cloudflared &>/dev/null; then
   echo "🌐 Installing Cloudflare tunnel for remote access from PC..."
   pkg install cloudflared -y 2>/dev/null || true
+fi
+if ! command -v curl &>/dev/null; then
+  pkg install curl -y 2>/dev/null || true
 fi
 
 # 7. Check for user account credentials, CLI arguments, or reset flag
@@ -68,9 +71,9 @@ if command -v cloudflared &>/dev/null; then
   rm -f cloudflared.log 2>/dev/null
   cloudflared tunnel --url http://localhost:8080 > cloudflared.log 2>&1 &
   
-  # Wait up to 6 seconds for the tunnel to establish
+  # Wait up to 10 seconds for the tunnel to establish
   TUNNEL_URL=""
-  for i in 1 2 3 4 5 6; do
+  for i in 1 2 3 4 5 6 7 8 9 10; do
     sleep 1
     TUNNEL_URL=$(grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare\.com' cloudflared.log 2>/dev/null | tail -n 1)
     if [ -n "$TUNNEL_URL" ]; then
@@ -80,17 +83,30 @@ if command -v cloudflared &>/dev/null; then
 
   if [ -n "$TUNNEL_URL" ]; then
     WSS_URL=$(echo "$TUNNEL_URL" | sed 's/https:\/\//wss:\/\//')
+    export DAEMON_PUBLIC_URL="$WSS_URL"
     ONE_CLICK_URL="https://afkvista.vercel.app/?connect=$WSS_URL"
+
+    # Automatically notify VistaAFK cloud so web dashboard connects instantly without pasting!
+    if [ -n "$CURRENT_USER" ]; then
+      echo "📡 Auto-linking tunnel to VistaAFK account (@$CURRENT_USER)..."
+      AUTH_TOKEN_PAYLOAD=$(grep -o '"token":"[^"]*' user_auth.json 2>/dev/null | cut -d'"' -f4)
+      if [ -z "$AUTH_TOKEN_PAYLOAD" ]; then
+        AUTH_TOKEN_PAYLOAD=$(grep -o '"token":"[^"]*' ../user_auth.json 2>/dev/null | cut -d'"' -f4)
+      fi
+      curl -s -m 5 -X POST "https://afkvista.vercel.app/api/daemon/heartbeat" \
+        -H "Content-Type: application/json" \
+        -d "{\"username\":\"$CURRENT_USER\",\"token\":\"$AUTH_TOKEN_PAYLOAD\",\"password\":\"$AUTH_TOKEN_PAYLOAD\",\"daemonUrl\":\"$WSS_URL\"}" >/dev/null 2>&1 &
+    fi
+
     echo ""
     echo "============================================================="
     echo "  🟢 VistaAFK Bot Daemon is RUNNING 24/7!"
     echo "============================================================="
-    echo ""
-    echo "👉 Click or copy this 1-CLICK LINK into your browser:"
-    echo ""
-    echo "   $ONE_CLICK_URL"
-    echo ""
-    echo "(Open on your PC or phone - connects instantly, NO setup needed!)"
+    echo "  ✨ AUTO-CONNECTED: Your web dashboard is now automatically"
+    echo "     connected to this daemon. No copy-pasting required!"
+    echo "============================================================="
+    echo "  🌐 Direct 1-Click Link (if needed):"
+    echo "     $ONE_CLICK_URL"
     echo "============================================================="
     echo ""
   fi

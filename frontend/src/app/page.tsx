@@ -21,7 +21,7 @@ export default function Dashboard() {
   const { user, token: authToken, openAuthModal } = useAuth();
   const [copiedTermux, setCopiedTermux] = useState(false);
   const termuxCommand = user?.username
-    ? `pkg update -y && pkg install -y git nodejs cloudflared && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh ${user.username} ${authToken || ''}`
+    ? `pkg update -y && pkg install -y git nodejs cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh ${user.username} ${authToken || ''}`
     : '';
   const {
     daemonUrl,

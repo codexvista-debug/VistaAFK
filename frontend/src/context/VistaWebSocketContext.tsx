@@ -101,7 +101,7 @@ export interface VistaWebSocketContextType {
 const VistaWebSocketContext = createContext<VistaWebSocketContextType | null>(null);
 
 export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, syncToCloud } = useAuth();
+  const { user, syncToCloud, refreshProfile } = useAuth();
   const [daemonUrl, setDaemonUrl] = useState<string>('ws://localhost:8080');
   const [secretToken, setSecretToken] = useState<string>('');
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -119,6 +119,10 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const [notifications, setNotifications] = useState<VistaNotification[]>([]);
 
   const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
+  const savedAccountsRef = useRef<SavedAccount[]>([]);
+  savedAccountsRef.current = savedAccounts;
+  const processedDiscoveryRef = useRef<string>('');
+
   const [serverPresets, setServerPresets] = useState<ServerPreset[]>(DEFAULT_SERVER_PRESETS);
 
   // Microsoft OAuth Discovery State
@@ -180,7 +184,12 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       const norm = normalizeWsUrl(activeDaemonUrl);
       if (norm !== daemonUrl) {
         setDaemonUrl(norm);
-        if (wsRef.current) wsRef.current.close();
+        retryCountRef.current = 0;
+        setConnectionAttempts(0);
+        failedUrlRef.current = '';
+        if (wsRef.current) {
+          try { wsRef.current.close(); } catch (e) {}
+        }
       }
     }
     const activeToken = user.secretToken !== undefined ? user.secretToken : (typeof window !== 'undefined' ? localStorage.getItem(userTokenKey) : null);
@@ -305,9 +314,11 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     });
   };
 
+  const username = user?.username;
+
   const connect = useCallback((force: boolean = false) => {
     if (typeof window === 'undefined') return;
-    if (!user) {
+    if (!username) {
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
@@ -356,7 +367,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         setAuthError(null);
 
         // Authenticate immediately upon connection
-        ws.send(JSON.stringify({ type: 'AUTH', payload: { token: secretToken || undefined, username: user?.username } }));
+        ws.send(JSON.stringify({ type: 'AUTH', payload: { token: secretToken || undefined, username } }));
 
         // Start client keepalive ping every 10 seconds to keep connection rock solid
         if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
@@ -473,7 +484,13 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
                 message: msg.payload.message,
                 botId: msg.payload.botId,
               };
-              setNotifications((prev) => [notif, ...prev.slice(0, 19)]);
+              setNotifications((prev) => {
+                // Reject duplicate notification arriving within 5 seconds
+                if (prev.some((n) => n.message === notif.message && Math.abs(Date.now() - n.timestamp) < 5000)) {
+                  return prev;
+                }
+                return [notif, ...prev.slice(0, 19)];
+              });
               break;
             }
 
@@ -506,32 +523,55 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
               setDiscoveryProfiles(profiles);
               setDiscoveryStatus('success');
 
+              const discoveryKey = `${profiles.java?.uuid || profiles.java?.name || ''}:${profiles.bedrock?.gamertag || ''}`;
+              if (discoveryKey && processedDiscoveryRef.current === discoveryKey) {
+                // Already processed this exact discovery event, do not duplicate
+                break;
+              }
+              processedDiscoveryRef.current = discoveryKey;
+
+              const currentAccounts = savedAccountsRef.current || [];
               const filter = discoveryFilterRef.current;
               const newlyAdded: string[] = [];
+
               if ((filter === 'both' || filter === 'java') && profiles.java?.name) {
-                const javaAccount: SavedAccount = {
-                  id: `msa-java-${profiles.java.name.toLowerCase()}`,
-                  name: profiles.java.name,
-                  authType: 'microsoft',
-                  edition: 'java',
-                  uuid: profiles.java.uuid,
-                  createdAt: Date.now(),
-                };
-                saveAccount(javaAccount);
-                newlyAdded.push(`${profiles.java.name} (Java)`);
+                const alreadyExists = currentAccounts.some(
+                  (a) =>
+                    (a.uuid && profiles.java?.uuid && a.uuid === profiles.java.uuid) ||
+                    a.name.toLowerCase() === profiles.java.name.toLowerCase()
+                );
+                if (!alreadyExists) {
+                  const javaAccount: SavedAccount = {
+                    id: `msa-java-${profiles.java.name.toLowerCase()}`,
+                    name: profiles.java.name,
+                    authType: 'microsoft',
+                    edition: 'java',
+                    uuid: profiles.java.uuid,
+                    createdAt: Date.now(),
+                  };
+                  saveAccount(javaAccount);
+                  newlyAdded.push(`${profiles.java.name} (Java)`);
+                }
               }
 
               if ((filter === 'both' || filter === 'bedrock') && profiles.bedrock?.gamertag) {
-                const bedrockAccount: SavedAccount = {
-                  id: `msa-bedrock-${profiles.bedrock.gamertag.toLowerCase()}`,
-                  name: profiles.bedrock.gamertag,
-                  gamertag: profiles.bedrock.gamertag,
-                  authType: 'microsoft',
-                  edition: 'bedrock',
-                  createdAt: Date.now(),
-                };
-                saveAccount(bedrockAccount);
-                newlyAdded.push(`${profiles.bedrock.gamertag} (Bedrock)`);
+                const alreadyExists = currentAccounts.some(
+                  (a) =>
+                    (a.gamertag && a.gamertag.toLowerCase() === profiles.bedrock.gamertag.toLowerCase()) ||
+                    a.name.toLowerCase() === profiles.bedrock.gamertag.toLowerCase()
+                );
+                if (!alreadyExists) {
+                  const bedrockAccount: SavedAccount = {
+                    id: `msa-bedrock-${profiles.bedrock.gamertag.toLowerCase()}`,
+                    name: profiles.bedrock.gamertag,
+                    gamertag: profiles.bedrock.gamertag,
+                    authType: 'microsoft',
+                    edition: 'bedrock',
+                    createdAt: Date.now(),
+                  };
+                  saveAccount(bedrockAccount);
+                  newlyAdded.push(`${profiles.bedrock.gamertag} (Bedrock)`);
+                }
               }
 
               if (newlyAdded.length > 0) {
@@ -541,7 +581,10 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
                   level: 'success',
                   message: `🎮 Linked Microsoft Account: ${newlyAdded.join(' & ')} added to Vault!`,
                 };
-                setNotifications((prev) => [notif, ...prev.slice(0, 19)]);
+                setNotifications((prev) => {
+                  if (prev.some((n) => n.message === notif.message)) return prev;
+                  return [notif, ...prev.slice(0, 19)];
+                });
               }
               break;
             }
@@ -565,13 +608,13 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
 
-        // Auto reconnect up to 3 attempts with delay only if user is logged in
-        if (user) {
+        // Auto reconnect up to 3 attempts with increasing delay only if user is logged in
+        if (username) {
           retryCountRef.current += 1;
           setConnectionAttempts(retryCountRef.current);
 
           if (retryCountRef.current < 3) {
-            const delay = retryCountRef.current === 1 ? 2500 : 4000;
+            const delay = retryCountRef.current === 1 ? 3000 : 6000;
             console.log(`[VistaAFK WS Provider] Reconnecting in ${delay}ms (attempt ${retryCountRef.current + 1}/3)...`);
             reconnectTimeoutRef.current = setTimeout(() => {
               connect();
@@ -584,8 +627,6 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
 
       ws.onerror = (err) => {
         console.error('[VistaAFK WS Provider] Socket error occurred:', err);
-        setIsConnected(false);
-        setIsConnecting(false);
         try {
           ws.close();
         } catch (e) {}
@@ -594,10 +635,11 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       console.error('[VistaAFK WS Provider] Connect exception:', e);
       setIsConnecting(false);
     }
-  }, [user, daemonUrl, secretToken]);
+  }, [username, daemonUrl, secretToken]);
 
+  // Main connection lifecycle
   useEffect(() => {
-    if (!user) {
+    if (!username) {
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
@@ -609,25 +651,26 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
 
     connect();
 
-    // Resilient connection watchdog: automatically reconnects whenever socket drops (only if under max 3 retries)
-    const watchdog = setInterval(() => {
-      if (typeof window === 'undefined') return;
-      if (!user) return;
-      if (retryCountRef.current >= 3) return; // Prevent endless flashing when daemon is offline
-      if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
-        connect();
-      }
-    }, 6000);
-
     return () => {
-      clearInterval(watchdog);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
       if (wsRef.current) {
         wsRef.current.close();
       }
     };
-  }, [user, connect]);
+  }, [username, daemonUrl, secretToken, connect]);
+
+  // Active daemon tunnel detection: polls cloud every 3.5s while disconnected so Termux links sync automatically
+  useEffect(() => {
+    if (!username || isConnected) return;
+
+    refreshProfile();
+    const pollInterval = setInterval(() => {
+      refreshProfile();
+    }, 3500);
+
+    return () => clearInterval(pollInterval);
+  }, [username, isConnected, refreshProfile]);
 
   const retryConnection = useCallback(() => {
     retryCountRef.current = 0;
