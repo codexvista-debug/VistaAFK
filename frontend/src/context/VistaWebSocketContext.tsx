@@ -135,6 +135,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const keepAliveIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check for URL parameters ?connect=wss://... or ?daemon=... on mount
   useEffect(() => {
@@ -190,6 +191,11 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         if (wsRef.current) {
           try { wsRef.current.close(); } catch (e) {}
         }
+      } else {
+        // Uniform sync across tabs: reset pause so newly opened tab or refreshed window connects immediately
+        retryCountRef.current = 0;
+        setConnectionAttempts(0);
+        failedUrlRef.current = '';
       }
     }
     const activeToken = user.secretToken !== undefined ? user.secretToken : (typeof window !== 'undefined' ? localStorage.getItem(userTokenKey) : null);
@@ -281,6 +287,75 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       return updated;
     });
   };
+
+  const handleDiscoveredProfiles = useCallback((
+    profiles: { java?: { name: string; uuid: string }; bedrock?: { gamertag: string; xuid?: string } },
+    filter: 'both' | 'java' | 'bedrock' = 'both'
+  ) => {
+    const discoveryKey = `${profiles.java?.uuid || profiles.java?.name || ''}:${profiles.bedrock?.gamertag || ''}`;
+    if (discoveryKey && processedDiscoveryRef.current === discoveryKey) {
+      return;
+    }
+    processedDiscoveryRef.current = discoveryKey;
+
+    const currentAccounts = savedAccountsRef.current || [];
+    const newlyAdded: string[] = [];
+
+    const javaProf = profiles.java;
+    if ((filter === 'both' || filter === 'java') && javaProf?.name) {
+      const alreadyExists = currentAccounts.some(
+        (a) =>
+          (a.uuid && javaProf.uuid && a.uuid === javaProf.uuid) ||
+          a.name.toLowerCase() === javaProf.name.toLowerCase()
+      );
+      if (!alreadyExists) {
+        const javaAccount: SavedAccount = {
+          id: `msa-java-${javaProf.name.toLowerCase()}`,
+          name: javaProf.name,
+          authType: 'microsoft',
+          edition: 'java',
+          uuid: javaProf.uuid,
+          createdAt: Date.now(),
+        };
+        saveAccount(javaAccount);
+        newlyAdded.push(`${javaProf.name} (Java)`);
+      }
+    }
+
+    const bedrockProf = profiles.bedrock;
+    if ((filter === 'both' || filter === 'bedrock') && bedrockProf?.gamertag) {
+      const alreadyExists = currentAccounts.some(
+        (a) =>
+          (a.gamertag && a.gamertag.toLowerCase() === bedrockProf.gamertag.toLowerCase()) ||
+          a.name.toLowerCase() === bedrockProf.gamertag.toLowerCase()
+      );
+      if (!alreadyExists) {
+        const bedrockAccount: SavedAccount = {
+          id: `msa-bedrock-${bedrockProf.gamertag.toLowerCase()}`,
+          name: bedrockProf.gamertag,
+          gamertag: bedrockProf.gamertag,
+          authType: 'microsoft',
+          edition: 'bedrock',
+          createdAt: Date.now(),
+        };
+        saveAccount(bedrockAccount);
+        newlyAdded.push(`${bedrockProf.gamertag} (Bedrock)`);
+      }
+    }
+
+    if (newlyAdded.length > 0) {
+      const notif: VistaNotification = {
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp: Date.now(),
+        level: 'success',
+        message: `🎮 Linked Microsoft Account: ${newlyAdded.join(' & ')} added to Vault!`,
+      };
+      setNotifications((prev) => {
+        if (prev.some((n) => n.message === notif.message)) return prev;
+        return [notif, ...prev.slice(0, 19)];
+      });
+    }
+  }, []);
 
   const saveServerPreset = (preset: ServerPreset) => {
     setServerPresets((prev) => {
@@ -497,24 +572,6 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
             case 'MICROSOFT_DEVICE_CODE': {
               setDiscoveryDeviceCode(msg.payload);
               setDiscoveryStatus('waiting_approval');
-
-              // Automatically copy code to clipboard & open browser tab
-              if (typeof window !== 'undefined') {
-                if (msg.payload?.userCode) {
-                  try {
-                    navigator.clipboard.writeText(msg.payload.userCode);
-                  } catch (e) {
-                    console.warn('[VistaAFK] Clipboard copy failed:', e);
-                  }
-                }
-                if (msg.payload?.verificationUri) {
-                  try {
-                    window.open(msg.payload.verificationUri, '_blank');
-                  } catch (e) {
-                    console.warn('[VistaAFK] Popup open failed:', e);
-                  }
-                }
-              }
               break;
             }
 
@@ -522,70 +579,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
               const profiles = msg.payload;
               setDiscoveryProfiles(profiles);
               setDiscoveryStatus('success');
-
-              const discoveryKey = `${profiles.java?.uuid || profiles.java?.name || ''}:${profiles.bedrock?.gamertag || ''}`;
-              if (discoveryKey && processedDiscoveryRef.current === discoveryKey) {
-                // Already processed this exact discovery event, do not duplicate
-                break;
-              }
-              processedDiscoveryRef.current = discoveryKey;
-
-              const currentAccounts = savedAccountsRef.current || [];
-              const filter = discoveryFilterRef.current;
-              const newlyAdded: string[] = [];
-
-              if ((filter === 'both' || filter === 'java') && profiles.java?.name) {
-                const alreadyExists = currentAccounts.some(
-                  (a) =>
-                    (a.uuid && profiles.java?.uuid && a.uuid === profiles.java.uuid) ||
-                    a.name.toLowerCase() === profiles.java.name.toLowerCase()
-                );
-                if (!alreadyExists) {
-                  const javaAccount: SavedAccount = {
-                    id: `msa-java-${profiles.java.name.toLowerCase()}`,
-                    name: profiles.java.name,
-                    authType: 'microsoft',
-                    edition: 'java',
-                    uuid: profiles.java.uuid,
-                    createdAt: Date.now(),
-                  };
-                  saveAccount(javaAccount);
-                  newlyAdded.push(`${profiles.java.name} (Java)`);
-                }
-              }
-
-              if ((filter === 'both' || filter === 'bedrock') && profiles.bedrock?.gamertag) {
-                const alreadyExists = currentAccounts.some(
-                  (a) =>
-                    (a.gamertag && a.gamertag.toLowerCase() === profiles.bedrock.gamertag.toLowerCase()) ||
-                    a.name.toLowerCase() === profiles.bedrock.gamertag.toLowerCase()
-                );
-                if (!alreadyExists) {
-                  const bedrockAccount: SavedAccount = {
-                    id: `msa-bedrock-${profiles.bedrock.gamertag.toLowerCase()}`,
-                    name: profiles.bedrock.gamertag,
-                    gamertag: profiles.bedrock.gamertag,
-                    authType: 'microsoft',
-                    edition: 'bedrock',
-                    createdAt: Date.now(),
-                  };
-                  saveAccount(bedrockAccount);
-                  newlyAdded.push(`${profiles.bedrock.gamertag} (Bedrock)`);
-                }
-              }
-
-              if (newlyAdded.length > 0) {
-                const notif: VistaNotification = {
-                  id: Math.random().toString(36).substring(2, 9),
-                  timestamp: Date.now(),
-                  level: 'success',
-                  message: `🎮 Linked Microsoft Account: ${newlyAdded.join(' & ')} added to Vault!`,
-                };
-                setNotifications((prev) => {
-                  if (prev.some((n) => n.message === notif.message)) return prev;
-                  return [notif, ...prev.slice(0, 19)];
-                });
-              }
+              handleDiscoveredProfiles(profiles, discoveryFilterRef.current);
               break;
             }
 
@@ -730,32 +724,123 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
   const clearNotifications = useCallback(() => setNotifications([]), []);
-  const discoverMicrosoftAccount = (email?: string, editionFilter: 'both' | 'java' | 'bedrock' = 'both') => {
-    discoveryFilterRef.current = editionFilter;
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      setDiscoveryError('VistaAFK daemon is not connected. Please ensure your local daemon terminal is running.');
-      setDiscoveryStatus('error');
-      return;
+  const resetDiscovery = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
     }
-    setDiscoveryStatus('waiting_code');
-    setDiscoveryDeviceCode(null);
-    setDiscoveryProfiles(null);
-    setDiscoveryError(null);
-    send({
-      type: 'DISCOVER_MICROSOFT_ACCOUNT',
-      payload: {
-        email: email ? email.trim() : undefined,
-        editionFilter,
-      },
-    });
-  };
-
-  const resetDiscovery = () => {
     setDiscoveryStatus('idle');
     setDiscoveryDeviceCode(null);
     setDiscoveryProfiles(null);
     setDiscoveryError(null);
-  };
+  }, []);
+
+  const discoverMicrosoftAccount = useCallback(async (email?: string, editionFilter: 'both' | 'java' | 'bedrock' = 'both') => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    discoveryFilterRef.current = editionFilter;
+    setDiscoveryStatus('waiting_code');
+    setDiscoveryDeviceCode(null);
+    setDiscoveryProfiles(null);
+    setDiscoveryError(null);
+
+    try {
+      const res = await fetch('/api/accounts/device-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email ? email.trim() : undefined }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to initiate Microsoft device code flow');
+      }
+
+      const data = await res.json();
+      if (!data.success || !data.userCode || !data.deviceCode) {
+        throw new Error(data.error || 'Failed to obtain Microsoft device code');
+      }
+
+      const devCode = {
+        userCode: data.userCode,
+        verificationUri: data.verificationUri,
+        expiresIn: data.expiresIn,
+      };
+      setDiscoveryDeviceCode(devCode);
+      setDiscoveryStatus('waiting_approval');
+
+      // If daemon is open, notify daemon so it also knows discovery is in progress
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        try {
+          wsRef.current.send(JSON.stringify({
+            type: 'DISCOVER_MICROSOFT_ACCOUNT',
+            payload: { email: email ? email.trim() : undefined, editionFilter },
+          }));
+        } catch (e) {}
+      }
+
+      const pollStartTime = Date.now();
+      const maxPollTime = (data.expiresIn || 900) * 1000;
+
+      pollTimerRef.current = setInterval(async () => {
+        if (Date.now() - pollStartTime > maxPollTime) {
+          if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+          setDiscoveryError('Authentication session timed out. Please try again.');
+          setDiscoveryStatus('error');
+          return;
+        }
+
+        try {
+          const pollRes = await fetch('/api/accounts/poll-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              deviceCode: data.deviceCode,
+              editionFilter,
+            }),
+          });
+
+          if (!pollRes.ok) return;
+
+          const pollData = await pollRes.json();
+          if (pollData.status === 'pending') {
+            return;
+          }
+
+          if (pollData.status === 'error') {
+            if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+            setDiscoveryError(pollData.error || 'Microsoft authentication failed');
+            setDiscoveryStatus('error');
+            return;
+          }
+
+          if (pollData.status === 'success' && pollData.profiles) {
+            if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+            setDiscoveryProfiles(pollData.profiles);
+            setDiscoveryStatus('success');
+            handleDiscoveredProfiles(pollData.profiles, editionFilter);
+          }
+        } catch (e) {
+          console.warn('[VistaAFK] Polling token error:', e);
+        }
+      }, 4000);
+    } catch (err: any) {
+      console.warn('[VistaAFK] Cloud discovery failed, checking WebSocket daemon...', err);
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        send({
+          type: 'DISCOVER_MICROSOFT_ACCOUNT',
+          payload: {
+            email: email ? email.trim() : undefined,
+            editionFilter,
+          },
+        });
+      } else {
+        setDiscoveryError(err?.message || 'Failed to start Microsoft authentication');
+        setDiscoveryStatus('error');
+      }
+    }
+  }, [handleDiscoveredProfiles]);
 
   // Deploy a saved account to a specific server instance
   const deployAccountToServer = (

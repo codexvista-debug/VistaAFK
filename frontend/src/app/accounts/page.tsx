@@ -146,12 +146,6 @@ export default function AccountsPage() {
       return;
     }
 
-    // Microsoft authentication strictly requires the daemon to be running
-    if (!isConnected) {
-      discoverMicrosoftAccount(val, accountType);
-      return;
-    }
-
     // Open popup immediately synchronously on user click to prevent popup blockers
     const popup = window.open('about:blank', 'ms_oauth_popup', 'width=520,height=680,scrollbars=yes,resizable=yes');
     if (popup) {
@@ -661,26 +655,6 @@ export default function AccountsPage() {
                   </div>
                 )}
 
-                {!isConnected && accountType !== 'offline' && (
-                  <div className="p-3.5 bg-amber-50 border-2 border-amber-200 rounded-2xl space-y-2 text-xs">
-                    <div className="flex items-start space-x-2 text-amber-900 font-bold">
-                      <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
-                      <span>Bot Daemon Required for Microsoft Login</span>
-                    </div>
-                    <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
-                      Microsoft accounts require your 24/7 Bot Daemon to be active on your phone (Termux) or PC to generate the secure verification code and store your Minecraft session tokens.
-                    </p>
-                    <Link
-                      href="/settings"
-                      onClick={() => setIsAddAccountModalOpen(false)}
-                      className="inline-flex px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] rounded-xl transition items-center space-x-1.5 shadow-sm active:scale-95"
-                    >
-                      <Terminal className="h-3.5 w-3.5" />
-                      <span>Open Daemon Settings &amp; Termux Setup</span>
-                    </Link>
-                  </div>
-                )}
-
                 {/* Footer Buttons */}
                 <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-200">
                   <button
@@ -695,10 +669,9 @@ export default function AccountsPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={!isConnected && accountType !== 'offline'}
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center space-x-1.5"
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center space-x-1.5"
                   >
-                    <span>{!isConnected && accountType !== 'offline' ? 'Daemon Offline' : 'Add Account'}</span>
+                    <span>Add Account</span>
                   </button>
                 </div>
               </form>
