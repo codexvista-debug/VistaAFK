@@ -945,14 +945,23 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     // DonutSMP is strictly sensitive to non-idle actions; default anti-actions to OFF for safety
     const isDonut = server.host.toLowerCase().includes('donut');
     const edition = server.edition || account.edition || (server.port === 19132 ? 'bedrock' : 'java');
-    const port = edition === 'bedrock' && server.port === 25565 ? 19132 : server.port;
+    let host = (server.host || '').trim();
+    let port = edition === 'bedrock' && server.port === 25565 ? 19132 : server.port;
+
+    // Auto-map DonutSMP Bedrock server address
+    if (edition === 'bedrock' && host.toLowerCase().includes('donutsmp.net') && !host.toLowerCase().startsWith('bedrock.')) {
+      host = 'bedrock.donutsmp.net';
+      port = 19132;
+    } else if (edition === 'bedrock' && host.toLowerCase().includes('freshsmp') && port === 25565) {
+      port = 19132;
+    }
 
     const newBotConfig: BotConfig = {
-      id: `${account.id}-${server.host.replace(/[^a-zA-Z0-9]/g, '')}`,
+      id: `${account.id}-${host.replace(/[^a-zA-Z0-9]/g, '')}`,
       name: account.name,
       authType: account.authType,
       edition,
-      host: server.host,
+      host,
       port,
       version: (server.version && server.version.trim() !== '') ? server.version.trim() : undefined,
       autoReconnect: true,

@@ -48,18 +48,36 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
     if (ed === 'bedrock') {
       setTargetServerPort(19132);
       if (targetServerHost === 'donutsmp.net') {
+        setTargetServerHost('bedrock.donutsmp.net');
+      } else if (!targetServerHost) {
         setTargetServerHost('play.freshsmp.fun');
       }
     } else {
       if (targetServerPort === 19132) {
         setTargetServerPort(25565);
       }
+      if (targetServerHost === 'bedrock.donutsmp.net') {
+        setTargetServerHost('donutsmp.net');
+      }
     }
   };
 
   const handlePresetSelect = (preset: ServerPreset) => {
-    setTargetServerHost(preset.host);
-    setTargetServerPort(preset.port);
+    let host = preset.host;
+    let port = preset.port;
+    if (edition === 'bedrock') {
+      port = 19132;
+      if (host.toLowerCase().includes('donutsmp.net') && !host.toLowerCase().startsWith('bedrock.')) {
+        host = 'bedrock.donutsmp.net';
+      }
+    } else {
+      if (host.toLowerCase().includes('donutsmp.net') && host.toLowerCase().startsWith('bedrock.')) {
+        host = 'donutsmp.net';
+        port = 25565;
+      }
+    }
+    setTargetServerHost(host);
+    setTargetServerPort(port);
     setTargetServerVersion(preset.version || '');
   };
 
@@ -183,6 +201,7 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
                 onClick={() => {
                   setEdition('java');
                   if (targetServerPort === 19132) setTargetServerPort(25565);
+                  if (targetServerHost === 'bedrock.donutsmp.net') setTargetServerHost('donutsmp.net');
                 }}
                 className={`p-3 rounded-2xl border-2 text-left flex items-center justify-between transition-all ${
                   edition === 'java'
@@ -202,7 +221,7 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
                 onClick={() => {
                   setEdition('bedrock');
                   if (targetServerPort === 25565) setTargetServerPort(19132);
-                  if (targetServerHost === 'donutsmp.net') setTargetServerHost('play.freshsmp.fun');
+                  if (targetServerHost === 'donutsmp.net') setTargetServerHost('bedrock.donutsmp.net');
                 }}
                 className={`p-3 rounded-2xl border-2 text-left flex items-center justify-between transition-all ${
                   edition === 'bedrock'

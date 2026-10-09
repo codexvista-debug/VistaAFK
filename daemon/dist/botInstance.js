@@ -147,6 +147,8 @@ class BotInstance {
     customMaxHealth = 0;
     recordedMaxHealth = 0;
     bedrockClient = null;
+    bedrockPosition = { x: 0, y: 0, z: 0 };
+    bedrockHealth = 20;
     tokenFolder;
     constructor(config, callbacks, tokenFolder) {
         this.config = config;
@@ -256,8 +258,17 @@ class BotInstance {
         this.isManuallyStopped = false;
         this.clearTimers();
         this.updateStatus('connecting', 'Connecting to Bedrock server...');
-        const port = this.config.port || 19132;
-        this.emitActivity('connect', `Connecting to Bedrock server ${this.config.host}:${port}...`);
+        let host = (this.config.host || '').trim();
+        let port = this.config.port || 19132;
+        // Auto-map DonutSMP Bedrock server address
+        if (host.toLowerCase().includes('donutsmp.net') && !host.toLowerCase().startsWith('bedrock.')) {
+            host = 'bedrock.donutsmp.net';
+            port = 19132;
+        }
+        else if (host.toLowerCase().includes('freshsmp') && port === 25565) {
+            port = 19132;
+        }
+        this.emitActivity('connect', `Connecting to Bedrock server ${host}:${port}...`);
         const tokenFolder = this.tokenFolder;
         try {
             let bedrock = null;
@@ -296,16 +307,29 @@ class BotInstance {
                 }
             }
             catch (e) { }
-            // Auto-detect target version: if FreshSMP or not set, use 1.26.51 (protocol 2193)
+            // Auto-detect target version: if FreshSMP, DonutSMP, or not set, use 1.26.51 (protocol 2193)
             let targetVersion = this.config.version?.trim();
             if (!targetVersion || targetVersion === '' || targetVersion.startsWith('26.')) {
                 targetVersion = '1.26.51';
             }
+            // Defensively clean up any previous client
+            if (this.bedrockClient) {
+                try {
+                    if (this.bedrockClient.connection && !this.bedrockClient.connection.raknet) {
+                        this.bedrockClient.connection.close = () => { };
+                    }
+                    this.bedrockClient.close();
+                }
+                catch (e) { }
+                this.bedrockClient = null;
+            }
             const client = bedrock.createClient({
-                host: this.config.host,
+                host,
                 port,
                 username: this.config.name,
                 offline: this.config.authType === 'offline',
+                skipPing: true,
+                useRaknetWorkers: false,
                 profilesFolder: tokenFolder,
                 version: targetVersion,
                 raknetBackend: 'jsp-raknet',
@@ -333,8 +357,9 @@ class BotInstance {
                 }
                 this.reconnectAttempts = 0;
                 this.connectStartTime = Date.now();
+                this.authCodeInfo = undefined;
                 this.updateStatus('online', 'Connected (Bedrock)');
-                this.emitActivity('connect', `🎮 Successfully joined Bedrock server ${this.config.host}:${port}`);
+                this.emitActivity('connect', `🎮 Successfully joined Bedrock server ${host}:${port}`);
                 this.emitTelemetry();
             });
             client.on('spawn', () => {
@@ -342,10 +367,44 @@ class BotInstance {
                     this.config.name = client.username;
                     this.callbacks.onConfigUpdated?.(this.config);
                 }
+                this.reconnectAttempts = 0;
+                if (!this.connectStartTime)
+                    this.connectStartTime = Date.now();
+                this.authCodeInfo = undefined;
                 this.updateStatus('online', 'Spawned in world (Bedrock)');
                 this.emitActivity('spawn', '🌍 Spawned into Bedrock world');
                 this.setupTelemetryLoop();
+                this.setupAntiAfk();
                 this.emitTelemetry();
+            });
+            client.on('start_game', (packet) => {
+                if (packet?.player_position) {
+                    this.bedrockPosition = {
+                        x: Math.round(packet.player_position.x * 10) / 10,
+                        y: Math.round(packet.player_position.y * 10) / 10,
+                        z: Math.round(packet.player_position.z * 10) / 10,
+                    };
+                    this.emitTelemetry();
+                }
+            });
+            client.on('move_player', (packet) => {
+                const myId = client.entityId || client.startGameData?.runtime_entity_id;
+                if (packet?.runtime_entity_id === myId || packet?.runtime_id === myId) {
+                    if (packet?.position) {
+                        this.bedrockPosition = {
+                            x: Math.round(packet.position.x * 10) / 10,
+                            y: Math.round(packet.position.y * 10) / 10,
+                            z: Math.round(packet.position.z * 10) / 10,
+                        };
+                        this.emitTelemetry();
+                    }
+                }
+            });
+            client.on('set_health', (packet) => {
+                if (typeof packet?.health === 'number') {
+                    this.bedrockHealth = Math.round(packet.health * 10) / 10;
+                    this.emitTelemetry();
+                }
             });
             client.on('text', (packet) => {
                 const msg = packet.message || packet.source_name ? `${packet.source_name}: ${packet.message}` : String(packet);
@@ -373,8 +432,9 @@ class BotInstance {
                 }
             });
             client.on('error', (err) => {
-                this.updateStatus('error', err?.message || 'Bedrock connection error');
-                this.emitActivity('status', `⚠️ Bedrock Error: ${err?.message || 'Connection failed'}`);
+                const errorMsg = err?.message || 'Bedrock connection error';
+                this.updateStatus('error', errorMsg);
+                this.emitActivity('status', `⚠️ Bedrock Error: ${errorMsg}`);
             });
         }
         catch (err) {
@@ -389,8 +449,12 @@ class BotInstance {
         const uptime = this.getSessionUptime();
         this.isManuallyStopped = true;
         this.clearTimers();
+        this.authCodeInfo = undefined;
         if (this.bedrockClient) {
             try {
+                if (this.bedrockClient.connection && !this.bedrockClient.connection.raknet) {
+                    this.bedrockClient.connection.close = () => { };
+                }
                 this.bedrockClient.close();
             }
             catch (e) { }
@@ -674,6 +738,19 @@ class BotInstance {
             this.lastAntiAfkLogTime = Date.now();
         }
         this.antiAfkInterval = setInterval(() => {
+            if (this.bedrockClient && this.currentStatus === 'online') {
+                try {
+                    if (this.config.antiAfk.swingArm && Math.random() > 0.3) {
+                        const eid = this.bedrockClient.entityId || this.bedrockClient.startGameData?.runtime_entity_id || 1n;
+                        this.bedrockClient.queue('animate', {
+                            action_id: 1, // swing arm
+                            runtime_entity_id: eid,
+                        });
+                    }
+                }
+                catch (e) { }
+                return;
+            }
             if (!this.bot || !this.bot.entity)
                 return;
             if (this.isEatingFood)
@@ -1121,18 +1198,21 @@ class BotInstance {
     }
     getTelemetry() {
         if (this.bedrockClient) {
+            const pos = this.bedrockPosition || { x: 0, y: 0, z: 0 };
+            const hp = this.bedrockHealth ?? 20;
+            const hearts = Math.round((hp / 2) * 10) / 10;
             return {
                 id: this.config.id,
                 name: this.config.name,
                 status: this.currentStatus,
                 statusMessage: this.statusMessage,
                 authCodeInfo: this.authCodeInfo,
-                health: 20,
+                health: hp,
                 maxHealth: 20,
-                hearts: 10,
+                hearts,
                 maxHearts: 10,
                 food: 20,
-                coordinates: { x: 0, y: 0, z: 0 },
+                coordinates: pos,
                 dimension: 'overworld',
                 ping: 0,
                 gamemode: 'survival',
@@ -1148,6 +1228,7 @@ class BotInstance {
                 currentLandBlock: 'Bedrock',
                 terrainGrid: null,
                 isPatrolling: false,
+                isFarming: false,
             };
         }
         if (!this.bot || !this.bot.entity) {
