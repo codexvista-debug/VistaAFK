@@ -11,6 +11,7 @@ interface NavbarProps {
   isConnecting: boolean;
   onOpenAddModal: () => void;
   onOpenSettingsModal: () => void;
+  onRetryConnection?: () => void;
   onStartAll?: () => void;
   onStopAll?: () => void;
   botCount: number;
@@ -23,6 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isConnecting,
   onOpenAddModal,
   onOpenSettingsModal,
+  onRetryConnection,
   botCount,
   onlineCount,
   savedAccountCount,
@@ -161,6 +163,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                         }`}>
                           {isConnected ? 'Connected (24/7)' : isConnecting ? 'Connecting...' : 'Disconnected'}
                         </span>
+                        {!isConnected && !isConnecting && onRetryConnection && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRetryConnection();
+                            }}
+                            className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-700/80 hover:bg-slate-700 text-slate-200 border border-slate-600 font-bold transition ml-1"
+                            title="Retry daemon connection"
+                          >
+                            Retry
+                          </button>
+                        )}
                       </div>
                     </div>
 

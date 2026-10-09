@@ -50,6 +50,7 @@ export default function AccountsPage() {
     stopAll,
     isConnected,
     isConnecting,
+    retryConnection,
     daemonUrl,
     secretToken,
     updateDaemonConfig,
@@ -229,6 +230,7 @@ export default function AccountsPage() {
         isConnecting={isConnecting}
         onOpenAddModal={() => setIsAddAccountModalOpen(true)}
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
+        onRetryConnection={retryConnection}
         botCount={configs.length}
         onlineCount={onlineCount}
         savedAccountCount={savedAccounts.length}
@@ -253,8 +255,8 @@ export default function AccountsPage() {
           </div>
         )}
 
-        {/* Termux Daemon Quick Start Banner for Logged-In User with Offline Daemon */}
-        {user && !isConnected && !isConnecting && (
+        {/* Termux Daemon Quick Start Banner for Logged-In User with Offline Daemon (Stable without flashing) */}
+        {user && !isConnected && (
           <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white border-2 border-emerald-500/40 shadow-xl space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center space-x-3">
@@ -273,6 +275,22 @@ export default function AccountsPage() {
               </div>
 
               <div className="flex items-center space-x-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={retryConnection}
+                  disabled={isConnecting}
+                  className="px-3 py-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold transition flex items-center space-x-1 disabled:opacity-50"
+                  title="Retry connecting to daemon"
+                >
+                  <RefreshCw className={`h-3 w-3 ${isConnecting ? 'animate-spin text-emerald-400' : ''}`} />
+                  <span>{isConnecting ? 'Connecting...' : 'Retry'}</span>
+                </button>
+                <button
+                  onClick={() => setIsSettingsModalOpen(true)}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 rounded-xl text-xs font-bold transition flex items-center space-x-1"
+                >
+                  <span>Settings</span>
+                </button>
                 <a
                   href="https://play.google.com/store/apps/details?id=com.termux"
                   target="_blank"

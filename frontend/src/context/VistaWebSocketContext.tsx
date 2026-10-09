@@ -94,6 +94,8 @@ export interface VistaWebSocketContextType {
   discoveryError: string | null;
   discoverMicrosoftAccount: (email?: string, editionFilter?: 'both' | 'java' | 'bedrock') => void;
   resetDiscovery: () => void;
+  retryConnection: () => void;
+  connectionAttempts: number;
 }
 
 const VistaWebSocketContext = createContext<VistaWebSocketContextType | null>(null);
@@ -104,7 +106,11 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const [secretToken, setSecretToken] = useState<string>('');
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
+  const [connectionAttempts, setConnectionAttempts] = useState<number>(0);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  const retryCountRef = useRef<number>(0);
+  const failedUrlRef = useRef<string>('');
 
   const [configs, setConfigs] = useState<BotConfig[]>([]);
   const [telemetry, setTelemetry] = useState<Record<string, BotTelemetry>>({});
@@ -134,6 +140,9 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     if (connectParam) {
       const norm = normalizeWsUrl(connectParam);
       setDaemonUrl(norm);
+      retryCountRef.current = 0;
+      failedUrlRef.current = '';
+      setConnectionAttempts(0);
       if (user) {
         const username = user.username.toLowerCase();
         localStorage.setItem(`vistaafk_${username}_daemon_url`, norm);
@@ -296,7 +305,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     });
   };
 
-  const connect = useCallback(() => {
+  const connect = useCallback((force: boolean = false) => {
     if (typeof window === 'undefined') return;
     if (!user) {
       if (wsRef.current) {
@@ -307,6 +316,25 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       setIsConnecting(false);
       return;
     }
+
+    const targetUrl = normalizeWsUrl(daemonUrl);
+
+    // If target URL changed, reset retry count
+    if (targetUrl !== failedUrlRef.current) {
+      retryCountRef.current = 0;
+      failedUrlRef.current = targetUrl;
+      setConnectionAttempts(0);
+    }
+
+    if (force) {
+      retryCountRef.current = 0;
+      setConnectionAttempts(0);
+    } else if (retryCountRef.current >= 3) {
+      console.log(`[VistaAFK WS Provider] Max retries reached (3) for ${targetUrl}. Pausing auto-reconnect.`);
+      setIsConnecting(false);
+      return;
+    }
+
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -315,13 +343,14 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     setAuthError(null);
 
     try {
-      const targetUrl = normalizeWsUrl(daemonUrl);
       console.log('[VistaAFK WS Provider] Connecting to:', targetUrl);
       const ws = new WebSocket(targetUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
         console.log('[VistaAFK WS Provider] Connected successfully to daemon!');
+        retryCountRef.current = 0;
+        setConnectionAttempts(0);
         setIsConnected(true);
         setIsConnecting(false);
         setAuthError(null);
@@ -534,13 +563,22 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         setIsConnecting(false);
         wsRef.current = null;
         if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
-
-        // Auto reconnect every 3 seconds only if user is logged in
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+
+        // Auto reconnect up to 3 attempts with delay only if user is logged in
         if (user) {
-          reconnectTimeoutRef.current = setTimeout(() => {
-            connect();
-          }, 3000);
+          retryCountRef.current += 1;
+          setConnectionAttempts(retryCountRef.current);
+
+          if (retryCountRef.current < 3) {
+            const delay = retryCountRef.current === 1 ? 2500 : 4000;
+            console.log(`[VistaAFK WS Provider] Reconnecting in ${delay}ms (attempt ${retryCountRef.current + 1}/3)...`);
+            reconnectTimeoutRef.current = setTimeout(() => {
+              connect();
+            }, delay);
+          } else {
+            console.warn(`[VistaAFK WS Provider] Stopped auto-reconnect after 3 failed attempts to ${targetUrl}. Pausing to prevent UI flashing.`);
+          }
         }
       };
 
@@ -571,14 +609,15 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
 
     connect();
 
-    // Resilient connection watchdog: automatically reconnects whenever socket drops (only for logged-in user)
+    // Resilient connection watchdog: automatically reconnects whenever socket drops (only if under max 3 retries)
     const watchdog = setInterval(() => {
       if (typeof window === 'undefined') return;
       if (!user) return;
+      if (retryCountRef.current >= 3) return; // Prevent endless flashing when daemon is offline
       if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
         connect();
       }
-    }, 3000);
+    }, 6000);
 
     return () => {
       clearInterval(watchdog);
@@ -590,6 +629,12 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     };
   }, [user, connect]);
 
+  const retryConnection = useCallback(() => {
+    retryCountRef.current = 0;
+    setConnectionAttempts(0);
+    connect(true);
+  }, [connect]);
+
   const send = (msg: any) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(msg));
@@ -600,6 +645,9 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     const url = normalizeWsUrl(rawUrl);
     setDaemonUrl(url);
     setSecretToken(token);
+    retryCountRef.current = 0;
+    setConnectionAttempts(0);
+    failedUrlRef.current = '';
     if (typeof window !== 'undefined') {
       if (user) {
         const username = user.username.toLowerCase();
@@ -614,6 +662,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     if (wsRef.current) {
       wsRef.current.close();
     }
+    setTimeout(() => connect(true), 150);
   };
 
   const addBot = (config: BotConfig) => send({ type: 'ADD_BOT', payload: config });
@@ -747,6 +796,8 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         discoveryError,
         discoverMicrosoftAccount,
         resetDiscovery,
+        retryConnection,
+        connectionAttempts,
       }}
     >
       {children}
