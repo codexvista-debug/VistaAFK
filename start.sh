@@ -58,9 +58,11 @@ if [ "$1" == "--login" ] || [ "$1" == "-l" ] || [ "$1" == "--reset" ]; then
 elif [ -n "$1" ] && [ -n "$2" ]; then
   AUTH_USER="$1"
   AUTH_SECRET="$2"
-  echo "{\"username\":\"$AUTH_USER\",\"token\":\"$AUTH_SECRET\",\"password\":\"$AUTH_SECRET\",\"cloudUrl\":\"https://afkvista.vercel.app\"}" > user_auth.json
+  AUTH_CLOUD="${3:-https://vista-afk.vercel.app}"
+  AUTH_CLOUD=$(echo "$AUTH_CLOUD" | sed 's:/*$::')
+  echo "{\"username\":\"$AUTH_USER\",\"token\":\"$AUTH_SECRET\",\"password\":\"$AUTH_SECRET\",\"cloudUrl\":\"$AUTH_CLOUD\"}" > user_auth.json
   cp user_auth.json ../user_auth.json 2>/dev/null
-  echo "✅ Credentials auto-configured for '$AUTH_USER'!"
+  echo "✅ Credentials auto-configured for '$AUTH_USER' (Cloud: $AUTH_CLOUD)!"
 fi
 
 CURRENT_USER=$(grep -o '"username":"[^"]*' user_auth.json 2>/dev/null | cut -d'"' -f4)
@@ -90,18 +92,37 @@ if command -v cloudflared &>/dev/null; then
   if [ -n "$TUNNEL_URL" ]; then
     WSS_URL=$(echo "$TUNNEL_URL" | sed 's/https:\/\//wss:\/\//')
     export DAEMON_PUBLIC_URL="$WSS_URL"
-    ONE_CLICK_URL="https://afkvista.vercel.app/?connect=$WSS_URL"
+    
+    TARGET_CLOUD=$(grep -o '"cloudUrl":"[^"]*' user_auth.json 2>/dev/null | cut -d'"' -f4)
+    if [ -z "$TARGET_CLOUD" ]; then
+      TARGET_CLOUD=$(grep -o '"cloudUrl":"[^"]*' ../user_auth.json 2>/dev/null | cut -d'"' -f4)
+    fi
+    if [ -z "$TARGET_CLOUD" ] || [ "$TARGET_CLOUD" == "https://afkvista.vercel.app" ]; then
+      TARGET_CLOUD="https://vista-afk.vercel.app"
+    fi
+    TARGET_CLOUD=$(echo "$TARGET_CLOUD" | sed 's:/*$::')
+
+    ONE_CLICK_URL="${TARGET_CLOUD}/?connect=$WSS_URL"
 
     # Automatically notify VistaAFK cloud so web dashboard connects instantly without pasting!
     if [ -n "$CURRENT_USER" ]; then
-      echo "📡 Auto-linking tunnel to VistaAFK account (@$CURRENT_USER)..."
+      echo "📡 Auto-linking tunnel to VistaAFK account (@$CURRENT_USER) on ${TARGET_CLOUD}..."
       AUTH_TOKEN_PAYLOAD=$(grep -o '"token":"[^"]*' user_auth.json 2>/dev/null | cut -d'"' -f4)
       if [ -z "$AUTH_TOKEN_PAYLOAD" ]; then
         AUTH_TOKEN_PAYLOAD=$(grep -o '"token":"[^"]*' ../user_auth.json 2>/dev/null | cut -d'"' -f4)
       fi
-      curl -s -m 5 -X POST "https://afkvista.vercel.app/api/daemon/heartbeat" \
+      
+      # 1. Post to primary configured cloud URL
+      curl -s -m 5 -X POST "${TARGET_CLOUD}/api/daemon/heartbeat" \
         -H "Content-Type: application/json" \
         -d "{\"username\":\"$CURRENT_USER\",\"token\":\"$AUTH_TOKEN_PAYLOAD\",\"password\":\"$AUTH_TOKEN_PAYLOAD\",\"daemonUrl\":\"$WSS_URL\"}" >/dev/null 2>&1 &
+
+      # 2. Always also notify https://vista-afk.vercel.app
+      if [ "$TARGET_CLOUD" != "https://vista-afk.vercel.app" ]; then
+        curl -s -m 5 -X POST "https://vista-afk.vercel.app/api/daemon/heartbeat" \
+          -H "Content-Type: application/json" \
+          -d "{\"username\":\"$CURRENT_USER\",\"token\":\"$AUTH_TOKEN_PAYLOAD\",\"password\":\"$AUTH_TOKEN_PAYLOAD\",\"daemonUrl\":\"$WSS_URL\"}" >/dev/null 2>&1 &
+      fi
     fi
 
     echo ""

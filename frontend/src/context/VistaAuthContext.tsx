@@ -71,6 +71,14 @@ export const VistaAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (data.user) {
           setUser((prev) => {
             if (!prev) return data.user;
+            // Never wipe out an active Cloudflare tunnel URL if server returned null/undefined
+            if (!data.user.daemonUrl && prev.daemonUrl && !prev.daemonUrl.includes('localhost')) {
+              data.user.daemonUrl = prev.daemonUrl;
+            }
+            if (!data.user.secretToken && prev.secretToken) {
+              data.user.secretToken = prev.secretToken;
+            }
+
             const isUnchanged =
               prev.id === data.user.id &&
               prev.username === data.user.username &&
@@ -85,6 +93,11 @@ export const VistaAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             }
             if (typeof window !== 'undefined') {
               localStorage.setItem('vistaafk_auth_user', JSON.stringify(data.user));
+              if (data.user.daemonUrl) {
+                const uKey = `vistaafk_${data.user.username.toLowerCase()}_daemon_url`;
+                localStorage.setItem(uKey, data.user.daemonUrl);
+                localStorage.setItem('vistaafk_last_known_daemon_url', data.user.daemonUrl);
+              }
             }
             return data.user;
           });
@@ -126,7 +139,9 @@ export const VistaAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         localStorage.setItem('vistaafk_auth_token', data.token);
         localStorage.setItem('vistaafk_auth_user', JSON.stringify(data.user));
         if (data.user.daemonUrl) {
-          localStorage.setItem('vistaafk_daemon_url', data.user.daemonUrl);
+          const uKey = `vistaafk_${data.user.username.toLowerCase()}_daemon_url`;
+          localStorage.setItem(uKey, data.user.daemonUrl);
+          localStorage.setItem('vistaafk_last_known_daemon_url', data.user.daemonUrl);
         }
         if (data.user.secretToken) {
           localStorage.setItem('vistaafk_secret_token', data.user.secretToken);

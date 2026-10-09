@@ -45,9 +45,10 @@ export default function SettingsPage() {
     setInputUrl(daemonUrl);
   }, [daemonUrl]);
 
+  const cloudOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://vista-afk.vercel.app';
   const termuxCommand = user?.username
-    ? `pkg update -y && pkg install -y git nodejs cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh ${user.username} ${authToken || ''}`
-    : 'pkg update -y && pkg install -y git nodejs cloudflared curl && git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK" && bash start.sh';
+    ? `pkg update -y && pkg install -y git nodejs cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh ${user.username} ${authToken || ''} ${cloudOrigin}`
+    : `pkg update -y && pkg install -y git nodejs cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh guest token ${cloudOrigin}`;
 
   const handleSaveUrl = (e: React.FormEvent) => {
     e.preventDefault();

@@ -241,7 +241,7 @@ wss.on('connection', (ws) => {
               username,
               password,
               token: token || password,
-              cloudUrl: cloudUrl || 'https://afkvista.vercel.app'
+              cloudUrl: cloudUrl || 'https://vista-afk.vercel.app'
             }, null, 2), 'utf8');
             console.log(`[Cloud Sync] 🔐 Linked daemon to VistaAFK user "${username}"`);
             botManager.setUser(username);
@@ -307,30 +307,42 @@ async function sendCloudHeartbeat() {
 
   const detectedTunnel = getDetectedTunnelUrl();
   const tunnelUrl = process.env.DAEMON_PUBLIC_URL || detectedTunnel || `ws://localhost:${PORT}`;
-  const cloudUrl = creds.cloudUrl || process.env.VISTAAFK_CLOUD_URL || 'https://afkvista.vercel.app';
+  
+  const targetCloudUrls = new Set<string>();
+  if (creds.cloudUrl) {
+    const clean = creds.cloudUrl.replace(/\/+$/, '');
+    if (!clean.includes('afkvista.vercel.app')) targetCloudUrls.add(clean);
+  }
+  if (process.env.VISTAAFK_CLOUD_URL) {
+    const clean = process.env.VISTAAFK_CLOUD_URL.replace(/\/+$/, '');
+    if (!clean.includes('afkvista.vercel.app')) targetCloudUrls.add(clean);
+  }
+  targetCloudUrls.add('https://vista-afk.vercel.app');
 
-  try {
-    const res = await fetch(`${cloudUrl}/api/daemon/heartbeat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: creds.username,
-        password: creds.password,
-        token: creds.token,
-        daemonUrl: tunnelUrl,
-        secretToken: SECRET,
-        bots: botManager.getAllConfigs(),
-      }),
-    });
+  for (const cloudUrl of targetCloudUrls) {
+    try {
+      const res = await fetch(`${cloudUrl}/api/daemon/heartbeat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: creds.username,
+          password: creds.password,
+          token: creds.token,
+          daemonUrl: tunnelUrl,
+          secretToken: SECRET,
+          bots: botManager.getAllConfigs(),
+        }),
+      });
 
-    if (res.ok) {
-      console.log(`[Cloud Sync] ☁️ Heartbeat synced with VistaAFK user "${creds.username}" (URL: ${tunnelUrl})`);
-    } else {
-      const err = await res.json().catch(() => ({}));
-      console.warn(`[Cloud Sync] ⚠️ Cloud heartbeat warning: ${err.error || res.statusText}`);
+      if (res.ok) {
+        console.log(`[Cloud Sync] ☁️ Heartbeat synced with ${cloudUrl} for "${creds.username}" (URL: ${tunnelUrl})`);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.warn(`[Cloud Sync] ⚠️ Cloud heartbeat warning from ${cloudUrl}: ${err.error || res.statusText}`);
+      }
+    } catch (err: any) {
+      // Retry quietly on network blips
     }
-  } catch (err: any) {
-    // Retry quietly on network blips
   }
 }
 

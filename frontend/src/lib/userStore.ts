@@ -145,12 +145,7 @@ export async function getUser(rawUsername: string): Promise<UserRecord | null> {
   const username = (rawUsername || '').trim().toLowerCase();
   if (!username) return null;
 
-  // 1. Check memory cache
-  if (memoryCache.has(username)) {
-    return memoryCache.get(username)!;
-  }
-
-  // 2. Check Supabase Postgres database
+  // 1. Check Supabase Postgres database first (live multi-device / multi-tab source of truth)
   try {
     const { data, error } = await supabase
       .from('users')
@@ -165,6 +160,11 @@ export async function getUser(rawUsername: string): Promise<UserRecord | null> {
     }
   } catch (e) {
     console.error('[UserStore] Supabase query error:', e);
+  }
+
+  // 2. Fallback to memory cache
+  if (memoryCache.has(username)) {
+    return memoryCache.get(username)!;
   }
 
   // 3. Check local file storage (fallback)
