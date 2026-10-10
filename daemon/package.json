@@ -1,6 +1,6 @@
 {
   "name": "vistaafk-daemon",
-  "version": "1.2.2",
+  "version": "1.2.4",
   "description": "Headless Minecraft Java AFK Bot Controller Daemon for VistaAFK",
   "main": "dist/server.js",
   "scripts": {

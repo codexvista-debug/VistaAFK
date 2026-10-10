@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "============================================="
-echo "      🚀 Starting VistaAFK Daemon v1.2.3      "
+echo "      🚀 Starting VistaAFK Daemon v1.2.4      "
 echo "============================================="
 
 # 1. Kill any existing zombie processes
