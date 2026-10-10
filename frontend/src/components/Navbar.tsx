@@ -62,90 +62,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           </Link>
         </div>
 
-        {/* Primary Page Navigation: Visible on Desktop/Tablet, Hidden on Mobile */}
-        <nav className="hidden md:flex items-center space-x-2 shrink-0">
-          <Link
-            href="/"
-            className={`flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-black transition-all border ${
-              pathname === '/'
-                ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30'
-                : 'bg-[#1b2637]/70 text-slate-300 hover:text-white hover:bg-[#1b2637] border-slate-700'
-            }`}
-            title="Server Fleet"
-          >
-            <Server className="h-4 w-4 stroke-[2.5]" />
-            <span>Server Fleet</span>
-            {botCount > 0 && (
-              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
-                pathname === '/' ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-800 text-slate-300'
-              }`}>
-                {botCount}
-              </span>
-            )}
-          </Link>
-
-          <Link
-            href="/accounts"
-            className={`flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-black transition-all border ${
-              pathname === '/accounts'
-                ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30'
-                : 'bg-[#1b2637]/70 text-slate-300 hover:text-white hover:bg-[#1b2637] border-slate-700'
-            }`}
-            title="Accounts Vault"
-          >
-            <Users className="h-4 w-4 stroke-[2.5]" />
-            <span>Accounts Vault</span>
-            {typeof savedAccountCount === 'number' && savedAccountCount > 0 && (
-              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
-                pathname === '/accounts' ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-800 text-slate-300'
-              }`}>
-                {savedAccountCount}
-              </span>
-            )}
-          </Link>
-
-          <Link
-            href="/versions"
-            className={`flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-black transition-all border ${
-              pathname === '/versions'
-                ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30'
-                : 'bg-[#1b2637]/70 text-slate-300 hover:text-white hover:bg-[#1b2637] border-slate-700'
-            }`}
-            title="Supported Minecraft Versions"
-          >
-            <Layers className="h-4 w-4 stroke-[2.5]" />
-            <span>Versions</span>
-          </Link>
-
-          <Link
-            href="/settings"
-            className={`flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-black transition-all border ${
-              pathname === '/settings'
-                ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30'
-                : 'bg-[#1b2637]/70 text-slate-300 hover:text-white hover:bg-[#1b2637] border-slate-700'
-            }`}
-            title="Daemon Connection & Settings"
-          >
-            <Settings className="h-4 w-4 stroke-[2.5]" />
-            <span>Settings</span>
-          </Link>
-
-          {isVista && (
-            <Link
-              href="/control-panel"
-              className={`flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-black transition-all border ${
-                pathname === '/control-panel'
-                  ? 'bg-amber-600 text-white border-amber-400 shadow-md shadow-amber-600/30'
-                  : 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border-amber-500/40'
-              }`}
-              title="Admin Control Panel"
-            >
-              <ShieldCheck className="h-4 w-4 stroke-[2.5]" />
-              <span>Admin</span>
-            </Link>
-          )}
-        </nav>
-
         {/* Right Section: Mobile & Desktop Status Button */}
         {user ? (
           <div className="relative shrink-0">
@@ -342,13 +258,83 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
         ) : (
-          <button
-            onClick={openAuthModal}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full sm:rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-md shadow-emerald-600/30 border border-emerald-400 shrink-0"
-          >
-            <User className="h-3.5 w-3.5" />
-            <span>Login</span>
-          </button>
+          <div className="relative flex items-center space-x-2 shrink-0">
+            <button
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+              title="Menu"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+            <button
+              onClick={openAuthModal}
+              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full sm:rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-md shadow-emerald-600/30 border border-emerald-400 shrink-0"
+            >
+              <User className="h-3.5 w-3.5" />
+              <span>Login</span>
+            </button>
+            {isUserMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs" onClick={() => setIsUserMenuOpen(false)} />
+                <div className="fixed sm:absolute top-16 sm:top-auto sm:mt-2 right-2 sm:right-0 w-[calc(100vw-16px)] sm:w-64 max-w-sm bg-slate-900 border-2 border-slate-700 rounded-3xl shadow-2xl p-3 sm:p-4 z-50 text-xs space-y-2 animate-in fade-in duration-150">
+                  <div className="space-y-1.5">
+                    <Link
+                      href="/"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className={`w-full flex items-center space-x-2.5 px-3.5 py-2.5 rounded-2xl font-bold text-xs transition border ${
+                        pathname === '/' ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700/60'
+                      }`}
+                    >
+                      <Server className="h-4 w-4 text-emerald-400" />
+                      <span>Server Fleet</span>
+                    </Link>
+                    <Link
+                      href="/accounts"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className={`w-full flex items-center space-x-2.5 px-3.5 py-2.5 rounded-2xl font-bold text-xs transition border ${
+                        pathname === '/accounts' ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700/60'
+                      }`}
+                    >
+                      <Users className="h-4 w-4 text-emerald-400" />
+                      <span>Accounts Vault</span>
+                    </Link>
+                    <Link
+                      href="/versions"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className={`w-full flex items-center space-x-2.5 px-3.5 py-2.5 rounded-2xl font-bold text-xs transition border ${
+                        pathname === '/versions' ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700/60'
+                      }`}
+                    >
+                      <Layers className="h-4 w-4 text-cyan-400" />
+                      <span>Supported Versions</span>
+                    </Link>
+                    <Link
+                      href="/settings"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className={`w-full flex items-center space-x-2.5 px-3.5 py-2.5 rounded-2xl font-bold text-xs transition border ${
+                        pathname === '/settings' ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700/60'
+                      }`}
+                    >
+                      <Settings className="h-4 w-4 text-emerald-400" />
+                      <span>Daemon Connection</span>
+                    </Link>
+                  </div>
+                  <div className="pt-2 border-t border-slate-800">
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        openAuthModal();
+                      }}
+                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl flex items-center justify-center space-x-2 shadow-md"
+                    >
+                      <User className="h-4 w-4" />
+                      <span>Sign In / Register</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         )}
       </div>
     </header>

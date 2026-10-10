@@ -13,10 +13,20 @@ export const AuthModal: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeAuthModal();
+    };
+    if (isAuthModalOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isAuthModalOpen, closeAuthModal]);
+
   if (!isAuthModalOpen) return null;
 
   const cleanUsername = username.trim();
-  const isUsernameValid = cleanUsername.length >= 4 && /^[a-zA-Z0-9_-]+$/.test(cleanUsername);
+  const isUsernameValid = cleanUsername.length >= 3 && cleanUsername.length <= 5 && /^[a-zA-Z0-9_-]+$/.test(cleanUsername);
   const isPasswordValid = password.length >= 4;
   const canSubmit = mode === 'register'
     ? isUsernameValid && isPasswordValid && !loading
@@ -28,7 +38,7 @@ export const AuthModal: React.FC = () => {
 
     if (mode === 'register') {
       if (!isUsernameValid) {
-        setError('Username must be at least 4 characters long (letters, numbers, hyphens, underscores).');
+        setError('Username must be between 3 and 5 characters (letters, numbers, hyphens, underscores).');
         return;
       }
       if (!isPasswordValid) {
@@ -58,14 +68,6 @@ export const AuthModal: React.FC = () => {
       setLoading(false);
     }
   };
-
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeAuthModal();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [closeAuthModal]);
 
   return (
     <div
@@ -156,7 +158,7 @@ export const AuthModal: React.FC = () => {
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-800">Username</label>
               {mode === 'register' && (
-                <span className="text-[10px] text-slate-500 font-medium">Min. 4 characters</span>
+                <span className="text-[10px] text-slate-500 font-medium">3 - 5 characters max</span>
               )}
             </div>
             <div className="relative">
@@ -164,9 +166,10 @@ export const AuthModal: React.FC = () => {
                 type="text"
                 required
                 autoFocus
+                maxLength={5}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter your username"
+                placeholder="e.g. vista (max 5 letters)"
                 className={`w-full pl-10 pr-9 py-2.5 bg-slate-50 border-2 rounded-xl text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white transition ${
                   username.length > 0 && (mode === 'register' ? isUsernameValid : true)
                     ? 'border-emerald-500 focus:border-emerald-600'

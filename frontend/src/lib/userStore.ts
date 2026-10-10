@@ -70,8 +70,11 @@ function saveLocalUsers(users: Record<string, UserRecord>) {
 
 export function validateUsername(username: string): { valid: boolean; error?: string } {
   const clean = (username || '').trim().toLowerCase();
-  if (clean.length < 4) {
-    return { valid: false, error: 'Username must be at least 4 characters long' };
+  if (clean.length < 3) {
+    return { valid: false, error: 'Username must be at least 3 characters long' };
+  }
+  if (clean.length > 5) {
+    return { valid: false, error: 'Username can be a maximum of 5 characters' };
   }
   if (!/^[a-zA-Z0-9_-]+$/.test(clean)) {
     return { valid: false, error: 'Username may only contain letters, numbers, hyphens, and underscores' };
