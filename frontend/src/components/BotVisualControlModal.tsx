@@ -10,15 +10,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Crosshair,
-  Trees,
-  Sun,
-  Layers,
-  ShieldAlert,
-  ShieldCheck,
-  MapPin,
-  Eye,
   Activity,
-  Wind,
   Swords,
 } from 'lucide-react';
 import { XaerosMinimap } from './XaerosMinimap';
@@ -49,26 +41,12 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
   const pitch = telemetry?.pitch || 0;
   const targetBlock = telemetry?.targetBlock;
   const isPatrolling = telemetry?.isPatrolling || false;
-  const terrainGrid = telemetry?.terrainGrid;
-  const coords = telemetry?.coordinates || { x: 0, y: 0, z: 0 };
-
-  // Landscape & Environment Metrics
-  const currentBiome = terrainGrid?.currentBiome || telemetry?.currentBiome || 'Plains';
-  const currentLand = terrainGrid?.currentLandBlock || telemetry?.currentLandBlock || 'Grass Block';
-  const timeOfDay = terrainGrid?.timeOfDay || 'Day (12:00)';
-  const weather = terrainGrid?.weather || 'Clear ☀️';
-  const lightLevel = terrainGrid?.lightLevel ?? 15;
-  const groundElevation = terrainGrid?.groundElevation ?? Math.round(coords.y);
-  const seaLevelDelta = terrainGrid?.seaLevelDelta ?? Math.round(coords.y - 63);
-  const skyClearance = terrainGrid?.skyClearance || 'Open Sky 🌤️';
-  const landscapeSummary = terrainGrid?.landscapeSummary || [];
-  const hazards = terrainGrid?.hazards || ['🛡️ Area clear of immediate hazards'];
-
   // Movement Control States
   const [activeControls, setActiveControls] = useState<Record<string, boolean>>({});
   const activeControlRef = useRef<Record<string, boolean>>({});
   const stepTimeoutsRef = useRef<Record<string, any>>({});
   const pressStartRef = useRef<Record<string, number>>({});
+  const pressedKeysRef = useRef<Set<string>>(new Set());
   const onMoveRef = useRef(onMove);
   useEffect(() => {
     onMoveRef.current = onMove;
@@ -91,6 +69,10 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
 
   const startMove = useCallback((control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak') => {
     if (!isOnlineRef.current) return;
+    if (stepTimeoutsRef.current[control]) {
+      clearTimeout(stepTimeoutsRef.current[control]);
+      delete stepTimeoutsRef.current[control];
+    }
     activeControlRef.current[control] = true;
     setActiveControls((prev) => ({ ...prev, [control]: true }));
     onMoveRef.current(configIdRef.current, control, true);
@@ -140,30 +122,22 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
   };
 
   const createButtonHandlers = (control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak') => ({
-    onMouseDown: (e: React.MouseEvent) => {
+    onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
       e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
       handleControlDown(control);
     },
-    onMouseUp: (e: React.MouseEvent) => {
+    onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => {
       e.preventDefault();
-      handleControlUp(control);
-    },
-    onMouseLeave: (e: React.MouseEvent) => {
-      if (activeControlRef.current[control]) {
-        handleControlUp(control);
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
       }
-    },
-    onTouchStart: (e: React.TouchEvent) => {
-      e.preventDefault();
-      handleControlDown(control);
-    },
-    onTouchEnd: (e: React.TouchEvent) => {
-      e.preventDefault();
       handleControlUp(control);
     },
-    onTouchCancel: (e: React.TouchEvent) => {
+    onPointerCancel: (e: React.PointerEvent<HTMLButtonElement>) => {
+      e.preventDefault();
       if (activeControlRef.current[control]) {
-        handleControlUp(control);
+        stopMove(control);
       }
     },
   });
@@ -181,21 +155,27 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
       if (e.repeat) return;
 
       if (e.code === 'KeyW' || e.code === 'ArrowUp') {
+        pressedKeysRef.current.add(e.code);
         e.preventDefault();
         handleControlDown('forward');
       } else if (e.code === 'KeyS' || e.code === 'ArrowDown') {
+        pressedKeysRef.current.add(e.code);
         e.preventDefault();
         handleControlDown('back');
       } else if (e.code === 'KeyA' || e.code === 'ArrowLeft') {
+        pressedKeysRef.current.add(e.code);
         e.preventDefault();
         handleControlDown('left');
       } else if (e.code === 'KeyD' || e.code === 'ArrowRight') {
+        pressedKeysRef.current.add(e.code);
         e.preventDefault();
         handleControlDown('right');
       } else if (e.code === 'Space') {
+        pressedKeysRef.current.add(e.code);
         e.preventDefault();
         handleControlDown('jump');
       } else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        pressedKeysRef.current.add(e.code);
         e.preventDefault();
         handleControlDown('sneak');
       } else if (e.code === 'KeyF') {
@@ -205,9 +185,7 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
-        return;
-      }
+      if (!pressedKeysRef.current.delete(e.code)) return;
       if (e.code === 'KeyW' || e.code === 'ArrowUp') {
         handleControlUp('forward');
       } else if (e.code === 'KeyS' || e.code === 'ArrowDown') {
@@ -223,11 +201,28 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
       }
     };
 
+    const handleWindowBlur = () => {
+      const keyControls: Record<string, 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak'> = {
+        KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back',
+        KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
+        Space: 'jump', ShiftLeft: 'sneak', ShiftRight: 'sneak',
+      };
+      const controls = new Set<'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak'>();
+      pressedKeysRef.current.forEach((code) => {
+        const control = keyControls[code];
+        if (control) controls.add(control);
+      });
+      pressedKeysRef.current.clear();
+      controls.forEach((control) => stopMove(control));
+    };
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleWindowBlur);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleWindowBlur);
     };
   }, [onClose]);
 
@@ -239,6 +234,7 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
           onMoveRef.current(configIdRef.current, ctrl as any, false);
         }
       });
+      Object.values(stepTimeoutsRef.current).forEach(clearTimeout);
     };
   }, []);
 
@@ -271,11 +267,11 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
               <div className="flex items-center space-x-1.5 sm:space-x-2">
                 <h2 className="text-sm sm:text-base font-bold text-slate-900 truncate">{config.name}</h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 shrink-0">
-                  Tactical Sight & Landscape
+                  Manual Controls
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">
-                Radar minimap, real-time terrain scanner & WASD controls
+                Radar minimap and real-time bot controls
               </p>
             </div>
           </div>
@@ -288,7 +284,7 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
           </button>
         </div>
 
-        {/* Content Body: Left Minimap & Landscape / Right Controls */}
+        {/* Content Body: Left Minimap / Right Controls */}
         <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 overflow-y-auto">
           {/* LEFT: Xaero's Minimap & Target Block (5 cols) */}
           <div className="lg:col-span-6 flex flex-col space-y-4">
@@ -316,107 +312,9 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
             </div>
           </div>
 
-          {/* RIGHT: Detailed Landscape Analysis & Movement Controls (6 cols) */}
+          {/* RIGHT: Movement and look controls (6 cols) */}
           <div className="lg:col-span-6 flex flex-col space-y-4">
-            {/* 1. Comprehensive Landscape & Environment Card */}
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                <div className="flex items-center space-x-2">
-                  <Trees className="h-4 w-4 text-emerald-600" />
-                  <span className="font-bold text-xs text-slate-900 uppercase tracking-wide">
-                    Landscape & Environment
-                  </span>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                  {currentBiome}
-                </span>
-              </div>
-
-              {/* Grid of Key Landscape Metrics */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-                {/* Surface Block */}
-                <div className="p-2 bg-white rounded-xl border border-slate-200">
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase block">Standing On</span>
-                  <span className="font-bold text-slate-800 truncate block">{currentLand}</span>
-                </div>
-
-                {/* Ground Elevation */}
-                <div className="p-2 bg-white rounded-xl border border-slate-200">
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase block">Elevation</span>
-                  <span className="font-bold text-slate-800 truncate block">
-                    Y: {groundElevation} ({seaLevelDelta >= 0 ? `+${seaLevelDelta}m` : `${seaLevelDelta}m`})
-                  </span>
-                </div>
-
-                {/* Sky Clearance */}
-                <div className="p-2 bg-white rounded-xl border border-slate-200">
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase block">Clearance</span>
-                  <span className="font-bold text-slate-800 truncate block">{skyClearance}</span>
-                </div>
-
-                {/* Time of Day */}
-                <div className="p-2 bg-white rounded-xl border border-slate-200">
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase block">Time of Day</span>
-                  <span className="font-bold text-slate-800 truncate block">{timeOfDay}</span>
-                </div>
-
-                {/* Weather */}
-                <div className="p-2 bg-white rounded-xl border border-slate-200">
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase block">Weather</span>
-                  <span className="font-bold text-slate-800 truncate block">{weather}</span>
-                </div>
-
-                {/* Light Level */}
-                <div className="p-2 bg-white rounded-xl border border-slate-200">
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase block">Light Level</span>
-                  <span className="font-bold text-slate-800 truncate block">
-                    {lightLevel} / 15 {lightLevel >= 8 ? '☀️ Safe' : '⚠️ Dim'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Dominant Surrounding Landscape Materials */}
-              {landscapeSummary.length > 0 && (
-                <div className="pt-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                    Surrounding Terrain Composition (29x29 Scanner)
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {landscapeSummary.map((block) => (
-                      <span
-                        key={block.name}
-                        className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-[11px] font-medium text-slate-700 shadow-2xs"
-                      >
-                        <span
-                          className="w-2.5 h-2.5 rounded-full inline-block shrink-0 border border-black/20"
-                          style={{ backgroundColor: block.color }}
-                        />
-                        <span className="truncate max-w-[110px]">{block.name}</span>
-                        <span className="text-[10px] font-bold text-slate-400">({block.percentage}%)</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Hazards Status */}
-              <div className="pt-1">
-                {hazards.map((hz, i) => (
-                  <div
-                    key={i}
-                    className={`text-[11px] font-medium px-2.5 py-1 rounded-xl flex items-center space-x-1.5 border ${
-                      hz.includes('⚠️')
-                        ? 'bg-amber-50 text-amber-800 border-amber-200'
-                        : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                    }`}
-                  >
-                    <span>{hz}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 2. Manual Movement Controls (Hold to move, click to step, or press WASD) */}
+            {/* Manual Movement Controls (hold to move, click to step, or press WASD) */}
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
@@ -535,7 +433,7 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
 
             </div>
 
-            {/* 3. Look & Head Rotation Control (Aim Compass, Pitch/Yaw Inputs, Tilts) */}
+            {/* Look and head rotation controls */}
             <BotLookControl
               botId={config.id}
               botName={config.name}
@@ -545,7 +443,7 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
               disabled={!isOnline}
             />
 
-            {/* 4. Auto Patrol Mode */}
+            {/* Auto Patrol Mode */}
             <div className="p-3 bg-emerald-50/60 border border-emerald-200 rounded-2xl flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Footprints className="h-4 w-4 text-emerald-700" />
