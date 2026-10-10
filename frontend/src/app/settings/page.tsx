@@ -5,6 +5,8 @@ import Link from 'next/link';
 import {
   Settings,
   Smartphone,
+  Monitor,
+  AlertTriangle,
   Copy,
   Check,
   ExternalLink,
@@ -38,7 +40,9 @@ export default function SettingsPage() {
   } = useVistaWebSocket();
 
   const [inputUrl, setInputUrl] = useState(daemonUrl);
+  const [selectedDevice, setSelectedDevice] = useState<'termux' | 'pc'>('termux');
   const [copiedTermux, setCopiedTermux] = useState(false);
+  const [copiedPc, setCopiedPc] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => {
@@ -49,6 +53,10 @@ export default function SettingsPage() {
   const termuxCommand = user?.username
     ? `pkg update -y && pkg install -y git nodejs cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh ${user.username} ${authToken || ''} ${cloudOrigin}`
     : `pkg update -y && pkg install -y git nodejs cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh guest token ${cloudOrigin}`;
+
+  const pcCommand = user?.username
+    ? `if (Test-Path "$HOME\\VistaAFK") { Set-Location "$HOME\\VistaAFK"; git pull origin main } else { git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME\\VistaAFK"; Set-Location "$HOME\\VistaAFK" }; powershell -ExecutionPolicy Bypass -File .\\start.ps1 "${user.username}" "${authToken || ''}" "${cloudOrigin}"`
+    : `if (Test-Path "$HOME\\VistaAFK") { Set-Location "$HOME\\VistaAFK"; git pull origin main } else { git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME\\VistaAFK"; Set-Location "$HOME\\VistaAFK" }; powershell -ExecutionPolicy Bypass -File .\\start.ps1 "guest" "token" "${cloudOrigin}"`;
 
   const handleSaveUrl = (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,95 +105,233 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        {/* 1-Click Termux Command Section */}
+        {/* 1-Click Launcher Section (Mobile Termux vs Windows PC PowerShell) */}
         <div className="p-4 sm:p-6 bg-white border-2 border-slate-200 rounded-2xl sm:rounded-3xl shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-start sm:items-center space-x-3">
-              <div className="p-2 sm:p-2.5 bg-emerald-500/10 text-emerald-600 rounded-xl sm:rounded-2xl border border-emerald-500/20 shrink-0 mt-0.5 sm:mt-0">
-                <Smartphone className="h-5 w-5 sm:h-6 sm:w-6" />
+          {/* Top Segmented Device Selector & Strict 1-at-a-time Notice */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center space-x-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setSelectedDevice('termux')}
+                className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-black transition flex items-center space-x-2 ${
+                  selectedDevice === 'termux'
+                    ? 'bg-white text-emerald-800 shadow-sm border border-emerald-300'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Smartphone className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span>Mobile (Termux)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedDevice('pc')}
+                className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-black transition flex items-center space-x-2 ${
+                  selectedDevice === 'pc'
+                    ? 'bg-white text-blue-800 shadow-sm border border-blue-300'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Monitor className="h-4 w-4 text-blue-600 shrink-0" />
+                <span>Windows PC (PowerShell)</span>
+              </button>
+            </div>
+
+            <div className="flex items-center space-x-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] font-bold text-amber-900">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+              <span>Use ONLY 1 at a time (Phone OR PC, never both)</span>
+            </div>
+          </div>
+
+          {/* DEVICE 1: MOBILE TERMUX */}
+          {selectedDevice === 'termux' && (
+            <div className="space-y-4 animate-in fade-in duration-150">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start sm:items-center space-x-3">
+                  <div className="p-2 sm:p-2.5 bg-emerald-500/10 text-emerald-600 rounded-xl sm:rounded-2xl border border-emerald-500/20 shrink-0 mt-0.5 sm:mt-0">
+                    <Smartphone className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <span>1-Click Termux Command</span>
+                      {user && (
+                        <span className="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full shrink-0">
+                          @{user.username}
+                        </span>
+                      )}
+                    </h2>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                      Run this single command in <strong>Termux</strong> on your phone to launch your 24/7 bot daemon.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 w-full sm:w-auto shrink-0 mt-1 sm:mt-0">
+                  <a
+                    href="https://play.google.com/store/apps/details?id=com.termux"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1 text-center"
+                  >
+                    <span>Google Play</span>
+                    <ExternalLink className="h-3 w-3 text-slate-400 shrink-0" />
+                  </a>
+                  <a
+                    href="https://f-droid.org/en/packages/com.termux/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1 text-center"
+                  >
+                    <span>F-Droid APK</span>
+                    <ExternalLink className="h-3 w-3 text-emerald-200 shrink-0" />
+                  </a>
+                </div>
               </div>
-              <div>
-                <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight flex flex-wrap items-center gap-1.5 sm:gap-2">
-                  <span>1-Click Termux Command</span>
-                  {user && (
-                    <span className="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full shrink-0">
-                      @{user.username}
-                    </span>
+
+              {/* Terminal Command Code Box */}
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 sm:p-4 text-xs font-mono space-y-3 shadow-inner">
+                <div className="flex items-center justify-between text-slate-400 border-b border-slate-800 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <Terminal className="h-4 w-4 text-emerald-400" />
+                    <span className="text-[11px] font-bold text-slate-300">Termux Command</span>
+                  </div>
+                  <span className="text-[10px] text-emerald-400 font-mono">Zero Setup Needed</span>
+                </div>
+
+                <div className="bg-black/60 border border-slate-800/80 rounded-xl p-3 max-h-40 overflow-y-auto">
+                  <code className="text-emerald-400 font-mono text-[11px] leading-relaxed break-words select-all block whitespace-pre-wrap">
+                    {termuxCommand}
+                  </code>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(termuxCommand);
+                    setCopiedTermux(true);
+                    setTimeout(() => setCopiedTermux(false), 2500);
+                  }}
+                  className="w-full py-2.5 sm:py-3 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white text-xs sm:text-sm font-black rounded-xl transition flex items-center justify-center space-x-2 shadow-md shadow-emerald-900/30"
+                >
+                  {copiedTermux ? (
+                    <>
+                      <Check className="h-4 w-4 text-white" />
+                      <span>Command Copied to Clipboard!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 text-white" />
+                      <span>Copy 1-Click Termux Command</span>
+                    </>
                   )}
-                </h2>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">
-                  Run this single command in Termux on your phone to launch your 24/7 bot daemon.
+                </button>
+              </div>
+
+              <div className="p-3.5 bg-emerald-50/60 border border-emerald-200 rounded-2xl flex items-start space-x-2.5 text-xs text-emerald-950 font-medium leading-relaxed">
+                <ShieldCheck className="h-4 w-4 text-emerald-700 shrink-0 mt-0.5" />
+                <p>
+                  <strong>Automated Cloud Linking:</strong> When you press Enter in Termux, your phone establishes a secure Cloudflare tunnel and automatically registers the connection link with your VistaAFK account (<strong>@{user?.username || 'your account'}</strong>). The URL is updated below and connected instantly without copying or pasting links!
                 </p>
               </div>
             </div>
+          )}
 
-            <div className="grid grid-cols-2 gap-2 w-full sm:w-auto shrink-0 mt-1 sm:mt-0">
-              <a
-                href="https://play.google.com/store/apps/details?id=com.termux"
-                target="_blank"
-                rel="noreferrer"
-                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1 text-center"
-              >
-                <span>Google Play</span>
-                <ExternalLink className="h-3 w-3 text-slate-400 shrink-0" />
-              </a>
-              <a
-                href="https://f-droid.org/en/packages/com.termux/"
-                target="_blank"
-                rel="noreferrer"
-                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1 text-center"
-              >
-                <span>F-Droid APK</span>
-                <ExternalLink className="h-3 w-3 text-emerald-200 shrink-0" />
-              </a>
-            </div>
-          </div>
+          {/* DEVICE 2: WINDOWS PC POWERSHELL */}
+          {selectedDevice === 'pc' && (
+            <div className="space-y-4 animate-in fade-in duration-150">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start sm:items-center space-x-3">
+                  <div className="p-2 sm:p-2.5 bg-blue-500/10 text-blue-600 rounded-xl sm:rounded-2xl border border-blue-500/20 shrink-0 mt-0.5 sm:mt-0">
+                    <Monitor className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <span>1-Click Windows PC Command</span>
+                      {user && (
+                        <span className="text-[10px] font-mono font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full shrink-0">
+                          @{user.username}
+                        </span>
+                      )}
+                    </h2>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                      Run this command in <strong>Windows PowerShell</strong> to launch your bot daemon and auto-link your account.
+                    </p>
+                  </div>
+                </div>
 
-          {/* Terminal Command Code Box */}
-          <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 sm:p-4 text-xs font-mono space-y-3 shadow-inner">
-            <div className="flex items-center justify-between text-slate-400 border-b border-slate-800 pb-2">
-              <div className="flex items-center space-x-2">
-                <Terminal className="h-4 w-4 text-emerald-400" />
-                <span className="text-[11px] font-bold text-slate-300">Termux Command</span>
+                <div className="flex items-center space-x-2 w-full sm:w-auto shrink-0 mt-1 sm:mt-0">
+                  <a
+                    href="https://nodejs.org"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 text-center w-full sm:w-auto"
+                  >
+                    <span>Requires Node.js (LTS)</span>
+                    <ExternalLink className="h-3 w-3 text-slate-400 shrink-0" />
+                  </a>
+                </div>
               </div>
-              <span className="text-[10px] text-emerald-400 font-mono">Zero Setup Needed</span>
+
+              {/* Terminal Command Code Box for PowerShell */}
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 sm:p-4 text-xs font-mono space-y-3 shadow-inner">
+                <div className="flex items-center justify-between text-slate-400 border-b border-slate-800 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <Terminal className="h-4 w-4 text-blue-400" />
+                    <span className="text-[11px] font-bold text-slate-300">Windows PowerShell Command</span>
+                  </div>
+                  <span className="text-[10px] text-blue-400 font-mono">Run in PowerShell</span>
+                </div>
+
+                <div className="bg-black/60 border border-slate-800/80 rounded-xl p-3 max-h-40 overflow-y-auto">
+                  <code className="text-blue-300 font-mono text-[11px] leading-relaxed break-words select-all block whitespace-pre-wrap">
+                    {pcCommand}
+                  </code>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(pcCommand);
+                    setCopiedPc(true);
+                    setTimeout(() => setCopiedPc(false), 2500);
+                  }}
+                  className="w-full py-2.5 sm:py-3 px-4 bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white text-xs sm:text-sm font-black rounded-xl transition flex items-center justify-center space-x-2 shadow-md shadow-blue-900/30"
+                >
+                  {copiedPc ? (
+                    <>
+                      <Check className="h-4 w-4 text-white" />
+                      <span>PowerShell Command Copied to Clipboard!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 text-white" />
+                      <span>Copy 1-Click PowerShell Command</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Instructions & Single-use Warning */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-2xl flex items-start space-x-2.5 text-xs text-blue-950 font-medium leading-relaxed">
+                  <ShieldCheck className="h-4 w-4 text-blue-700 shrink-0 mt-0.5" />
+                  <p>
+                    <strong>Automated Cloud Linking:</strong> When you press Enter in PowerShell, your PC establishes a secure Cloudflare tunnel and automatically registers the connection link with your VistaAFK account (<strong>@{user?.username || 'your account'}</strong>). The URL is updated below and connected instantly without copying or pasting links!
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-amber-50/80 border border-amber-300 rounded-2xl flex items-start space-x-2.5 text-xs text-amber-950 font-medium leading-relaxed">
+                  <AlertTriangle className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div>
+                    <strong>Important Requirements:</strong>
+                    <ul className="list-disc list-inside mt-1 space-y-0.5 text-[11px] text-amber-900 font-normal">
+                      <li><strong>Must run in Windows PowerShell:</strong> Press <kbd className="px-1 py-0.5 bg-white border border-amber-300 rounded text-[10px] font-mono">Win + X</kbd> and select <strong>Windows PowerShell</strong> or Terminal.</li>
+                      <li><strong>Use only 1 at a time:</strong> Never run the PC daemon and phone Termux daemon at the same time on the same account to avoid bot kickouts.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </div>
-
-            <div className="bg-black/60 border border-slate-800/80 rounded-xl p-3 max-h-40 overflow-y-auto">
-              <code className="text-emerald-400 font-mono text-[11px] leading-relaxed break-words select-all block whitespace-pre-wrap">
-                {termuxCommand}
-              </code>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(termuxCommand);
-                setCopiedTermux(true);
-                setTimeout(() => setCopiedTermux(false), 2500);
-              }}
-              className="w-full py-2.5 sm:py-3 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white text-xs sm:text-sm font-black rounded-xl transition flex items-center justify-center space-x-2 shadow-md shadow-emerald-900/30"
-            >
-              {copiedTermux ? (
-                <>
-                  <Check className="h-4 w-4 text-white" />
-                  <span>Command Copied to Clipboard!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4 text-white" />
-                  <span>Copy 1-Click Termux Command</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          <div className="p-3.5 bg-emerald-50/60 border border-emerald-200 rounded-2xl flex items-start space-x-2.5 text-xs text-emerald-950 font-medium leading-relaxed">
-            <ShieldCheck className="h-4 w-4 text-emerald-700 shrink-0 mt-0.5" />
-            <p>
-              <strong>Automated Cloud Linking:</strong> When you press Enter in Termux, your phone establishes a secure Cloudflare tunnel and automatically registers the connection link with your VistaAFK account. The URL is updated below and connected instantly without copying or pasting links!
-            </p>
-          </div>
+          )}
         </div>
 
         {/* Live WebSocket Connection Section */}
