@@ -79,23 +79,30 @@ export const VistaAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               data.user.secretToken = prev.secretToken;
             }
 
+            const accountsUnchanged = JSON.stringify(prev.savedAccounts || []) === JSON.stringify(data.user.savedAccounts || []);
+            const presetsUnchanged = JSON.stringify(prev.serverPresets || []) === JSON.stringify(data.user.serverPresets || []);
+            const configsUnchanged = JSON.stringify(prev.botConfigs || []) === JSON.stringify(data.user.botConfigs || []);
+
             const isUnchanged =
               prev.id === data.user.id &&
               prev.username === data.user.username &&
               prev.daemonUrl === data.user.daemonUrl &&
               prev.secretToken === data.user.secretToken &&
-              (prev.savedAccounts?.length || 0) === (data.user.savedAccounts?.length || 0) &&
-              (prev.serverPresets?.length || 0) === (data.user.serverPresets?.length || 0) &&
-              (prev.botConfigs?.length || 0) === (data.user.botConfigs?.length || 0);
+              accountsUnchanged &&
+              presetsUnchanged &&
+              configsUnchanged;
 
             if (isUnchanged) {
               return prev; // Same reference, 0 re-renders
             }
             if (typeof window !== 'undefined') {
               localStorage.setItem('vistaafk_auth_user', JSON.stringify(data.user));
+              const uLower = data.user.username.toLowerCase();
               if (data.user.daemonUrl) {
-                const uKey = `vistaafk_${data.user.username.toLowerCase()}_daemon_url`;
-                localStorage.setItem(uKey, data.user.daemonUrl);
+                localStorage.setItem(`vistaafk_${uLower}_daemon_url`, data.user.daemonUrl);
+              }
+              if (Array.isArray(data.user.savedAccounts)) {
+                localStorage.setItem(`vistaafk_${uLower}_saved_accounts`, JSON.stringify(data.user.savedAccounts));
               }
             }
             return data.user;

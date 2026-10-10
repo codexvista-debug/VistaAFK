@@ -135,7 +135,7 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
           {/* Step 1: Select Saved Account */}
           <div>
             <div className="flex items-center justify-between mb-2">

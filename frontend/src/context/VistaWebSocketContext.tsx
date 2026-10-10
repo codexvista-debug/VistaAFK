@@ -273,15 +273,16 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
       setSecretToken(activeToken);
     }
 
-    // 2. Saved Accounts: Load from user profile or user-scoped storage, migrating legacy global storage if needed
+    // 2. Saved Accounts: Load from user profile or user-scoped storage, merging to ensure no accounts are lost
     let accountsToLoad: SavedAccount[] = [];
-    if (Array.isArray(user.savedAccounts) && user.savedAccounts.length > 0) {
-      accountsToLoad = user.savedAccounts;
-    } else if (typeof window !== 'undefined') {
+    const cloudAccounts = Array.isArray(user.savedAccounts) ? user.savedAccounts : [];
+    let cachedAccounts: SavedAccount[] = [];
+
+    if (typeof window !== 'undefined') {
       const cached = localStorage.getItem(userAccountsKey);
       if (cached) {
         try {
-          accountsToLoad = JSON.parse(cached);
+          cachedAccounts = JSON.parse(cached);
         } catch (e) {}
       }
 
@@ -291,24 +292,27 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         try {
           const legacyList: SavedAccount[] = JSON.parse(legacyRaw);
           if (legacyList.length > 0) {
-            const map = new Map(accountsToLoad.map((a) => [a.id, a]));
-            legacyList.forEach((a) => map.set(a.id, a));
-            accountsToLoad = Array.from(map.values());
-            syncToCloud({ savedAccounts: accountsToLoad });
+            cachedAccounts = [...cachedAccounts, ...legacyList];
           }
-          // Remove global key so logged-out users never see it
           localStorage.removeItem('vistaafk_saved_accounts');
         } catch (e) {}
       }
     }
 
-    if (accountsToLoad.length > 0) {
-      setSavedAccounts(accountsToLoad);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(userAccountsKey, JSON.stringify(accountsToLoad));
-      }
-    } else {
-      setSavedAccounts([]);
+    // Merge cloud and cached accounts, prioritizing cloud for duplicates
+    const combinedMap = new Map<string, SavedAccount>();
+    cachedAccounts.forEach((a) => combinedMap.set(a.id, a));
+    cloudAccounts.forEach((a) => combinedMap.set(a.id, a));
+    accountsToLoad = Array.from(combinedMap.values());
+
+    // If local cache had extra accounts that cloud lacked, sync them to Supabase
+    if (accountsToLoad.length > cloudAccounts.length) {
+      syncToCloud({ savedAccounts: accountsToLoad });
+    }
+
+    setSavedAccounts(accountsToLoad);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(userAccountsKey, JSON.stringify(accountsToLoad));
     }
 
     // 3. Server Presets: Load user-scoped presets
@@ -326,37 +330,44 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     setServerPresets(presetsToLoad);
   }, [user]);
 
-  const saveAccount = (account: SavedAccount) => {
+  const userRef = useRef(user);
+  userRef.current = user;
+  const syncToCloudRef = useRef(syncToCloud);
+  syncToCloudRef.current = syncToCloud;
+
+  const saveAccount = useCallback((account: SavedAccount) => {
     setSavedAccounts((prev) => {
       const updated = [...prev.filter((a) => a.id !== account.id), account];
       if (typeof window !== 'undefined') {
-        if (user) {
-          const userAccountsKey = `vistaafk_${user.username.toLowerCase()}_saved_accounts`;
+        const currentUser = userRef.current;
+        if (currentUser) {
+          const userAccountsKey = `vistaafk_${currentUser.username.toLowerCase()}_saved_accounts`;
           localStorage.setItem(userAccountsKey, JSON.stringify(updated));
-          syncToCloud({ savedAccounts: updated });
+          syncToCloudRef.current({ savedAccounts: updated });
         } else {
           localStorage.setItem('vistaafk_guest_saved_accounts', JSON.stringify(updated));
         }
       }
       return updated;
     });
-  };
+  }, []);
 
-  const deleteSavedAccount = (id: string) => {
+  const deleteSavedAccount = useCallback((id: string) => {
     setSavedAccounts((prev) => {
       const updated = prev.filter((a) => a.id !== id);
       if (typeof window !== 'undefined') {
-        if (user) {
-          const userAccountsKey = `vistaafk_${user.username.toLowerCase()}_saved_accounts`;
+        const currentUser = userRef.current;
+        if (currentUser) {
+          const userAccountsKey = `vistaafk_${currentUser.username.toLowerCase()}_saved_accounts`;
           localStorage.setItem(userAccountsKey, JSON.stringify(updated));
-          syncToCloud({ savedAccounts: updated, deletedAccountId: id } as any);
+          syncToCloudRef.current({ savedAccounts: updated, deletedAccountId: id } as any);
         } else {
           localStorage.setItem('vistaafk_guest_saved_accounts', JSON.stringify(updated));
         }
       }
       return updated;
     });
-  };
+  }, []);
 
   const handleDiscoveredProfiles = useCallback((
     profiles: { java?: { name: string; uuid: string }; bedrock?: { gamertag: string; xuid?: string } },
@@ -370,10 +381,11 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
 
     const currentAccounts = savedAccountsRef.current || [];
     const newlyAdded: string[] = [];
+    let accountsToSync = [...currentAccounts];
 
     const javaProf = profiles.java;
     if ((filter === 'both' || filter === 'java') && javaProf?.name) {
-      const alreadyExists = currentAccounts.some(
+      const alreadyExists = accountsToSync.some(
         (a) =>
           (a.uuid && javaProf.uuid && a.uuid === javaProf.uuid) ||
           a.name.toLowerCase() === javaProf.name.toLowerCase()
@@ -387,14 +399,14 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
           uuid: javaProf.uuid,
           createdAt: Date.now(),
         };
-        saveAccount(javaAccount);
+        accountsToSync = [...accountsToSync.filter((a) => a.id !== javaAccount.id), javaAccount];
         newlyAdded.push(`${javaProf.name} (Java)`);
       }
     }
 
     const bedrockProf = profiles.bedrock;
     if ((filter === 'both' || filter === 'bedrock') && bedrockProf?.gamertag) {
-      const alreadyExists = currentAccounts.some(
+      const alreadyExists = accountsToSync.some(
         (a) =>
           (a.gamertag && a.gamertag.toLowerCase() === bedrockProf.gamertag.toLowerCase()) ||
           a.name.toLowerCase() === bedrockProf.gamertag.toLowerCase()
@@ -408,12 +420,24 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
           edition: 'bedrock',
           createdAt: Date.now(),
         };
-        saveAccount(bedrockAccount);
+        accountsToSync = [...accountsToSync.filter((a) => a.id !== bedrockAccount.id), bedrockAccount];
         newlyAdded.push(`${bedrockProf.gamertag} (Bedrock)`);
       }
     }
 
     if (newlyAdded.length > 0) {
+      setSavedAccounts(accountsToSync);
+      if (typeof window !== 'undefined') {
+        const currentUser = userRef.current;
+        if (currentUser) {
+          const userAccountsKey = `vistaafk_${currentUser.username.toLowerCase()}_saved_accounts`;
+          localStorage.setItem(userAccountsKey, JSON.stringify(accountsToSync));
+          syncToCloudRef.current({ savedAccounts: accountsToSync });
+        } else {
+          localStorage.setItem('vistaafk_guest_saved_accounts', JSON.stringify(accountsToSync));
+        }
+      }
+
       const notif: VistaNotification = {
         id: Math.random().toString(36).substring(2, 9),
         timestamp: Date.now(),

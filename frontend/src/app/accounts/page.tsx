@@ -425,11 +425,11 @@ export default function AccountsPage() {
           }}
         >
           <div
-            className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl w-full max-w-md p-5 sm:p-6 shadow-2xl my-auto max-h-[92vh] overflow-y-auto"
+            className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl w-full max-w-md shadow-2xl my-auto max-h-[90vh] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-start justify-between pb-3.5 border-b-2 border-slate-200 gap-2">
+            <div className="flex items-start justify-between p-5 pb-3.5 border-b-2 border-slate-200 gap-2 shrink-0 bg-white">
               <div>
                 <h3 className="font-black text-slate-900 text-base">Add an account</h3>
                 <p className="text-[11px] text-slate-500 font-medium mt-0.5">
@@ -449,8 +449,10 @@ export default function AccountsPage() {
               </button>
             </div>
 
-            {/* Waiting for popup confirmation (MinecraftAFK Screenshot 3) */}
-            {(discoveryStatus === 'waiting_code' || discoveryStatus === 'waiting_approval') ? (
+            {/* Scrollable Body */}
+            <div className="p-5 overflow-y-auto flex-1 space-y-4">
+              {/* Waiting for popup confirmation (MinecraftAFK Screenshot 3) */}
+              {(discoveryStatus === 'waiting_code' || discoveryStatus === 'waiting_approval') ? (
               <div className="py-6 px-3 flex flex-col items-center justify-center text-center space-y-4">
                 <div className="w-12 h-12 rounded-full border-4 border-slate-200 border-t-emerald-500 animate-spin" />
                 <div className="space-y-1">
@@ -750,6 +752,7 @@ export default function AccountsPage() {
                 )}
               </div>
             )}
+            </div>
           </div>
         </div>
       )}
@@ -766,10 +769,10 @@ export default function AccountsPage() {
           }}
         >
           <div
-            className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl w-full max-w-lg p-4 sm:p-6 shadow-2xl my-auto max-h-[92vh] overflow-y-auto"
+            className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl w-full max-w-lg shadow-2xl my-auto max-h-[90vh] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3 border-b-2 border-slate-200 gap-2">
+            <div className="flex items-center justify-between p-4 sm:p-5 pb-3 border-b-2 border-slate-200 gap-2 shrink-0 bg-white">
               <div className="flex items-center space-x-2.5 min-w-0">
                 <img
                   src={`https://mc-heads.net/avatar/${selectedAccountForDeploy.name}/48`}
@@ -814,8 +817,10 @@ export default function AccountsPage() {
               </button>
             </div>
 
-            {/* Bedrock Protocol Notice */}
-            {selectedAccountForDeploy.edition === 'bedrock' && (
+            {/* Scrollable Form Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+              {/* Bedrock Protocol Notice */}
+              {selectedAccountForDeploy.edition === 'bedrock' && (
               <div className="mt-3 p-3 bg-sky-50 border-2 border-sky-200 rounded-2xl flex items-start space-x-2 text-xs text-sky-950">
                 <Box className="h-4 w-4 text-sky-700 shrink-0 mt-0.5" />
                 <div>
@@ -923,6 +928,7 @@ export default function AccountsPage() {
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}
