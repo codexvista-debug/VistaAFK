@@ -197,10 +197,10 @@ class BotManager {
             instance.sendChat(message);
         }
     }
-    moveBot(botId, control, state) {
+    moveBot(botId, control, state, durationMs) {
         const instance = this.bots.get(botId);
         if (instance) {
-            instance.move(control, state);
+            instance.move(control, state, durationMs);
         }
     }
     togglePatrol(botId, enabled) {

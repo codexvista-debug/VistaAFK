@@ -58,12 +58,12 @@ export default function Dashboard() {
   const activeChatTelemetry = chatBotId ? telemetry[chatBotId] : undefined;
 
   const handleSaveBot = (config: BotConfig) => {
-    if (editingBot) {
+    const isExisting = editingBot || configs.some((c) => c.id === config.id);
+    if (isExisting) {
       updateBot(config);
     } else {
       addBot(config);
     }
-    setEditingBot(null);
   };
 
   const handleEditBot = (config: BotConfig) => {

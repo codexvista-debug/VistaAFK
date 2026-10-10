@@ -71,6 +71,19 @@ export interface MinimapPlayer {
   health?: number;
 }
 
+export interface MinimapMob {
+  id: number;
+  name: string;
+  type: string;
+  distance: number;
+  x: number;
+  y: number;
+  z: number;
+  dx: number;
+  dz: number;
+  isHostile: boolean;
+}
+
 export interface TerrainPaletteItem {
   id: number;
   name: string;
@@ -130,6 +143,7 @@ export interface BotTelemetry {
   targetBlock?: { name: string; x: number; y: number; z: number } | null;
   nearbyEntities?: Array<{ id: number; name: string; type: string; distance: number; x: number; z: number; isPlayer: boolean; isHostile: boolean }>;
   nearbyPlayers?: MinimapPlayer[];
+  nearbyMobs?: MinimapMob[];
   currentBiome?: string;
   currentLandBlock?: string;
   terrainGrid?: TerrainGridData | null;
@@ -165,7 +179,7 @@ export type ClientMessage =
   | { type: 'START_ALL' }
   | { type: 'STOP_ALL' }
   | { type: 'SEND_CHAT'; payload: { botId: string; message: string } }
-  | { type: 'MOVE_BOT'; payload: { botId: string; control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak'; state: boolean } }
+  | { type: 'MOVE_BOT'; payload: { botId: string; control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak'; state: boolean; durationMs?: number } }
   | { type: 'TOGGLE_PATROL'; payload: { botId: string; enabled: boolean } }
   | { type: 'LOOK_AT'; payload: { botId: string; yaw: number; pitch: number } }
   | { type: 'MOVE_INVENTORY_ITEM'; payload: { botId: string; sourceSlot: number; targetSlot: number } }

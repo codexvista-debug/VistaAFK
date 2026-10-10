@@ -27,7 +27,7 @@ interface BotVisualControlModalProps {
   config: BotConfig;
   telemetry?: BotTelemetry;
   onClose: () => void;
-  onMove: (botId: string, control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean) => void;
+  onMove: (botId: string, control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean, durationMs?: number) => void;
   onTogglePatrol: (botId: string, enabled: boolean) => void;
   onLook: (botId: string, yaw: number, pitch: number) => void;
 }
@@ -67,7 +67,6 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
 
   const startMove = useCallback((control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak') => {
     if (!isOnline) return;
-    if (activeControlRef.current[control]) return;
     activeControlRef.current[control] = true;
     setActiveControls((prev) => ({ ...prev, [control]: true }));
     onMove(config.id, control, true);
@@ -84,13 +83,60 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
     onMove(config.id, control, false);
   }, [isOnline, config.id, onMove]);
 
-  const stepMove = useCallback((control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak') => {
+  const stepMove = useCallback((control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', durationMs = 1200) => {
     if (!isOnline) return;
-    startMove(control);
+    activeControlRef.current[control] = true;
+    setActiveControls((prev) => ({ ...prev, [control]: true }));
+    if (stepTimeoutsRef.current[control]) {
+      clearTimeout(stepTimeoutsRef.current[control]);
+    }
+    onMove(config.id, control, true, durationMs);
     stepTimeoutsRef.current[control] = setTimeout(() => {
-      stopMove(control);
-    }, 600);
-  }, [isOnline, startMove, stopMove]);
+      activeControlRef.current[control] = false;
+      setActiveControls((prev) => ({ ...prev, [control]: false }));
+      delete stepTimeoutsRef.current[control];
+    }, durationMs);
+  }, [isOnline, config.id, onMove]);
+
+  const createButtonHandlers = (control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak') => {
+    let pressTimer: NodeJS.Timeout | null = null;
+    let isContinuous = false;
+
+    return {
+      onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
+        if (!isOnline) return;
+        try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch (err) {}
+        isContinuous = false;
+        pressTimer = setTimeout(() => {
+          isContinuous = true;
+          startMove(control);
+        }, 200);
+      },
+      onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => {
+        if (!isOnline) return;
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+        }
+        if (isContinuous) {
+          stopMove(control);
+          isContinuous = false;
+        } else {
+          stepMove(control, control === 'jump' ? 400 : 1200);
+        }
+      },
+      onPointerCancel: () => {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+        }
+        if (isContinuous) {
+          stopMove(control);
+          isContinuous = false;
+        }
+      },
+    };
+  };
 
   const handleTurn = (deltaYawDeg: number) => {
     if (!isOnline) return;
@@ -362,19 +408,14 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
               <div className="flex flex-col items-center space-y-2 select-none">
                 {/* Forward [W] */}
                 <button
-                  onMouseDown={() => startMove('forward')}
-                  onMouseUp={() => stopMove('forward')}
-                  onMouseLeave={() => stopMove('forward')}
-                  onTouchStart={(e) => { e.preventDefault(); startMove('forward'); }}
-                  onTouchEnd={(e) => { e.preventDefault(); stopMove('forward'); }}
-                  onClick={() => stepMove('forward')}
+                  {...createButtonHandlers('forward')}
                   disabled={!isOnline}
-                  className={`w-14 h-12 rounded-xl font-bold border shadow-sm flex flex-col items-center justify-center transition active:scale-95 ${
+                  className={`w-14 h-12 rounded-xl font-bold border shadow-sm flex flex-col items-center justify-center transition active:scale-95 touch-none select-none ${
                     activeControls['forward']
                       ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400'
                       : 'bg-white hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 border-slate-300'
                   }`}
-                  title="Forward (W / ↑)"
+                  title="Forward (Click for step, hold to walk, or press W / ↑)"
                 >
                   <ArrowUp className="h-4 w-4" />
                   <span className="text-[10px] font-mono">W</span>
@@ -383,55 +424,40 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
                 {/* Left [A], Back [S], Right [D] */}
                 <div className="flex items-center space-x-2">
                   <button
-                    onMouseDown={() => startMove('left')}
-                    onMouseUp={() => stopMove('left')}
-                    onMouseLeave={() => stopMove('left')}
-                    onTouchStart={(e) => { e.preventDefault(); startMove('left'); }}
-                    onTouchEnd={(e) => { e.preventDefault(); stopMove('left'); }}
-                    onClick={() => stepMove('left')}
+                    {...createButtonHandlers('left')}
                     disabled={!isOnline}
-                    className={`w-14 h-12 rounded-xl font-bold border shadow-sm flex flex-col items-center justify-center transition active:scale-95 ${
+                    className={`w-14 h-12 rounded-xl font-bold border shadow-sm flex flex-col items-center justify-center transition active:scale-95 touch-none select-none ${
                       activeControls['left']
                         ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400'
                         : 'bg-white hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 border-slate-300'
                     }`}
-                    title="Strafe Left (A / ←)"
+                    title="Strafe Left (Click for step, hold to strafe, or press A / ←)"
                   >
                     <ArrowLeft className="h-4 w-4" />
                     <span className="text-[10px] font-mono">A</span>
                   </button>
                   <button
-                    onMouseDown={() => startMove('back')}
-                    onMouseUp={() => stopMove('back')}
-                    onMouseLeave={() => stopMove('back')}
-                    onTouchStart={(e) => { e.preventDefault(); startMove('back'); }}
-                    onTouchEnd={(e) => { e.preventDefault(); stopMove('back'); }}
-                    onClick={() => stepMove('back')}
+                    {...createButtonHandlers('back')}
                     disabled={!isOnline}
-                    className={`w-14 h-12 rounded-xl font-bold border shadow-sm flex flex-col items-center justify-center transition active:scale-95 ${
+                    className={`w-14 h-12 rounded-xl font-bold border shadow-sm flex flex-col items-center justify-center transition active:scale-95 touch-none select-none ${
                       activeControls['back']
                         ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400'
                         : 'bg-white hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 border-slate-300'
                     }`}
-                    title="Walk Back (S / ↓)"
+                    title="Walk Back (Click for step, hold to walk, or press S / ↓)"
                   >
                     <ArrowDown className="h-4 w-4" />
                     <span className="text-[10px] font-mono">S</span>
                   </button>
                   <button
-                    onMouseDown={() => startMove('right')}
-                    onMouseUp={() => stopMove('right')}
-                    onMouseLeave={() => stopMove('right')}
-                    onTouchStart={(e) => { e.preventDefault(); startMove('right'); }}
-                    onTouchEnd={(e) => { e.preventDefault(); stopMove('right'); }}
-                    onClick={() => stepMove('right')}
+                    {...createButtonHandlers('right')}
                     disabled={!isOnline}
-                    className={`w-14 h-12 rounded-xl font-bold border shadow-sm flex flex-col items-center justify-center transition active:scale-95 ${
+                    className={`w-14 h-12 rounded-xl font-bold border shadow-sm flex flex-col items-center justify-center transition active:scale-95 touch-none select-none ${
                       activeControls['right']
                         ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400'
                         : 'bg-white hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 border-slate-300'
                     }`}
-                    title="Strafe Right (D / →)"
+                    title="Strafe Right (Click for step, hold to strafe, or press D / →)"
                   >
                     <ArrowRight className="h-4 w-4" />
                     <span className="text-[10px] font-mono">D</span>
@@ -441,34 +467,26 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
                 {/* Jump & Sneak */}
                 <div className="flex items-center space-x-2 pt-1 w-full justify-center">
                   <button
-                    onMouseDown={() => startMove('jump')}
-                    onMouseUp={() => stopMove('jump')}
-                    onMouseLeave={() => stopMove('jump')}
-                    onTouchStart={(e) => { e.preventDefault(); startMove('jump'); }}
-                    onTouchEnd={(e) => { e.preventDefault(); stopMove('jump'); }}
-                    onClick={() => stepMove('jump')}
+                    {...createButtonHandlers('jump')}
                     disabled={!isOnline}
-                    className={`px-4 py-2 rounded-xl font-bold text-xs border shadow-sm transition ${
+                    className={`px-4 py-2 rounded-xl font-bold text-xs border shadow-sm transition touch-none select-none ${
                       activeControls['jump']
                         ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400'
                         : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
                     }`}
+                    title="Jump (Space / Tap)"
                   >
                     Jump (Space)
                   </button>
                   <button
-                    onMouseDown={() => startMove('sneak')}
-                    onMouseUp={() => stopMove('sneak')}
-                    onMouseLeave={() => stopMove('sneak')}
-                    onTouchStart={(e) => { e.preventDefault(); startMove('sneak'); }}
-                    onTouchEnd={(e) => { e.preventDefault(); stopMove('sneak'); }}
-                    onClick={() => stepMove('sneak')}
+                    {...createButtonHandlers('sneak')}
                     disabled={!isOnline}
-                    className={`px-4 py-2 rounded-xl font-bold text-xs border shadow-sm transition ${
+                    className={`px-4 py-2 rounded-xl font-bold text-xs border shadow-sm transition touch-none select-none ${
                       activeControls['sneak']
                         ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400'
                         : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
                     }`}
+                    title="Sneak (Shift / Hold)"
                   >
                     Sneak (Shift)
                   </button>

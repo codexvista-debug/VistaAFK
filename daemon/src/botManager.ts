@@ -218,10 +218,10 @@ export class BotManager {
     }
   }
 
-  public moveBot(botId: string, control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean) {
+  public moveBot(botId: string, control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean, durationMs?: number) {
     const instance = this.bots.get(botId);
     if (instance) {
-      instance.move(control, state);
+      instance.move(control, state, durationMs);
     }
   }
 

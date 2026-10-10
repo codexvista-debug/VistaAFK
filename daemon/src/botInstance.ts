@@ -1,6 +1,6 @@
 import mineflayer, { Bot } from 'mineflayer';
 import { SocksProxyAgent } from 'socks-proxy-agent';
-import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, InventoryItem, ItemEnchantment, MinimapPlayer } from './types.js';
+import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, InventoryItem, ItemEnchantment, MinimapPlayer, MinimapMob } from './types.js';
 import { sampleTerrainGrid } from './terrainMapper.js';
 import path from 'path';
 
@@ -1103,7 +1103,7 @@ export class BotInstance {
     this.emitTelemetry();
   }
 
-  public move(control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean) {
+  public move(control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean, durationMs?: number) {
     if (!this.bot || this.currentStatus !== 'online') return;
     try {
       // 1. If user takes manual control, pause any automated patrol so they don't conflict
@@ -1114,7 +1114,25 @@ export class BotInstance {
       // 2. Set Mineflayer movement control
       this.bot.setControlState(control, state);
 
-      // 3. Auto-jump assistance for 1-block elevations, carpets, slabs or entity collisions
+      // Auto-sprint on forward movement for responsive walking
+      if (control === 'forward') {
+        try { this.bot.setControlState('sprint', state); } catch (e) {}
+      }
+
+      // 3. If durationMs is provided and state is true, automatically release after duration
+      if (state && durationMs && durationMs > 0) {
+        setTimeout(() => {
+          try {
+            if (this.bot) {
+              this.bot.setControlState(control, false);
+              if (control === 'forward') this.bot.setControlState('sprint', false);
+              this.emitTelemetry();
+            }
+          } catch (e) {}
+        }, durationMs);
+      }
+
+      // 4. Auto-jump assistance for 1-block elevations, carpets, slabs or entity collisions
       if (state && (control === 'forward' || control === 'back' || control === 'left' || control === 'right')) {
         const entAny = this.bot.entity as any;
         if (entAny?.isCollidedHorizontally && entAny?.onGround) {
@@ -1125,7 +1143,7 @@ export class BotInstance {
         }
       }
 
-      // 4. Emit telemetry quickly so coordinates update on the UI radar
+      // 5. Emit telemetry quickly so coordinates update on the UI radar
       setTimeout(() => this.emitTelemetry(), 60);
     } catch (e) {
       console.warn(`[VistaAFK Bot ${this.config.name}] Movement error:`, e);
@@ -1306,6 +1324,7 @@ export class BotInstance {
         targetBlock: null,
         nearbyEntities: [],
         nearbyPlayers: [],
+        nearbyMobs: [],
         currentBiome: 'Overworld',
         currentLandBlock: 'Bedrock',
         terrainGrid: null,
@@ -1338,6 +1357,7 @@ export class BotInstance {
         targetBlock: null,
         nearbyEntities: [],
         nearbyPlayers: [],
+        nearbyMobs: [],
         currentBiome: undefined,
         currentLandBlock: undefined,
         terrainGrid: null,
@@ -1372,6 +1392,14 @@ export class BotInstance {
     const nearbyEntities: Array<{ id: number; name: string; type: string; distance: number; x: number; z: number; isPlayer: boolean; isHostile: boolean }> = [];
     // Nearby players in radar range (up to 36 blocks) with usernames for Xaero's minimap
     const nearbyPlayers: MinimapPlayer[] = [];
+    // Nearby mobs in radar range (up to 36 blocks)
+    const nearbyMobs: MinimapMob[] = [];
+    const HOSTILE_MOBS = new Set([
+      'zombie', 'skeleton', 'creeper', 'spider', 'cave_spider', 'enderman', 'witch', 'blaze',
+      'ghast', 'warden', 'phantom', 'drowned', 'husk', 'stray', 'silverfish', 'slime',
+      'magma_cube', 'hoglin', 'zoglin', 'piglin_brute', 'pillager', 'ravager', 'vindicator',
+      'evoker', 'vex', 'shulker', 'guardian', 'elder_guardian', 'wither', 'wither_skeleton', 'ender_dragon'
+    ]);
 
     try {
       const myPos = this.bot.entity.position;
@@ -1421,10 +1449,33 @@ export class BotInstance {
           }
         }
 
-        // 2. Collect general entities
+        // 2. Collect nearby mobs (hostile or passive) up to 36 blocks
+        if (!isPlayer && dist <= 36) {
+          const rawName = (ent.name || '').toLowerCase();
+          const isHostile = HOSTILE_MOBS.has(rawName) || ent.type === 'hostile';
+          const rawDisplayName = (ent as any).displayName?.text || (ent as any).displayName || ent.name || 'Mob';
+          const cleanName = typeof rawDisplayName === 'string'
+            ? rawDisplayName.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+            : 'Mob';
+
+          nearbyMobs.push({
+            id: ent.id,
+            name: cleanName,
+            type: ent.type || (isHostile ? 'hostile' : 'passive'),
+            distance: Math.round(dist * 10) / 10,
+            x: Math.round(ent.position.x * 10) / 10,
+            y: Math.round(ent.position.y * 10) / 10,
+            z: Math.round(ent.position.z * 10) / 10,
+            dx: Math.round(dx * 10) / 10,
+            dz: Math.round(dz * 10) / 10,
+            isHostile,
+          });
+        }
+
+        // 3. Collect general entities
         if (dist <= 24) {
           const entName = ent.username || ent.name || (ent as any).displayName || 'entity';
-          const isHostile = ['zombie', 'skeleton', 'creeper', 'spider', 'enderman', 'witch', 'blaze', 'ghast', 'warden', 'phantom', 'drowned'].includes(ent.name?.toLowerCase() || '');
+          const isHostile = HOSTILE_MOBS.has((ent.name || '').toLowerCase());
           nearbyEntities.push({
             id: ent.id,
             name: entName,
@@ -1439,6 +1490,7 @@ export class BotInstance {
       }
       nearbyEntities.sort((a, b) => a.distance - b.distance);
       nearbyPlayers.sort((a, b) => a.distance - b.distance);
+      nearbyMobs.sort((a, b) => a.distance - b.distance);
     } catch (e) {}
 
     // Sample terrain surface grid for Xaero's Minimap view
@@ -1557,6 +1609,7 @@ export class BotInstance {
       targetBlock,
       nearbyEntities: nearbyEntities.slice(0, 15),
       nearbyPlayers,
+      nearbyMobs: nearbyMobs.slice(0, 30),
       currentBiome: terrainGrid?.currentBiome,
       currentLandBlock: terrainGrid?.currentLandBlock,
       terrainGrid,

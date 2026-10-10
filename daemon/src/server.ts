@@ -173,7 +173,7 @@ wss.on('connection', (ws) => {
           botManager.sendChat(msg.payload.botId, msg.payload.message);
           break;
         case 'MOVE_BOT':
-          botManager.moveBot(msg.payload.botId, msg.payload.control, msg.payload.state);
+          botManager.moveBot(msg.payload.botId, msg.payload.control, msg.payload.state, msg.payload.durationMs);
           break;
         case 'TOGGLE_PATROL':
           botManager.togglePatrol(msg.payload.botId, msg.payload.enabled);

@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
-import { Compass, Users, MapPin, Layers, Trees, Shield } from 'lucide-react';
-import { BotTelemetry, MinimapPlayer } from '../types';
+import { Compass, Users, MapPin, Layers, Trees, Shield, Skull, Bug, Sparkles } from 'lucide-react';
+import { BotTelemetry, MinimapPlayer, MinimapMob } from '../types';
 
 interface XaerosMinimapProps {
   telemetry?: BotTelemetry;
@@ -27,6 +27,7 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [zoom, setZoom] = useState<number>(1);
   const [rotateWithPlayer, setRotateWithPlayer] = useState<boolean>(false);
+  const [activeFeedTab, setActiveFeedTab] = useState<'players' | 'mobs'>('players');
 
   const yaw = telemetry?.yaw || 0;
   const compassDeg = (((-yaw * 180 / Math.PI) % 360) + 360) % 360;
@@ -35,9 +36,13 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
   const currentBiome = telemetry?.currentBiome || (telemetry?.dimension === 'the_nether' ? 'Nether Wastes' : 'Plains');
   const currentLand = telemetry?.currentLandBlock || 'Grass Block';
   const nearbyPlayers: MinimapPlayer[] = telemetry?.nearbyPlayers || [];
+  const nearbyMobs: MinimapMob[] = telemetry?.nearbyMobs || [];
   const terrainGrid = telemetry?.terrainGrid;
 
-  // Render terrain grid onto canvas
+  const hostileMobs = nearbyMobs.filter((m) => m.isHostile);
+  const passiveMobs = nearbyMobs.filter((m) => !m.isHostile);
+
+  // Render square terrain grid onto canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -55,17 +60,11 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
     const heights = terrainGrid?.heights || [];
 
     const centerPx = width / 2;
-    const radiusPx = (width / 2) - 4;
 
     ctx.save();
 
-    // Clip to circle
-    ctx.beginPath();
-    ctx.arc(centerPx, centerPx, radiusPx, 0, Math.PI * 2);
-    ctx.clip();
-
     // Base background
-    ctx.fillStyle = '#0f172a';
+    ctx.fillStyle = '#0a0f1d';
     ctx.fillRect(0, 0, width, height);
 
     // Apply rotation if rotateWithPlayer is enabled
@@ -104,9 +103,9 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
       }
     } else {
       // Fallback stylized grid if terrain isn't populated yet
-      ctx.fillStyle = '#1e293b';
+      ctx.fillStyle = '#111827';
       ctx.fillRect(0, 0, width, height);
-      ctx.strokeStyle = '#334155';
+      ctx.strokeStyle = '#1f2937';
       ctx.lineWidth = 1;
       const step = 20 * zoom;
       for (let x = 0; x < width; x += step) {
@@ -123,20 +122,30 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
       }
     }
 
-    // Grid circles for distance reference (8m, 16m)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    // Concentric distance reference rings (8m, 16m, 24m)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 4]);
 
+    const r8 = (8 / (radius / zoom)) * (width / 2);
+    const r16 = (16 / (radius / zoom)) * (width / 2);
+    const r24 = (24 / (radius / zoom)) * (width / 2);
+
     ctx.beginPath();
-    ctx.arc(centerPx, centerPx, radiusPx * 0.35, 0, Math.PI * 2);
+    ctx.arc(centerPx, centerPx, r8, 0, Math.PI * 2);
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.arc(centerPx, centerPx, radiusPx * 0.7, 0, Math.PI * 2);
+    ctx.arc(centerPx, centerPx, r16, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Crosshair axis lines
+    if (r24 < width * 0.48) {
+      ctx.beginPath();
+      ctx.arc(centerPx, centerPx, r24, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Radar crosshair axes
     ctx.beginPath();
     ctx.moveTo(centerPx, 0);
     ctx.lineTo(centerPx, height);
@@ -146,25 +155,23 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
 
     ctx.restore();
 
-    // Vignette shadow around border for high-end minimap aesthetic
-    const gradient = ctx.createRadialGradient(centerPx, centerPx, radiusPx * 0.75, centerPx, centerPx, radiusPx);
-    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    gradient.addColorStop(1, 'rgba(15, 23, 42, 0.65)');
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(centerPx, centerPx, radiusPx, 0, Math.PI * 2);
-    ctx.fill();
+    // Subtle edge vignette
+    const vignette = ctx.createRadialGradient(centerPx, centerPx, width * 0.35, centerPx, centerPx, width * 0.7);
+    vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vignette.addColorStop(1, 'rgba(10, 15, 29, 0.55)');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, width, height);
 
   }, [terrainGrid, zoom, rotateWithPlayer, compassDeg]);
 
-  // Convert player coordinate to Minimap % position
+  // Convert coordinate delta to minimap percentage position
   const maxRange = (terrainGrid?.radius || 14) / zoom;
 
   return (
-    <div className="flex flex-col space-y-3">
+    <div className="flex flex-col space-y-3 select-none">
       {/* Top Info Bar: Biome, Land, Facing & Zoom */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div className="flex items-center space-x-1.5">
+        <div className="flex items-center space-x-1.5 flex-wrap gap-1">
           <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold shadow-xs">
             <Trees className="h-3.5 w-3.5 text-emerald-600" />
             <span>{currentBiome}</span>
@@ -173,10 +180,16 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
             <Layers className="h-3.5 w-3.5 text-slate-500" />
             <span>{currentLand}</span>
           </span>
+          {nearbyMobs.length > 0 && (
+            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-red-50 text-red-700 border border-red-200 font-bold text-[11px]">
+              <Skull className="h-3 w-3 text-red-600" />
+              <span>{hostileMobs.length} Hostile</span>
+            </span>
+          )}
         </div>
 
         {/* Zoom & Mode buttons */}
-        <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+        <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg border border-slate-200 shrink-0">
           <button
             onClick={() => setZoom(1)}
             className={`px-2 py-0.5 rounded text-[11px] font-bold transition ${
@@ -218,8 +231,8 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
         </div>
       </div>
 
-      {/* Main Minimap Frame */}
-      <div className="relative w-full aspect-square max-w-[340px] mx-auto rounded-full p-2 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-950 border-4 border-slate-600/90 shadow-2xl flex items-center justify-center">
+      {/* Main SQUARE Minimap Frame (Xaero's Square Radar) */}
+      <div className="relative w-full aspect-square max-w-[340px] mx-auto rounded-2xl p-2 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-950 border-4 border-slate-700/90 shadow-2xl flex items-center justify-center">
         {/* Outer Compass Cardinal Labels */}
         <div
           className="absolute inset-0 pointer-events-none transition-transform duration-300"
@@ -239,8 +252,8 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
           </span>
         </div>
 
-        {/* Inner Canvas Container */}
-        <div className="relative w-full h-full rounded-full overflow-hidden border-2 border-slate-900 shadow-inner flex items-center justify-center">
+        {/* Square Canvas Container with rounded corners */}
+        <div className="relative w-full h-full rounded-xl overflow-hidden border-2 border-slate-900 shadow-inner flex items-center justify-center bg-slate-950">
           <canvas
             ref={canvasRef}
             width={340}
@@ -250,7 +263,7 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
 
           {/* Self Bot Marker in Center */}
           <div className="absolute z-20 pointer-events-none flex flex-col items-center justify-center">
-            {/* Facing Pointer Arrow / Cone */}
+            {/* Facing Pointer Arrow */}
             <div
               className="w-10 h-10 transition-transform duration-200 flex items-center justify-center"
               style={{
@@ -274,13 +287,11 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
             </div>
           </div>
 
-          {/* Nearby Players Overlay with Head Avatars & Prominent Usernames */}
-          {nearbyPlayers.map((player) => {
-            // Relative dx, dz from bot
-            const dx = player.dx;
-            const dz = player.dz;
+          {/* Mobs Overlay on Radar (Red = Hostile, Yellow/Green = Passive) */}
+          {nearbyMobs.map((mob) => {
+            const dx = mob.dx;
+            const dz = mob.dz;
 
-            // Rotate coordinates if map is rotating
             let rotDx = dx;
             let rotDz = dz;
             if (rotateWithPlayer) {
@@ -289,15 +300,61 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
               rotDz = dx * Math.sin(rad) + dz * Math.cos(rad);
             }
 
-            // Map to percentage from center (50%, 50%)
-            // Clamp within minimap circle
-            const distFromCenter = Math.sqrt(rotDx * rotDx + rotDz * rotDz);
-            const isOutOfRange = distFromCenter > maxRange;
-            const effectiveDist = isOutOfRange ? maxRange * 0.92 : distFromCenter;
-            const angle = Math.atan2(rotDz, rotDx);
+            // Map within square [-maxRange, maxRange] -> [5%, 95%]
+            const clampedX = Math.max(5, Math.min(95, 50 + (rotDx / maxRange) * 44));
+            const clampedY = Math.max(5, Math.min(95, 50 + (rotDz / maxRange) * 44));
 
-            const displayX = 50 + (effectiveDist / maxRange) * Math.cos(angle) * 44;
-            const displayY = 50 + (effectiveDist / maxRange) * Math.sin(angle) * 44;
+            return (
+              <div
+                key={`mob-${mob.id}`}
+                className="absolute z-25 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-auto group cursor-pointer"
+                style={{
+                  left: `${clampedX}%`,
+                  top: `${clampedY}%`,
+                }}
+                title={`${mob.name} (${mob.distance}m, ${mob.isHostile ? 'Hostile' : 'Passive'})`}
+              >
+                {/* Mob Pip */}
+                <div
+                  className={`w-3.5 h-3.5 rounded-full flex items-center justify-center border shadow-md transition transform group-hover:scale-125 ${
+                    mob.isHostile
+                      ? 'bg-red-600 border-red-200 ring-2 ring-red-500/50 animate-pulse'
+                      : 'bg-amber-400 border-yellow-100 ring-1 ring-amber-400/40'
+                  }`}
+                >
+                  {mob.isHostile ? (
+                    <Skull className="h-2 w-2 text-white" />
+                  ) : (
+                    <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                  )}
+                </div>
+
+                {/* Mob Hover Tooltip */}
+                <div className="hidden group-hover:flex mt-0.5 px-1 py-0.5 bg-slate-950/95 border border-slate-700 rounded text-[8px] font-bold text-slate-200 shadow-md whitespace-nowrap items-center space-x-1">
+                  <span className={mob.isHostile ? 'text-red-400' : 'text-amber-300'}>
+                    {mob.name}
+                  </span>
+                  <span className="text-[7px] text-slate-400 font-mono">{mob.distance}m</span>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Nearby Players Overlay with Head Avatars & Prominent Usernames */}
+          {nearbyPlayers.map((player) => {
+            const dx = player.dx;
+            const dz = player.dz;
+
+            let rotDx = dx;
+            let rotDz = dz;
+            if (rotateWithPlayer) {
+              const rad = (-compassDeg * Math.PI) / 180;
+              rotDx = dx * Math.cos(rad) - dz * Math.sin(rad);
+              rotDz = dx * Math.sin(rad) + dz * Math.cos(rad);
+            }
+
+            const clampedX = Math.max(6, Math.min(94, 50 + (rotDx / maxRange) * 44));
+            const clampedY = Math.max(6, Math.min(94, 50 + (rotDz / maxRange) * 44));
 
             // Player facing degree
             const playerFacingDeg = (((-player.yaw * 180 / Math.PI) % 360) + 360) % 360;
@@ -314,8 +371,8 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
                 key={player.username}
                 className="absolute z-30 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center transition-all duration-300 group cursor-pointer"
                 style={{
-                  left: `${displayX}%`,
-                  top: `${displayY}%`,
+                  left: `${clampedX}%`,
+                  top: `${clampedY}%`,
                 }}
               >
                 {/* PROMINENT USERNAME BADGE (Xaero's Minimap Style) */}
@@ -327,7 +384,6 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
 
                 {/* Player Head & Direction Pointer */}
                 <div className="relative mt-0.5 flex items-center justify-center">
-                  {/* Direction Arrow behind player head */}
                   <div
                     className="absolute -inset-1 flex items-center justify-center pointer-events-none"
                     style={{ transform: `rotate(${effectivePlayerFacing}deg)` }}
@@ -335,21 +391,18 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
                     <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[8px] border-b-cyan-300 transform -translate-y-3.5" />
                   </div>
 
-                  {/* Player Head Skin / Icon */}
                   <div className="w-5 h-5 rounded-md overflow-hidden bg-slate-800 border-2 border-cyan-300 shadow-md">
                     <img
                       src={`https://mc-heads.net/avatar/${encodeURIComponent(player.username)}/24`}
                       alt={player.username}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        // Fallback if avatar fails to load
                         (e.target as HTMLElement).style.display = 'none';
                       }}
                     />
                   </div>
                 </div>
 
-                {/* Subtag: Elevation */}
                 <span className="text-[8px] font-mono font-bold text-slate-200 bg-black/80 px-1 rounded shadow-xs mt-0.5">
                   {yDeltaStr}
                 </span>
@@ -373,67 +426,161 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
         </div>
       </div>
 
-      {/* Nearby Players Radar Feed (Exact Xaero's Minimap List) */}
-      <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-1.5">
-            <Users className="h-4 w-4 text-cyan-600" />
-            <span className="text-xs font-bold text-slate-800">
-              Nearby Players ({nearbyPlayers.length})
-            </span>
+      {/* Nearby Radar Feed Tabs: Players & Mobs */}
+      <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setActiveFeedTab('players')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-xl text-xs font-bold transition ${
+                activeFeedTab === 'players'
+                  ? 'bg-cyan-600 text-white shadow-xs'
+                  : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
+              }`}
+            >
+              <Users className="h-3.5 w-3.5" />
+              <span>Players ({nearbyPlayers.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveFeedTab('mobs')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-xl text-xs font-bold transition ${
+                activeFeedTab === 'mobs'
+                  ? 'bg-red-600 text-white shadow-xs'
+                  : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
+              }`}
+            >
+              <Bug className="h-3.5 w-3.5" />
+              <span>Mobs ({nearbyMobs.length})</span>
+            </button>
           </div>
           <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-            Range: 36 Blocks
+            Range: 36m
           </span>
         </div>
 
-        {nearbyPlayers.length === 0 ? (
-          <div className="py-2.5 px-3 bg-white border border-slate-200 rounded-xl flex items-center space-x-2 text-xs text-slate-500">
-            <Shield className="h-4 w-4 text-emerald-500" />
-            <span>Radar clear — No other players detected within 36 blocks.</span>
-          </div>
-        ) : (
-          <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
-            {nearbyPlayers.map((player) => (
-              <div
-                key={player.username}
-                className="flex items-center justify-between p-2 bg-white border border-slate-200 hover:border-cyan-300 rounded-xl shadow-xs transition"
-              >
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-6 h-6 rounded-md overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0">
-                    <img
-                      src={`https://mc-heads.net/avatar/${encodeURIComponent(player.username)}/24`}
-                      alt={player.username}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <span className="font-bold text-xs text-slate-900 block leading-tight">
-                      {player.username}
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      {player.facing || 'Facing ?'} • Y: {player.y}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <span className="text-xs font-mono font-bold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full">
-                    {player.distance}m
-                  </span>
-                  <span className="text-[10px] text-slate-400 block font-mono mt-0.5">
-                    {player.y > coords.y
-                      ? `+${Math.round(player.y - coords.y)} above`
-                      : player.y < coords.y
-                      ? `${Math.round(coords.y - player.y)} below`
-                      : 'same height'}
-                  </span>
-                </div>
+        {/* Tab 1: Players Feed */}
+        {activeFeedTab === 'players' && (
+          <div>
+            {nearbyPlayers.length === 0 ? (
+              <div className="py-2.5 px-3 bg-white border border-slate-200 rounded-xl flex items-center space-x-2 text-xs text-slate-500">
+                <Shield className="h-4 w-4 text-emerald-500" />
+                <span>Radar clear — No other players detected within 36 blocks.</span>
               </div>
-            ))}
+            ) : (
+              <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
+                {nearbyPlayers.map((player) => (
+                  <div
+                    key={player.username}
+                    className="flex items-center justify-between p-2 bg-white border border-slate-200 hover:border-cyan-300 rounded-xl shadow-xs transition"
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-6 h-6 rounded-md overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0">
+                        <img
+                          src={`https://mc-heads.net/avatar/${encodeURIComponent(player.username)}/24`}
+                          alt={player.username}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <span className="font-bold text-xs text-slate-900 block leading-tight">
+                          {player.username}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {player.facing || 'Facing ?'} • Y: {player.y}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-xs font-mono font-bold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full">
+                        {player.distance}m
+                      </span>
+                      <span className="text-[10px] text-slate-400 block font-mono mt-0.5">
+                        {player.y > coords.y
+                          ? `+${Math.round(player.y - coords.y)} above`
+                          : player.y < coords.y
+                          ? `${Math.round(coords.y - player.y)} below`
+                          : 'same height'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 2: Mobs Feed */}
+        {activeFeedTab === 'mobs' && (
+          <div>
+            {nearbyMobs.length === 0 ? (
+              <div className="py-2.5 px-3 bg-white border border-slate-200 rounded-xl flex items-center space-x-2 text-xs text-slate-500">
+                <Shield className="h-4 w-4 text-emerald-500" />
+                <span>Radar clear — No mobs detected within 36 blocks.</span>
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
+                {nearbyMobs.map((mob) => (
+                  <div
+                    key={`mob-item-${mob.id}`}
+                    className="flex items-center justify-between p-2 bg-white border border-slate-200 hover:border-slate-300 rounded-xl shadow-xs transition"
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <div
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs shrink-0 ${
+                          mob.isHostile
+                            ? 'bg-red-100 text-red-700 border border-red-200'
+                            : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                        }`}
+                      >
+                        {mob.isHostile ? <Skull className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="font-bold text-xs text-slate-900 block leading-tight">
+                            {mob.name}
+                          </span>
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                              mob.isHostile
+                                ? 'bg-red-50 text-red-700 border border-red-200'
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            }`}
+                          >
+                            {mob.isHostile ? 'Hostile' : 'Passive'}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          X: {mob.x} • Y: {mob.y} • Z: {mob.z}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <span
+                        className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full border ${
+                          mob.isHostile
+                            ? 'bg-red-50 text-red-700 border-red-200'
+                            : 'bg-slate-100 text-slate-700 border-slate-200'
+                        }`}
+                      >
+                        {mob.distance}m
+                      </span>
+                      <span className="text-[10px] text-slate-400 block font-mono mt-0.5">
+                        {mob.y > coords.y
+                          ? `+${Math.round(mob.y - coords.y)} above`
+                          : mob.y < coords.y
+                          ? `${Math.round(coords.y - mob.y)} below`
+                          : 'same height'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

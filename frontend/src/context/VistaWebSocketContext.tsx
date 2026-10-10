@@ -84,7 +84,7 @@ export interface VistaWebSocketContextType {
   startAll: () => void;
   stopAll: () => void;
   sendChat: (botId: string, message: string) => void;
-  moveBot: (botId: string, control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean) => void;
+  moveBot: (botId: string, control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean, durationMs?: number) => void;
   togglePatrol: (botId: string, enabled: boolean) => void;
   lookAt: (botId: string, yaw: number, pitch: number) => void;
   moveInventoryItem: (botId: string, sourceSlot: number, targetSlot: number) => void;
@@ -859,8 +859,8 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const startAll = () => send({ type: 'START_ALL' });
   const stopAll = () => send({ type: 'STOP_ALL' });
   const sendChat = (botId: string, message: string) => send({ type: 'SEND_CHAT', payload: { botId, message } });
-  const moveBot = (botId: string, control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean) =>
-    send({ type: 'MOVE_BOT', payload: { botId, control, state } });
+  const moveBot = (botId: string, control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean, durationMs?: number) =>
+    send({ type: 'MOVE_BOT', payload: { botId, control, state, durationMs } });
   const togglePatrol = (botId: string, enabled: boolean) =>
     send({ type: 'TOGGLE_PATROL', payload: { botId, enabled } });
   const lookAt = (botId: string, yaw: number, pitch: number) =>

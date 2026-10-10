@@ -126,10 +126,20 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
               <Bot className="h-5 w-5 stroke-[2.5]" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight truncate">
-                {initialConfig ? 'Edit Bot Account' : 'Add Minecraft AFK Account'}
-              </h2>
-              <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">Configure connection & survival routines</p>
+              <div className="flex items-center space-x-2">
+                <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight truncate">
+                  {initialConfig ? 'Edit Bot Account' : 'Add Minecraft AFK Account'}
+                </h2>
+                {initialConfig && (
+                  <span className="hidden sm:inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                    <span>Auto-saving</span>
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">
+                {initialConfig ? 'Changes apply to your bot in real-time' : 'Configure connection & survival routines'}
+              </p>
             </div>
           </div>
           <button
@@ -213,36 +223,6 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
               </div>
 
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Authentication Method</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, authType: 'microsoft' })}
-                    className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition ${
-                      formData.authType === 'microsoft'
-                        ? 'bg-emerald-50/70 border-emerald-500 text-emerald-900 shadow-sm'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
-                    }`}
-                  >
-                    <span className="font-bold text-xs text-slate-900">Microsoft OAuth (Safe)</span>
-                    <span className="text-[10px] text-slate-500 mt-1">Official Device Code. No passwords stored.</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, authType: 'offline' })}
-                    className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition ${
-                      formData.authType === 'offline'
-                        ? 'bg-emerald-50/70 border-emerald-500 text-emerald-900 shadow-sm'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
-                    }`}
-                  >
-                    <span className="font-bold text-xs text-slate-900">Offline / Cracked</span>
-                    <span className="text-[10px] text-slate-500 mt-1">For test servers or offline-mode networks.</span>
-                  </button>
-                </div>
-              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
@@ -843,49 +823,48 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
           )}
 
           {/* Submit Buttons / Auto-save Status */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
             {initialConfig ? (
-              <div className="flex items-center space-x-2 text-xs">
-                {saveStatus === 'saving' ? (
-                  <span className="flex items-center space-x-1.5 text-slate-500 font-medium">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
-                    <span>Auto-saving...</span>
-                  </span>
-                ) : saveStatus === 'saved' ? (
-                  <span className="flex items-center space-x-1 text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                    <Check className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>Auto-saved</span>
-                  </span>
-                ) : (
-                  <span className="flex items-center space-x-1 text-emerald-700 font-semibold bg-emerald-50/60 px-2.5 py-1 rounded-full border border-emerald-200/80">
-                    <Check className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>All changes auto-saved</span>
-                  </span>
-                )}
+              <div className="w-full flex items-center justify-between text-xs py-1">
+                <div className="flex items-center space-x-2">
+                  {saveStatus === 'saving' ? (
+                    <span className="flex items-center space-x-2 text-slate-600 font-semibold">
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping" />
+                      <span>Saving changes in real-time...</span>
+                    </span>
+                  ) : saveStatus === 'saved' ? (
+                    <span className="flex items-center space-x-1.5 text-emerald-800 font-bold bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                      <Check className="h-4 w-4 text-emerald-600" />
+                      <span>All updates saved live!</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center space-x-1.5 text-emerald-800 font-semibold bg-emerald-50/70 px-3 py-1 rounded-full border border-emerald-200/80">
+                      <Check className="h-4 w-4 text-emerald-600" />
+                      <span>Updates auto-save directly to your bot (close anytime with ✕)</span>
+                    </span>
+                  )}
+                </div>
               </div>
-            ) : <div />}
-
-            <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className={`px-5 py-2 text-xs font-bold rounded-xl shadow-md transition ${
-                  initialConfig
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                }`}
-              >
-                {initialConfig ? 'Done' : 'Cancel'}
-              </button>
-              {!initialConfig && (
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition"
-                >
-                  Add Account
-                </button>
-              )}
-            </div>
+            ) : (
+              <>
+                <div />
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-5 py-2 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition"
+                  >
+                    Add Account
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </form>
       </div>
