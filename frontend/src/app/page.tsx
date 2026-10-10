@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useVistaWebSocket } from '../hooks/useVistaWebSocket';
 import { Navbar } from '../components/Navbar';
 import { StatsOverview } from '../components/StatsOverview';
@@ -57,14 +57,14 @@ export default function Dashboard() {
   const activeChatConfig = configs.find((c) => c.id === chatBotId);
   const activeChatTelemetry = chatBotId ? telemetry[chatBotId] : undefined;
 
-  const handleSaveBot = (config: BotConfig) => {
+  const handleSaveBot = useCallback((config: BotConfig) => {
     const isExisting = editingBot || configs.some((c) => c.id === config.id);
     if (isExisting) {
       updateBot(config);
     } else {
       addBot(config);
     }
-  };
+  }, [editingBot, configs, updateBot, addBot]);
 
   const handleEditBot = (config: BotConfig) => {
     setEditingBot(config);

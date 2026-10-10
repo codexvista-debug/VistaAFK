@@ -51,26 +51,34 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
   const [activeTab, setActiveTab] = useState<'connection' | 'antiAfk' | 'survival' | 'farming' | 'alerts'>('connection');
   const [testWebhookStatus, setTestWebhookStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
-  const isInitialMount = useRef(true);
-
-  // Auto-save whenever formData changes when editing an existing bot account
+  const onSaveRef = useRef(onSave);
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
+    onSaveRef.current = onSave;
+  }, [onSave]);
+
+  const lastSavedJson = useRef(JSON.stringify(formData));
+
+  // Auto-save ONLY when formData actually changes compared to last saved state
+  useEffect(() => {
     if (!initialConfig) return;
     if (!formData.name.trim() || !formData.host.trim()) return;
 
+    const currentJson = JSON.stringify(formData);
+    // If nothing has changed, do not trigger auto-save!
+    if (currentJson === lastSavedJson.current) {
+      return;
+    }
+
     setSaveStatus('saving');
     const timer = setTimeout(() => {
-      onSave(formData);
+      lastSavedJson.current = currentJson;
+      onSaveRef.current(formData);
       setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 2500);
-    }, 200);
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    }, 500);
 
     return () => clearTimeout(timer);
-  }, [formData, initialConfig, onSave]);
+  }, [formData, initialConfig]);
 
   const handleTestWebhook = async () => {
     if (!formData.discordWebhookUrl?.trim()) return;
