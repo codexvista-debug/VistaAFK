@@ -39,6 +39,7 @@ interface BotCardProps {
   onOpenSightModal?: (config: BotConfig) => void;
   onOpenInventory?: (config: BotConfig) => void;
   onEdit: (config: BotConfig) => void;
+  onUpdate?: (config: BotConfig) => void;
 }
 
 export const BotCard: React.FC<BotCardProps> = ({
@@ -54,6 +55,7 @@ export const BotCard: React.FC<BotCardProps> = ({
   onOpenSightModal,
   onOpenInventory,
   onEdit,
+  onUpdate,
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [isLogsExpanded, setIsLogsExpanded] = useState(true);
@@ -95,6 +97,62 @@ export const BotCard: React.FC<BotCardProps> = ({
     if (hrs > 0) return `${hrs}h ${mins}m`;
     if (mins > 0) return `${mins}m ${secs}s`;
     return `${secs}s`;
+  };
+
+  // Toggle handlers for real-time feature pill buttons
+  const isAntiAfkActive = Boolean(config.antiAfk?.enabled);
+  const isAutoEatActive = Boolean(config.survival?.autoEat);
+  const isTotemActive = Boolean(config.survival?.autoTotem);
+  const isFarmActive = Boolean(config.farming?.enabled);
+
+  const toggleAntiAfk = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onUpdate) return;
+    onUpdate({
+      ...config,
+      antiAfk: {
+        ...config.antiAfk,
+        enabled: !isAntiAfkActive,
+      },
+    });
+  };
+
+  const toggleAutoEat = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onUpdate) return;
+    onUpdate({
+      ...config,
+      survival: {
+        ...config.survival,
+        autoEat: !isAutoEatActive,
+      },
+    });
+  };
+
+  const toggleTotem = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onUpdate) return;
+    onUpdate({
+      ...config,
+      survival: {
+        ...config.survival,
+        autoTotem: !isTotemActive,
+      },
+    });
+  };
+
+  const toggleFarm = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onUpdate) return;
+    onUpdate({
+      ...config,
+      farming: {
+        enabled: !isFarmActive,
+        autoEquipSword: config.farming?.autoEquipSword ?? true,
+        swingIntervalMs: config.farming?.swingIntervalMs ?? 900,
+        targetMode: config.farming?.targetMode ?? 'continuous',
+      },
+    });
   };
 
   // Filter to dedicated bot activity events (connects, joins, commands, survival, kicks, reconnects)
@@ -300,47 +358,67 @@ export const BotCard: React.FC<BotCardProps> = ({
             </span>
           </div>
 
-          {/* Features Active Pills */}
-          <div className="flex flex-wrap items-center gap-1.5 text-[10px] pt-1">
-            <span
-              className={`flex items-center space-x-1 px-2 py-0.5 rounded-full font-medium border ${
-                config.antiAfk.enabled
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                  : 'bg-slate-50 border-slate-200 text-slate-400'
+          {/* Features Active / Toggleable Pills */}
+          <div className="flex flex-wrap items-center gap-1.5 text-[10px] pt-1 select-none">
+            {/* 1. Anti-AFK */}
+            <button
+              type="button"
+              onClick={toggleAntiAfk}
+              title={`Click to turn ${isAntiAfkActive ? 'OFF' : 'ON'} Anti-AFK`}
+              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded-full transition active:scale-95 cursor-pointer font-bold border shadow-2xs ${
+                isAntiAfkActive
+                  ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-400 text-emerald-800'
+                  : 'bg-amber-50 hover:bg-amber-100 border-amber-400 text-amber-800'
               }`}
             >
-              <Zap className="h-2.5 w-2.5" />
+              <Zap className={`h-2.5 w-2.5 ${isAntiAfkActive ? 'text-emerald-600' : 'text-amber-600'}`} />
               <span>Anti-AFK</span>
-            </span>
+            </button>
 
-            <span
-              className={`flex items-center space-x-1 px-2 py-0.5 rounded-full font-medium border ${
-                config.survival.autoEat
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                  : 'bg-slate-50 border-slate-200 text-slate-400'
+            {/* 2. Auto-Eat */}
+            <button
+              type="button"
+              onClick={toggleAutoEat}
+              title={`Click to turn ${isAutoEatActive ? 'OFF' : 'ON'} Auto-Eat`}
+              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded-full transition active:scale-95 cursor-pointer font-bold border shadow-2xs ${
+                isAutoEatActive
+                  ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-400 text-emerald-800'
+                  : 'bg-amber-50 hover:bg-amber-100 border-amber-400 text-amber-800'
               }`}
             >
-              <Utensils className="h-2.5 w-2.5" />
+              <Utensils className={`h-2.5 w-2.5 ${isAutoEatActive ? 'text-emerald-600' : 'text-amber-600'}`} />
               <span>Auto-Eat</span>
-            </span>
+            </button>
 
-            <span
-              className={`flex items-center space-x-1 px-2 py-0.5 rounded-full font-medium border ${
-                config.survival.autoTotem
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                  : 'bg-slate-50 border-slate-200 text-slate-400'
+            {/* 3. Totem */}
+            <button
+              type="button"
+              onClick={toggleTotem}
+              title={`Click to turn ${isTotemActive ? 'OFF' : 'ON'} Auto-Totem`}
+              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded-full transition active:scale-95 cursor-pointer font-bold border shadow-2xs ${
+                isTotemActive
+                  ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-400 text-emerald-800'
+                  : 'bg-amber-50 hover:bg-amber-100 border-amber-400 text-amber-800'
               }`}
             >
-              <Shield className="h-2.5 w-2.5" />
+              <Shield className={`h-2.5 w-2.5 ${isTotemActive ? 'text-emerald-600' : 'text-amber-600'}`} />
               <span>Totem</span>
-            </span>
+            </button>
 
-            {config.farming?.enabled && (
-              <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full font-bold border bg-purple-50 border-purple-200 text-purple-700 animate-pulse">
-                <Swords className="h-2.5 w-2.5" />
-                <span>Farm (Auto-Swing)</span>
-              </span>
-            )}
+            {/* 4. Farm (Auto-Swing) */}
+            <button
+              type="button"
+              onClick={toggleFarm}
+              title={`Click to turn ${isFarmActive ? 'OFF' : 'ON'} Auto-Swing Farming`}
+              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded-full transition active:scale-95 cursor-pointer font-bold border shadow-2xs ${
+                isFarmActive
+                  ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-400 text-emerald-800'
+                  : 'bg-amber-50 hover:bg-amber-100 border-amber-400 text-amber-800'
+              }`}
+            >
+              <Swords className={`h-2.5 w-2.5 ${isFarmActive ? 'text-emerald-600 animate-pulse' : 'text-amber-600'}`} />
+              <span>Farm (Auto-Swing)</span>
+            </button>
 
             {isOnline && (
               <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full font-mono font-bold text-[10px] bg-emerald-100 text-emerald-800 border-2 border-emerald-400 shadow-xs">

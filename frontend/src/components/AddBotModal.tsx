@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, Bot, Server, Zap, Heart, Bell, Terminal, ShieldCheck, Swords } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Bot, Server, Zap, Heart, Bell, Terminal, ShieldCheck, Swords, Check } from 'lucide-react';
 import { BotConfig } from '../types';
 
 interface AddBotModalProps {
@@ -50,6 +50,27 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
 
   const [activeTab, setActiveTab] = useState<'connection' | 'antiAfk' | 'survival' | 'farming' | 'alerts'>('connection');
   const [testWebhookStatus, setTestWebhookStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const isInitialMount = useRef(true);
+
+  // Auto-save whenever formData changes when editing an existing bot account
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    if (!initialConfig) return;
+    if (!formData.name.trim() || !formData.host.trim()) return;
+
+    setSaveStatus('saving');
+    const timer = setTimeout(() => {
+      onSave(formData);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2500);
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [formData, initialConfig, onSave]);
 
   const handleTestWebhook = async () => {
     if (!formData.discordWebhookUrl?.trim()) return;
@@ -821,21 +842,50 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
             </div>
           )}
 
-          {/* Submit Buttons */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-end space-x-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition"
-            >
-              {initialConfig ? 'Save Changes' : 'Add Account'}
-            </button>
+          {/* Submit Buttons / Auto-save Status */}
+          <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+            {initialConfig ? (
+              <div className="flex items-center space-x-2 text-xs">
+                {saveStatus === 'saving' ? (
+                  <span className="flex items-center space-x-1.5 text-slate-500 font-medium">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                    <span>Auto-saving...</span>
+                  </span>
+                ) : saveStatus === 'saved' ? (
+                  <span className="flex items-center space-x-1 text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                    <Check className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Auto-saved</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center space-x-1 text-emerald-700 font-semibold bg-emerald-50/60 px-2.5 py-1 rounded-full border border-emerald-200/80">
+                    <Check className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>All changes auto-saved</span>
+                  </span>
+                )}
+              </div>
+            ) : <div />}
+
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className={`px-5 py-2 text-xs font-bold rounded-xl shadow-md transition ${
+                  initialConfig
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                {initialConfig ? 'Done' : 'Cancel'}
+              </button>
+              {!initialConfig && (
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition"
+                >
+                  Add Account
+                </button>
+              )}
+            </div>
           </div>
         </form>
       </div>

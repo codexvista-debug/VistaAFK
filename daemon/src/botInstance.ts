@@ -199,6 +199,7 @@ export class BotInstance {
       this.setupAntiAfk();
       this.setupAutoCommands();
       this.setupFarming();
+      this.emitTelemetry();
     }
   }
 

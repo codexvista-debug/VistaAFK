@@ -271,6 +271,7 @@ export default function Dashboard() {
                   onOpenSightModal={(c) => setSightModalBot(c)}
                   onOpenInventory={(c) => setInventoryModalBot(c)}
                   onEdit={handleEditBot}
+                  onUpdate={updateBot}
                 />
               ))}
             </div>
