@@ -1,6 +1,6 @@
 import mineflayer, { Bot } from 'mineflayer';
 import { SocksProxyAgent } from 'socks-proxy-agent';
-import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, InventoryItem, ItemEnchantment, MinimapPlayer, MinimapMob } from './types.js';
+import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, InventoryItem, ItemEnchantment, MinimapPlayer, MinimapMob, TerrainGridData } from './types.js';
 import { sampleTerrainGrid } from './terrainMapper.js';
 import path from 'path';
 
@@ -149,6 +149,9 @@ export class BotInstance {
   private lastAntiAfkLogTime: number = 0;
   private isEatingFood: boolean = false;
   private customMaxHealth: number = 0;
+  private terrainGridCache: TerrainGridData | null = null;
+  private terrainGridSampledAt = 0;
+  private terrainGridCenter: { x: number; y: number; z: number } | null = null;
   private recordedMaxHealth: number = 0;
   private bedrockClient: any = null;
   private bedrockPosition: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
@@ -1126,10 +1129,12 @@ export class BotInstance {
   public move(control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean, durationMs?: number) {
     if (!this.bot || this.currentStatus !== 'online') {
       console.warn(`[VistaAFK Bot ${this.config.name}] Cannot move: bot is offline or not spawned`);
+      this.callbacks.onNotification('warn', `Cannot move ${this.config.name}: bot is offline or not spawned.`, this.config.id);
       return;
     }
     try {
       console.log(`[VistaAFK Bot ${this.config.name}] Manual move: control=${control}, state=${state}, duration=${durationMs}ms`);
+      const wasManualControlActive = this.manualMovementControls.has(control);
 
       const clearMovementTimers = (target: typeof control) => {
         const timeout = this.movementTimeouts.get(target);
@@ -1185,6 +1190,9 @@ export class BotInstance {
 
       // 2. Set Mineflayer movement control
       this.bot.setControlState(control, state);
+      if (state && !wasManualControlActive) {
+        this.emitActivity('status', `🎮 Manual control received: ${control}`);
+      }
 
       if (!state) {
         if (control === 'forward') {
@@ -1723,8 +1731,20 @@ export class BotInstance {
       nearbyMobs.sort((a, b) => a.distance - b.distance);
     } catch (e) {}
 
-    // Sample terrain surface grid for Xaero's Minimap view
-    const terrainGrid = sampleTerrainGrid(this.bot, 14);
+    // Reuse the detailed surface grid between telemetry events. Movement can emit
+    // telemetry several times per second, and rescanning thousands of blocks on
+    // every event starves Mineflayer's own physics loop.
+    const mapCenter = { x: Math.floor(pos.x), y: Math.floor(pos.y), z: Math.floor(pos.z) };
+    const movedFarEnough = !this.terrainGridCenter
+      || Math.abs(mapCenter.x - this.terrainGridCenter.x) >= 3
+      || Math.abs(mapCenter.y - this.terrainGridCenter.y) >= 3
+      || Math.abs(mapCenter.z - this.terrainGridCenter.z) >= 3;
+    if (!this.terrainGridCache || Date.now() - this.terrainGridSampledAt >= 2000 || movedFarEnough) {
+      this.terrainGridCache = sampleTerrainGrid(this.bot, 24);
+      this.terrainGridSampledAt = Date.now();
+      this.terrainGridCenter = mapCenter;
+    }
+    const terrainGrid = this.terrainGridCache;
 
     // Inventory serialization with enchantments and lore
     const inventoryList: InventoryItem[] = [];
@@ -1839,7 +1859,7 @@ export class BotInstance {
       targetBlock,
       nearbyEntities: nearbyEntities.slice(0, 15),
       nearbyPlayers,
-      nearbyMobs: nearbyMobs.slice(0, 30),
+      nearbyMobs: nearbyMobs.slice(0, 60),
       currentBiome: terrainGrid?.currentBiome,
       currentLandBlock: terrainGrid?.currentLandBlock,
       terrainGrid,

@@ -151,6 +151,9 @@ class BotInstance {
     lastAntiAfkLogTime = 0;
     isEatingFood = false;
     customMaxHealth = 0;
+    terrainGridCache = null;
+    terrainGridSampledAt = 0;
+    terrainGridCenter = null;
     recordedMaxHealth = 0;
     bedrockClient = null;
     bedrockPosition = { x: 0, y: 0, z: 0 };
@@ -1070,10 +1073,12 @@ class BotInstance {
     move(control, state, durationMs) {
         if (!this.bot || this.currentStatus !== 'online') {
             console.warn(`[VistaAFK Bot ${this.config.name}] Cannot move: bot is offline or not spawned`);
+            this.callbacks.onNotification('warn', `Cannot move ${this.config.name}: bot is offline or not spawned.`, this.config.id);
             return;
         }
         try {
             console.log(`[VistaAFK Bot ${this.config.name}] Manual move: control=${control}, state=${state}, duration=${durationMs}ms`);
+            const wasManualControlActive = this.manualMovementControls.has(control);
             const clearMovementTimers = (target) => {
                 const timeout = this.movementTimeouts.get(target);
                 if (timeout)
@@ -1135,6 +1140,9 @@ class BotInstance {
             }
             // 2. Set Mineflayer movement control
             this.bot.setControlState(control, state);
+            if (state && !wasManualControlActive) {
+                this.emitActivity('status', `🎮 Manual control received: ${control}`);
+            }
             if (!state) {
                 if (control === 'forward') {
                     try {
@@ -1677,8 +1685,20 @@ class BotInstance {
             nearbyMobs.sort((a, b) => a.distance - b.distance);
         }
         catch (e) { }
-        // Sample terrain surface grid for Xaero's Minimap view
-        const terrainGrid = (0, terrainMapper_js_1.sampleTerrainGrid)(this.bot, 14);
+        // Reuse the detailed surface grid between telemetry events. Movement can emit
+        // telemetry several times per second, and rescanning thousands of blocks on
+        // every event starves Mineflayer's own physics loop.
+        const mapCenter = { x: Math.floor(pos.x), y: Math.floor(pos.y), z: Math.floor(pos.z) };
+        const movedFarEnough = !this.terrainGridCenter
+            || Math.abs(mapCenter.x - this.terrainGridCenter.x) >= 3
+            || Math.abs(mapCenter.y - this.terrainGridCenter.y) >= 3
+            || Math.abs(mapCenter.z - this.terrainGridCenter.z) >= 3;
+        if (!this.terrainGridCache || Date.now() - this.terrainGridSampledAt >= 2000 || movedFarEnough) {
+            this.terrainGridCache = (0, terrainMapper_js_1.sampleTerrainGrid)(this.bot, 24);
+            this.terrainGridSampledAt = Date.now();
+            this.terrainGridCenter = mapCenter;
+        }
+        const terrainGrid = this.terrainGridCache;
         // Inventory serialization with enchantments and lore
         const inventoryList = [];
         try {
@@ -1791,7 +1811,7 @@ class BotInstance {
             targetBlock,
             nearbyEntities: nearbyEntities.slice(0, 15),
             nearbyPlayers,
-            nearbyMobs: nearbyMobs.slice(0, 30),
+            nearbyMobs: nearbyMobs.slice(0, 60),
             currentBiome: terrainGrid?.currentBiome,
             currentLandBlock: terrainGrid?.currentLandBlock,
             terrainGrid,

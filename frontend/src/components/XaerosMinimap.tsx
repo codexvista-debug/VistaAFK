@@ -101,6 +101,19 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
           ctx.fillRect(px, pz, Math.ceil(cellSize) + 0.5, Math.ceil(cellSize) + 0.5);
         }
       }
+
+      // Fine block boundaries make the terrain legible at higher radar resolution.
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 0.65;
+      ctx.beginPath();
+      for (let i = 0; i <= size; i++) {
+        const edge = startOffset + i * cellSize;
+        ctx.moveTo(startOffset + i * cellSize, startOffset);
+        ctx.lineTo(startOffset + i * cellSize, startOffset + size * cellSize);
+        ctx.moveTo(startOffset, edge);
+        ctx.lineTo(startOffset + size * cellSize, edge);
+      }
+      ctx.stroke();
     } else {
       // Fallback stylized grid if terrain isn't populated yet
       ctx.fillStyle = '#111827';
@@ -180,12 +193,14 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
             <Layers className="h-3.5 w-3.5 text-slate-500" />
             <span>{currentLand}</span>
           </span>
-          {nearbyMobs.length > 0 && (
-            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-red-50 text-red-700 border border-red-200 font-bold text-[11px]">
-              <Skull className="h-3 w-3 text-red-600" />
-              <span>{hostileMobs.length} Hostile</span>
-            </span>
-          )}
+          <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg border font-bold text-[11px] ${
+            hostileMobs.length > 0
+              ? 'bg-red-50 text-red-700 border-red-200'
+              : 'bg-amber-50 text-amber-800 border-amber-200'
+          }`}>
+            <Bug className="h-3 w-3" />
+            <span>{nearbyMobs.length} Mobs · {hostileMobs.length} Hostile</span>
+          </span>
         </div>
 
         {/* Zoom & Mode buttons */}
@@ -307,7 +322,7 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
             return (
               <div
                 key={`mob-${mob.id}`}
-                className="absolute z-25 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-auto group cursor-pointer"
+                className="absolute z-30 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-auto group cursor-pointer"
                 style={{
                   left: `${clampedX}%`,
                   top: `${clampedY}%`,
@@ -316,18 +331,28 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
               >
                 {/* Mob Pip */}
                 <div
-                  className={`w-3.5 h-3.5 rounded-full flex items-center justify-center border shadow-md transition transform group-hover:scale-125 ${
+                  className={`w-5 h-5 rounded-md flex items-center justify-center border-2 shadow-lg transition transform group-hover:scale-125 ${
                     mob.isHostile
-                      ? 'bg-red-600 border-red-200 ring-2 ring-red-500/50 animate-pulse'
-                      : 'bg-amber-400 border-yellow-100 ring-1 ring-amber-400/40'
+                      ? 'bg-red-600 border-red-100 ring-2 ring-red-500/60 animate-pulse'
+                      : 'bg-emerald-500 border-emerald-100 ring-2 ring-emerald-500/40'
                   }`}
                 >
                   {mob.isHostile ? (
-                    <Skull className="h-2 w-2 text-white" />
+                    <Skull className="h-3 w-3 text-white" />
                   ) : (
-                    <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                    <Bug className="h-3 w-3 text-white" />
                   )}
                 </div>
+
+                {mob.distance <= Math.min(12, maxRange) && (
+                  <div className={`mt-0.5 px-1 py-0.5 rounded border text-[8px] font-black shadow-md whitespace-nowrap ${
+                    mob.isHostile
+                      ? 'bg-red-950/95 text-red-100 border-red-400/80'
+                      : 'bg-emerald-950/95 text-emerald-100 border-emerald-400/80'
+                  }`}>
+                    {mob.name} {mob.distance}m
+                  </div>
+                )}
 
                 {/* Mob Hover Tooltip */}
                 <div className="hidden group-hover:flex mt-0.5 px-1 py-0.5 bg-slate-950/95 border border-slate-700 rounded text-[8px] font-bold text-slate-200 shadow-md whitespace-nowrap items-center space-x-1">
@@ -454,7 +479,7 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
             </button>
           </div>
           <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-            Range: 36m
+            Range: {Math.round(maxRange * 2)}m
           </span>
         </div>
 
