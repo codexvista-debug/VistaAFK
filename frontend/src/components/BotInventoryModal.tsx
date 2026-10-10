@@ -5,6 +5,11 @@ import { X, Shield, Sparkles, Package, Info, Swords, ArrowRight, ArrowLeftRight,
 import { BotConfig, BotTelemetry, InventoryItem } from '../types';
 import { useVistaWebSocket } from '../hooks/useVistaWebSocket';
 
+function getEnchantLabel(enchantment: NonNullable<InventoryItem['enchantments']>[number]) {
+  const displayName = (enchantment.displayName || enchantment.name).replace(/\s+(?:X|IX|VIII|VII|VI|V|IV|III|II|I)$/i, '');
+  return `${displayName} ${enchantment.level}`;
+}
+
 interface BotInventoryModalProps {
   onClose?: () => void;
   config: BotConfig;
@@ -141,7 +146,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
             ? 'bg-purple-50/70 border-purple-400 hover:border-purple-500'
             : 'bg-slate-100/80 border-slate-300 hover:border-slate-400 hover:bg-slate-200/60'
         }`}
-        title={item ? `${item.displayName} (x${item.count}) • Slot #${slotNumber}` : label || `Slot #${slotNumber}`}
+        title={item ? `${item.displayName} (x${item.count}) • Slot #${slotNumber}${isEnchanted ? ` • ${item.enchantments!.map(getEnchantLabel).join(', ')}` : ''}` : label || `Slot #${slotNumber}`}
       >
         {/* Placeholder Slot Label if empty */}
         {!item && label && (
@@ -175,12 +180,9 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
               }}
             />
 
-            {/* Enchantment Shimmer Dot */}
+            {/* Visible enchantment marker; the full names appear in the item inspector. */}
             {isEnchanted && (
-              <span className="absolute top-0.5 right-0.5 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-600"></span>
-              </span>
+              <span className="absolute -top-1 -right-1 rounded-full bg-purple-700 border border-white p-0.5 shadow-sm"><Sparkles className="h-2.5 w-2.5 text-white" /></span>
             )}
 
             {/* Stack Count Badge */}
@@ -243,14 +245,14 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
             />
             <div className="min-w-0">
               <div className="flex items-center space-x-1.5 sm:space-x-2">
-                <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight truncate">
+                <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight truncate">
                   {config.name}&apos;s Live Inventory
                 </h2>
-                <span className="px-1.5 sm:px-2 py-0.5 text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-md shrink-0">
+                <span className="px-2 py-1 text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-md shrink-0">
                   {telemetry?.inventoryCount ?? 0} Stacks
                 </span>
               </div>
-              <p className="text-[11px] sm:text-xs text-slate-500 font-mono font-medium truncate">
+              <p className="text-xs sm:text-sm text-slate-600 font-medium truncate">
                 {config.host}:{config.port} &bull; Drag & drop or click items to move
               </p>
             </div>
@@ -290,7 +292,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
           <div className="md:col-span-2 space-y-4">
             {/* Equipment Row */}
             <div className="p-3.5 bg-slate-50 border-2 border-slate-200 rounded-2xl">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
+              <span className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-2">
                 Armor & Hands Equipment
               </span>
               <div className="flex items-center justify-between gap-2">
@@ -306,11 +308,11 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                 <div className="flex items-center space-x-2 border-l-2 border-slate-200 pl-3">
                   <div className="flex flex-col items-center">
                     {renderSlot(36 + selectedHotbarIndex, 'Main', true)}
-                    <span className="text-[9px] font-bold text-slate-500 mt-0.5">Main Hand</span>
+                    <span className="text-[11px] font-semibold text-slate-600 mt-0.5">Main Hand</span>
                   </div>
                   <div className="flex flex-col items-center">
                     {renderSlot(45, 'Off')}
-                    <span className="text-[9px] font-bold text-slate-500 mt-0.5">Off-Hand</span>
+                    <span className="text-[11px] font-semibold text-slate-600 mt-0.5">Off-Hand</span>
                   </div>
                 </div>
               </div>
@@ -319,10 +321,10 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
             {/* Main Storage (Slots 9 - 35, 3 Rows of 9) */}
             <div className="p-3.5 bg-slate-50 border-2 border-slate-200 rounded-2xl">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">
                   Main Inventory (27 Slots)
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium">Click to inspect or drag to move</span>
+                <span className="text-[11px] text-slate-500 font-medium">Click an item to inspect, or drag it to move</span>
               </div>
 
               <div className="grid grid-cols-9 gap-1 sm:gap-1.5 justify-items-center">
@@ -335,11 +337,11 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-1.5">
                   <Swords className="h-3.5 w-3.5 text-emerald-600" />
-                  <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
                     Hotbar (Active Slot: #{selectedHotbarIndex + 1})
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
                   Equipped in Hand
                 </span>
               </div>
@@ -357,12 +359,12 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                 <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                   <div className="flex items-center space-x-2">
                     <Info className="h-4 w-4 text-cyan-400" />
-                    <span className="font-mono font-bold text-xs uppercase text-cyan-300 tracking-wider">
+                    <span className="font-sans font-bold text-sm text-cyan-200 tracking-wide">
                       Item Lore & Stats
                     </span>
                   </div>
                   {activeItem && (
-                    <span className="text-[10px] font-mono text-slate-400">
+                    <span className="text-[11px] font-medium text-slate-400">
                       Slot #{activeItem.slot}
                     </span>
                   )}
@@ -387,26 +389,45 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                         />
                       </div>
                       <div className="truncate">
-                        <h3 className={`font-black text-sm truncate ${
+                        <h3 className={`font-bold text-base truncate ${
                           activeItem.enchantments && activeItem.enchantments.length > 0
                             ? 'text-cyan-300 drop-shadow-[0_1px_3px_rgba(6,182,212,0.4)]'
                             : 'text-white'
                         }`}>
                           {activeItem.displayName}
                         </h3>
-                        <p className="text-[10px] font-mono text-slate-400 truncate mt-0.5">
+                        <p className="text-[11px] font-medium text-slate-400 truncate mt-0.5">
                           minecraft:{activeItem.name}
                         </p>
-                        <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                        <span className="inline-block mt-1 px-2 py-1 rounded-md text-xs font-semibold bg-slate-800 text-slate-200 border border-slate-700">
                           Count: {activeItem.count}
                         </span>
                       </div>
                     </div>
 
+                    {/* Enchantments are shown as readable numeric levels (for example, Looting 3). */}
+                    {activeItem.enchantments && activeItem.enchantments.length > 0 ? (
+                      <div className="p-3 bg-purple-950/40 border border-purple-800/60 rounded-xl space-y-2">
+                        <div className="flex items-center space-x-2 text-purple-200 font-bold text-sm">
+                          <Sparkles className="h-4 w-4 text-purple-300" />
+                          <span>Enchantments</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {activeItem.enchantments.map((ench, idx) => (
+                            <span key={`${ench.name}-${idx}`} className="px-2 py-1 rounded-lg border border-purple-700/70 bg-purple-900/60 text-sm font-semibold text-cyan-100">
+                              {getEnchantLabel(ench)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400">No enchantments detected on this item.</p>
+                    )}
+
                     {/* Move & Quick Equip Actions */}
                     <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2">
                       <div className="flex items-center justify-between text-[11px] font-mono">
-                        <span className="font-bold text-slate-200">Move / Swap Item:</span>
+                        <span className="font-bold text-slate-100 text-xs">Move / swap item</span>
                         {movingSlot === activeItem.slot && (
                           <span className="text-[10px] text-emerald-400 font-bold animate-pulse">Pick target slot</span>
                         )}
@@ -422,7 +443,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                               setMovingSlot(activeItem.slot);
                             }
                           }}
-                          className={`py-1.5 px-2 rounded-lg text-xs font-bold font-mono transition flex items-center justify-center space-x-1 border ${
+                          className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center space-x-1 border ${
                             movingSlot === activeItem.slot
                               ? 'bg-emerald-600 border-emerald-400 text-white'
                               : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
@@ -441,7 +462,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                               moveInventoryItem(config.id, activeItem.slot, 36 + selectedHotbarIndex);
                             }
                           }}
-                          className="py-1.5 px-2 rounded-lg text-xs font-bold font-mono bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 transition flex items-center justify-center space-x-1"
+                          className="py-1.5 px-2 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-300 transition flex items-center justify-center space-x-1"
                         >
                           <Swords className="h-3 w-3" />
                           <span>Equip Main</span>
@@ -450,7 +471,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
 
                       {/* Move to Hotbar 1-9 Quick Buttons */}
                       <div className="pt-1.5 border-t border-slate-800/80">
-                        <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider block mb-1">
+                        <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wide block mb-1.5">
                           Move to Hotbar Slot:
                         </span>
                         <div className="grid grid-cols-9 gap-1">
@@ -466,7 +487,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                                   moveInventoryItem(config.id, activeItem.slot, targetHotbarSlot);
                                   setSelectedSlotIndex(targetHotbarSlot);
                                 }}
-                                className={`py-1 text-center font-mono text-[10px] font-bold rounded border transition ${
+                                className={`py-1.5 text-center text-xs font-bold rounded border transition ${
                                   isCurrentSlot
                                     ? 'bg-emerald-950 border-emerald-700 text-emerald-300'
                                     : 'bg-slate-800 hover:bg-emerald-600 hover:text-white border-slate-700 text-slate-300'
@@ -487,7 +508,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                           moveInventoryItem(config.id, activeItem.slot, 45);
                           setSelectedSlotIndex(45);
                         }}
-                        className="w-full py-1.5 px-2 rounded-lg text-xs font-bold font-mono bg-slate-800 hover:bg-slate-700 border border-slate-700 text-purple-300 transition flex items-center justify-center space-x-1 mt-1"
+                        className="w-full py-1.5 px-2 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-purple-200 transition flex items-center justify-center space-x-1 mt-1"
                       >
                         <Shield className="h-3 w-3" />
                         <span>Move to Off-Hand (Slot #45)</span>
@@ -497,7 +518,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                     {/* Durability */}
                     {typeof activeItem.durabilityUsed === 'number' && typeof activeItem.maxDurability === 'number' && activeItem.maxDurability > 0 && (
                       <div className="p-2 bg-slate-900/90 rounded-xl border border-slate-800 space-y-1">
-                        <div className="flex items-center justify-between text-[11px] font-mono">
+                        <div className="flex items-center justify-between text-xs">
                           <span className="text-slate-400 font-medium">Durability:</span>
                           <span className="text-emerald-400 font-bold">
                             {activeItem.maxDurability - activeItem.durabilityUsed} / {activeItem.maxDurability}
@@ -514,24 +535,6 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                       </div>
                     )}
 
-                    {/* Enchantments Section */}
-                    {activeItem.enchantments && activeItem.enchantments.length > 0 && (
-                      <div className="p-2.5 bg-purple-950/40 border border-purple-800/60 rounded-xl space-y-1">
-                        <div className="flex items-center space-x-1.5 text-purple-300 font-bold text-xs">
-                          <Sparkles className="h-3.5 w-3.5 text-purple-400" />
-                          <span>Enchantments ({activeItem.enchantments.length})</span>
-                        </div>
-                        <div className="space-y-1 pt-0.5 font-mono text-xs">
-                          {activeItem.enchantments.map((ench, idx) => (
-                            <div key={idx} className="flex items-center justify-between text-cyan-300 font-semibold">
-                              <span>&bull; {ench.displayName}</span>
-                              <span className="text-[10px] text-purple-300 font-bold">Lvl {ench.level}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
                     {/* Item Custom Lore Section */}
                     {activeItem.lore && activeItem.lore.length > 0 && (
                       <div className="p-2.5 bg-slate-900/90 border border-purple-900/50 rounded-xl space-y-1">
@@ -540,7 +543,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                         </span>
                         <div className="space-y-1 pt-0.5">
                           {activeItem.lore.map((line, idx) => (
-                            <p key={idx} className="font-mono text-xs text-purple-200/90 italic leading-snug">
+                            <p key={idx} className="text-xs text-purple-100 leading-relaxed">
                               {line}
                             </p>
                           ))}

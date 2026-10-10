@@ -7,6 +7,7 @@ import { BotTelemetry, MinimapPlayer, MinimapMob } from '../types';
 interface XaerosMinimapProps {
   telemetry?: BotTelemetry;
   botName: string;
+  large?: boolean;
 }
 
 // Adjust hex color brightness for topographic elevation shading
@@ -23,7 +24,7 @@ function shadeColor(hex: string, percent: number): string {
   return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 }
 
-export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName }) => {
+export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName, large = false }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [zoom, setZoom] = useState<number>(1);
   const [rotateWithPlayer, setRotateWithPlayer] = useState<boolean>(false);
@@ -247,7 +248,7 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
       </div>
 
       {/* Main SQUARE Minimap Frame (Xaero's Square Radar) */}
-      <div className="relative w-full aspect-square max-w-[340px] mx-auto rounded-2xl p-2 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-950 border-4 border-slate-700/90 shadow-2xl flex items-center justify-center">
+      <div className={`relative w-full aspect-square ${large ? 'max-w-[500px]' : 'max-w-[340px]'} mx-auto rounded-2xl p-2 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-950 border-4 border-slate-700/90 shadow-2xl flex items-center justify-center`}>
         {/* Outer Compass Cardinal Labels */}
         <div
           className="absolute inset-0 pointer-events-none transition-transform duration-300"
@@ -271,8 +272,8 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
         <div className="relative w-full h-full rounded-xl overflow-hidden border-2 border-slate-900 shadow-inner flex items-center justify-center bg-slate-950">
           <canvas
             ref={canvasRef}
-            width={340}
-            height={340}
+            width={512}
+            height={512}
             className="w-full h-full block"
           />
 

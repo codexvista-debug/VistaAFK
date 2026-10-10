@@ -44,6 +44,32 @@ function formatEnchantName(rawId: string, lvl: number): string {
   return `${title} I`;
 }
 
+function parseEnchantmentsFromLore(lines: string[]): ItemEnchantment[] {
+  const knownNames = new Set([
+    'protection', 'fire_protection', 'feather_falling', 'blast_protection', 'projectile_protection',
+    'respiration', 'aqua_affinity', 'thorns', 'depth_strider', 'frost_walker', 'sharpness', 'smite',
+    'bane_of_arthropods', 'knockback', 'fire_aspect', 'looting', 'sweeping_edge', 'efficiency',
+    'silk_touch', 'unbreaking', 'fortune', 'power', 'punch', 'flame', 'infinity', 'luck_of_the_sea',
+    'lure', 'loyalty', 'impaling', 'riptide', 'channeling', 'multishot', 'quick_charge', 'piercing',
+    'mending', 'soul_speed', 'swift_sneak', 'wind_burst', 'density', 'breach', 'binding_curse',
+    'vanishing_curse', 'curse_of_binding', 'curse_of_vanishing', 'sweeping',
+  ]);
+  const romanLevels: Record<string, number> = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10 };
+  const found = new Map<string, ItemEnchantment>();
+
+  for (const line of lines) {
+    const match = line.replace(/§[0-9a-fk-or]/gi, '').match(/^\s*([\w ]+?)\s+(X|IX|VIII|VII|VI|V|IV|III|II|I|\d+)\s*$/i);
+    if (!match) continue;
+    const name = match[1].toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    const rawLevel = match[2].toUpperCase();
+    const level = romanLevels[rawLevel] || Number(rawLevel);
+    if (!knownNames.has(name) || !Number.isFinite(level) || level < 1) continue;
+    found.set(name, { name, level, displayName: formatEnchantName(name, level) });
+  }
+
+  return [...found.values()];
+}
+
 function cleanMinecraftJsonText(raw: any): string {
   if (!raw) return '';
   if (typeof raw === 'string') {
@@ -1756,14 +1782,22 @@ export class BotInstance {
 
           // Parse enchantments
           const enchants: ItemEnchantment[] = [];
-          if (Array.isArray(it.enchants)) {
-            for (const e of it.enchants) {
-              enchants.push({
-                name: e.name,
-                level: e.lvl,
-                displayName: formatEnchantName(e.name, e.lvl),
-              });
+          try {
+            const itemEnchants = it.enchants;
+            if (Array.isArray(itemEnchants)) {
+              for (const e of itemEnchants) {
+                const enchantName = typeof e?.name === 'string' ? e.name.replace(/^minecraft:/, '') : '';
+                const enchantLevel = Number(e?.lvl ?? (e as any)?.level);
+                if (!enchantName || !Number.isFinite(enchantLevel) || enchantLevel < 1) continue;
+                enchants.push({
+                  name: enchantName,
+                  level: enchantLevel,
+                  displayName: formatEnchantName(enchantName, enchantLevel),
+                });
+              }
             }
+          } catch (e) {
+            // Some protocol versions expose enchantments through NBT instead of item components.
           }
           if (enchants.length === 0 && (it as any).nbt?.value) {
             const nbtVal = (it as any).nbt.value;
@@ -1797,6 +1831,10 @@ export class BotInstance {
                 if (cleaned) loreLines.push(cleaned);
               }
             }
+          }
+
+          if (enchants.length === 0 && loreLines.length > 0) {
+            enchants.push(...parseEnchantmentsFromLore(loreLines));
           }
 
           // Custom Name
