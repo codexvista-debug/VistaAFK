@@ -173,6 +173,7 @@ wss.on('connection', (ws) => {
           botManager.sendChat(msg.payload.botId, msg.payload.message);
           break;
         case 'MOVE_BOT':
+          console.log(`[VistaAFK Server] MOVE_BOT payload:`, msg.payload);
           botManager.moveBot(msg.payload.botId, msg.payload.control, msg.payload.state, msg.payload.durationMs);
           break;
         case 'TOGGLE_PATROL':

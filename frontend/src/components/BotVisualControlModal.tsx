@@ -20,8 +20,9 @@ import {
   Activity,
   Wind,
 } from 'lucide-react';
-import { BotConfig, BotTelemetry } from '../types';
 import { XaerosMinimap } from './XaerosMinimap';
+import { BotLookControl } from './BotLookControl';
+import { BotConfig, BotTelemetry } from '../types';
 
 interface BotVisualControlModalProps {
   config: BotConfig;
@@ -63,94 +64,103 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
   // Movement Control States
   const [activeControls, setActiveControls] = useState<Record<string, boolean>>({});
   const activeControlRef = useRef<Record<string, boolean>>({});
-  const stepTimeoutsRef = useRef<Record<string, NodeJS.Timeout>>({});
+  const stepTimeoutsRef = useRef<Record<string, any>>({});
+  const pressStartRef = useRef<Record<string, number>>({});
+  const onMoveRef = useRef(onMove);
+  useEffect(() => {
+    onMoveRef.current = onMove;
+  }, [onMove]);
+
+  const configIdRef = useRef(config.id);
+  useEffect(() => {
+    configIdRef.current = config.id;
+  }, [config.id]);
+
+  const isOnlineRef = useRef(isOnline);
+  useEffect(() => {
+    isOnlineRef.current = isOnline;
+  }, [isOnline]);
 
   const startMove = useCallback((control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak') => {
-    if (!isOnline) return;
+    if (!isOnlineRef.current) return;
     activeControlRef.current[control] = true;
     setActiveControls((prev) => ({ ...prev, [control]: true }));
-    onMove(config.id, control, true);
-  }, [isOnline, config.id, onMove]);
+    onMoveRef.current(configIdRef.current, control, true);
+  }, []);
 
   const stopMove = useCallback((control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak') => {
-    if (!isOnline) return;
     if (stepTimeoutsRef.current[control]) {
       clearTimeout(stepTimeoutsRef.current[control]);
       delete stepTimeoutsRef.current[control];
     }
     activeControlRef.current[control] = false;
     setActiveControls((prev) => ({ ...prev, [control]: false }));
-    onMove(config.id, control, false);
-  }, [isOnline, config.id, onMove]);
+    onMoveRef.current(configIdRef.current, control, false);
+  }, []);
 
-  const stepMove = useCallback((control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', durationMs = 1200) => {
-    if (!isOnline) return;
+  const stepMove = useCallback((control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', durationMs = 1500) => {
+    if (!isOnlineRef.current) return;
     activeControlRef.current[control] = true;
     setActiveControls((prev) => ({ ...prev, [control]: true }));
     if (stepTimeoutsRef.current[control]) {
       clearTimeout(stepTimeoutsRef.current[control]);
     }
-    onMove(config.id, control, true, durationMs);
+    onMoveRef.current(configIdRef.current, control, true, durationMs);
     stepTimeoutsRef.current[control] = setTimeout(() => {
       activeControlRef.current[control] = false;
       setActiveControls((prev) => ({ ...prev, [control]: false }));
       delete stepTimeoutsRef.current[control];
     }, durationMs);
-  }, [isOnline, config.id, onMove]);
+  }, []);
 
-  const createButtonHandlers = (control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak') => {
-    let pressTimer: NodeJS.Timeout | null = null;
-    let isContinuous = false;
-
-    return {
-      onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
-        if (!isOnline) return;
-        try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch (err) {}
-        isContinuous = false;
-        pressTimer = setTimeout(() => {
-          isContinuous = true;
-          startMove(control);
-        }, 200);
-      },
-      onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => {
-        if (!isOnline) return;
-        if (pressTimer) {
-          clearTimeout(pressTimer);
-          pressTimer = null;
-        }
-        if (isContinuous) {
-          stopMove(control);
-          isContinuous = false;
-        } else {
-          stepMove(control, control === 'jump' ? 400 : 1200);
-        }
-      },
-      onPointerCancel: () => {
-        if (pressTimer) {
-          clearTimeout(pressTimer);
-          pressTimer = null;
-        }
-        if (isContinuous) {
-          stopMove(control);
-          isContinuous = false;
-        }
-      },
-    };
+  const handleControlDown = (control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak') => {
+    if (!isOnlineRef.current) return;
+    pressStartRef.current[control] = Date.now();
+    startMove(control);
   };
 
-  const handleTurn = (deltaYawDeg: number) => {
-    if (!isOnline) return;
-    const deltaRad = (deltaYawDeg * Math.PI) / 180;
-    onLook(config.id, yaw + deltaRad, pitch);
+  const handleControlUp = (control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak') => {
+    if (!isOnlineRef.current) return;
+    const duration = Date.now() - (pressStartRef.current[control] || 0);
+    if (duration < 250) {
+      // Tap or click: trigger a multi-block 1500ms step
+      stepMove(control, control === 'jump' ? 400 : 1500);
+    } else {
+      // Sustained hold: stop now
+      stopMove(control);
+    }
   };
 
-  const snapToCardinal = (targetDeg: number) => {
-    if (!isOnline) return;
-    const rad = (-targetDeg * Math.PI) / 180;
-    onLook(config.id, rad, 0);
-  };
+  const createButtonHandlers = (control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak') => ({
+    onMouseDown: (e: React.MouseEvent) => {
+      e.preventDefault();
+      handleControlDown(control);
+    },
+    onMouseUp: (e: React.MouseEvent) => {
+      e.preventDefault();
+      handleControlUp(control);
+    },
+    onMouseLeave: (e: React.MouseEvent) => {
+      if (activeControlRef.current[control]) {
+        handleControlUp(control);
+      }
+    },
+    onTouchStart: (e: React.TouchEvent) => {
+      e.preventDefault();
+      handleControlDown(control);
+    },
+    onTouchEnd: (e: React.TouchEvent) => {
+      e.preventDefault();
+      handleControlUp(control);
+    },
+    onTouchCancel: (e: React.TouchEvent) => {
+      if (activeControlRef.current[control]) {
+        handleControlUp(control);
+      }
+    },
+  });
 
-  // Physical Keyboard Listener (WASD, Space, Shift, Arrow keys)
+  // Keyboard listener: uses stable refs and does NOT cancel on telemetry updates
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -160,41 +170,45 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
         return;
       }
+      if (e.repeat) return;
 
       if (e.code === 'KeyW' || e.code === 'ArrowUp') {
         e.preventDefault();
-        startMove('forward');
+        handleControlDown('forward');
       } else if (e.code === 'KeyS' || e.code === 'ArrowDown') {
         e.preventDefault();
-        startMove('back');
+        handleControlDown('back');
       } else if (e.code === 'KeyA' || e.code === 'ArrowLeft') {
         e.preventDefault();
-        startMove('left');
+        handleControlDown('left');
       } else if (e.code === 'KeyD' || e.code === 'ArrowRight') {
         e.preventDefault();
-        startMove('right');
+        handleControlDown('right');
       } else if (e.code === 'Space') {
         e.preventDefault();
-        startMove('jump');
+        handleControlDown('jump');
       } else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         e.preventDefault();
-        startMove('sneak');
+        handleControlDown('sneak');
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
+        return;
+      }
       if (e.code === 'KeyW' || e.code === 'ArrowUp') {
-        stopMove('forward');
+        handleControlUp('forward');
       } else if (e.code === 'KeyS' || e.code === 'ArrowDown') {
-        stopMove('back');
+        handleControlUp('back');
       } else if (e.code === 'KeyA' || e.code === 'ArrowLeft') {
-        stopMove('left');
+        handleControlUp('left');
       } else if (e.code === 'KeyD' || e.code === 'ArrowRight') {
-        stopMove('right');
+        handleControlUp('right');
       } else if (e.code === 'Space') {
-        stopMove('jump');
+        handleControlUp('jump');
       } else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
-        stopMove('sneak');
+        handleControlUp('sneak');
       }
     };
 
@@ -203,14 +217,19 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
-      // Clean up any moving state
+    };
+  }, [onClose]);
+
+  // Clean up movement ONLY on true component unmount
+  useEffect(() => {
+    return () => {
       Object.keys(activeControlRef.current).forEach((ctrl) => {
         if (activeControlRef.current[ctrl]) {
-          onMove(config.id, ctrl as any, false);
+          onMoveRef.current(configIdRef.current, ctrl as any, false);
         }
       });
     };
-  }, [isOnline, config.id, onClose, startMove, stopMove, onMove]);
+  }, []);
 
   const activeMovementLabels: string[] = [];
   if (activeControls['forward']) activeMovementLabels.push('Walking Forward (W)');
@@ -493,72 +512,19 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
                 </div>
               </div>
 
-              {/* Cardinal Orientations & Turn Controls */}
-              <div className="pt-2 border-t border-slate-200 flex flex-col space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-600 text-[11px]">Snap Facing:</span>
-                  <div className="grid grid-cols-4 gap-1">
-                    <button
-                      onClick={() => snapToCardinal(0)}
-                      disabled={!isOnline}
-                      className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-700 shadow-2xs"
-                    >
-                      North (0°)
-                    </button>
-                    <button
-                      onClick={() => snapToCardinal(90)}
-                      disabled={!isOnline}
-                      className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-700 shadow-2xs"
-                    >
-                      East (90°)
-                    </button>
-                    <button
-                      onClick={() => snapToCardinal(180)}
-                      disabled={!isOnline}
-                      className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-700 shadow-2xs"
-                    >
-                      South (180°)
-                    </button>
-                    <button
-                      onClick={() => snapToCardinal(270)}
-                      disabled={!isOnline}
-                      className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-700 shadow-2xs"
-                    >
-                      West (270°)
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-1">
-                  <span className="font-semibold text-slate-600 text-[11px]">Turn Head:</span>
-                  <div className="flex items-center space-x-1.5">
-                    <button
-                      onClick={() => handleTurn(-45)}
-                      disabled={!isOnline}
-                      className="px-3 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-700 shadow-2xs"
-                    >
-                      ↺ -45°
-                    </button>
-                    <button
-                      onClick={() => handleTurn(45)}
-                      disabled={!isOnline}
-                      className="px-3 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-700 shadow-2xs"
-                    >
-                      ↻ +45°
-                    </button>
-                    <button
-                      onClick={() => handleTurn(180)}
-                      disabled={!isOnline}
-                      className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg font-bold shadow-2xs"
-                    >
-                      180° Flip
-                    </button>
-                  </div>
-                </div>
-              </div>
             </div>
 
-            {/* 3. Auto Patrol Mode */}
+            {/* 3. Look & Head Rotation Control (Aim Compass, Pitch/Yaw Inputs, Tilts) */}
+            <BotLookControl
+              botId={config.id}
+              botName={config.name}
+              yaw={yaw}
+              pitch={pitch}
+              onLook={onLook}
+              disabled={!isOnline}
+            />
+
+            {/* 4. Auto Patrol Mode */}
             <div className="p-3 bg-emerald-50/60 border border-emerald-200 rounded-2xl flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Footprints className="h-4 w-4 text-emerald-700" />

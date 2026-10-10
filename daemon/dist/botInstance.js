@@ -1051,25 +1051,74 @@ class BotInstance {
         this.emitTelemetry();
     }
     move(control, state, durationMs) {
-        if (!this.bot || this.currentStatus !== 'online')
+        if (!this.bot || this.currentStatus !== 'online') {
+            console.warn(`[VistaAFK Bot ${this.config.name}] Cannot move: bot is offline or not spawned`);
             return;
+        }
         try {
+            console.log(`[VistaAFK Bot ${this.config.name}] Manual move: control=${control}, state=${state}, duration=${durationMs}ms`);
             // 1. If user takes manual control, pause any automated patrol so they don't conflict
             if (state && this.isPatrolling) {
                 this.togglePatrol(false);
             }
+            // If engaging movement, clear opposite conflicting controls
+            if (state) {
+                if (control === 'forward') {
+                    this.bot.setControlState('back', false);
+                    this.bot.setControlState('sneak', false);
+                    try {
+                        this.bot.setControlState('sprint', true);
+                    }
+                    catch (e) { }
+                }
+                else if (control === 'back') {
+                    this.bot.setControlState('forward', false);
+                    this.bot.setControlState('sprint', false);
+                    this.bot.setControlState('sneak', false);
+                }
+                else if (control === 'left') {
+                    this.bot.setControlState('right', false);
+                }
+                else if (control === 'right') {
+                    this.bot.setControlState('left', false);
+                }
+            }
             // 2. Set Mineflayer movement control
             this.bot.setControlState(control, state);
-            // Auto-sprint on forward movement for responsive walking
-            if (control === 'forward') {
-                try {
-                    this.bot.setControlState('sprint', state);
+            // Auto-jump assistance: If grounded and walking forward/back/strafing, check for collision
+            if (state && (control === 'forward' || control === 'back' || control === 'left' || control === 'right')) {
+                const entAny = this.bot.entity;
+                if (entAny?.onGround && entAny?.isCollidedHorizontally) {
+                    this.bot.setControlState('jump', true);
+                    setTimeout(() => {
+                        try {
+                            this.bot?.setControlState('jump', false);
+                        }
+                        catch (e) { }
+                    }, 300);
                 }
-                catch (e) { }
             }
-            // 3. If durationMs is provided and state is true, automatically release after duration
+            // 3. Emit telemetry repeatedly during sustained movements so coordinates update in real time
             if (state && durationMs && durationMs > 0) {
+                const emitInterval = setInterval(() => {
+                    this.emitTelemetry();
+                    // Periodically check if auto-jump is needed while walking
+                    const entAny = this.bot?.entity;
+                    if (entAny?.onGround && entAny?.isCollidedHorizontally) {
+                        try {
+                            this.bot?.setControlState('jump', true);
+                            setTimeout(() => {
+                                try {
+                                    this.bot?.setControlState('jump', false);
+                                }
+                                catch (e) { }
+                            }, 250);
+                        }
+                        catch (e) { }
+                    }
+                }, 150);
                 setTimeout(() => {
+                    clearInterval(emitInterval);
                     try {
                         if (this.bot) {
                             this.bot.setControlState(control, false);
@@ -1081,21 +1130,9 @@ class BotInstance {
                     catch (e) { }
                 }, durationMs);
             }
-            // 4. Auto-jump assistance for 1-block elevations, carpets, slabs or entity collisions
-            if (state && (control === 'forward' || control === 'back' || control === 'left' || control === 'right')) {
-                const entAny = this.bot.entity;
-                if (entAny?.isCollidedHorizontally && entAny?.onGround) {
-                    this.bot.setControlState('jump', true);
-                    setTimeout(() => {
-                        try {
-                            this.bot?.setControlState('jump', false);
-                        }
-                        catch (e) { }
-                    }, 250);
-                }
+            else {
+                setTimeout(() => this.emitTelemetry(), 60);
             }
-            // 5. Emit telemetry quickly so coordinates update on the UI radar
-            setTimeout(() => this.emitTelemetry(), 60);
         }
         catch (e) {
             console.warn(`[VistaAFK Bot ${this.config.name}] Movement error:`, e);
