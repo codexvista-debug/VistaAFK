@@ -163,6 +163,8 @@ if ($HasCloudflared) {
                 token = $currentToken
                 password = $currentToken
                 daemonUrl = $WssUrl
+                deviceType = "pc"
+                deviceLabel = "Windows PC"
             } | ConvertTo-Json -Compress
             
             try {
@@ -187,5 +189,7 @@ if ($HasCloudflared) {
 }
 
 # 7. Start the Daemon Node server
-Write-Host "[+] Launching VistaAFK Daemon on port 8080..." -ForegroundColor Green
+$env:VISTAAFK_DEVICE_TYPE = "pc"
+$env:VISTAAFK_DEVICE_LABEL = "Windows PC"
+Write-Host "[+] Launching VistaAFK Daemon on port 8080 (Windows PC)..." -ForegroundColor Green
 node dist/server.js

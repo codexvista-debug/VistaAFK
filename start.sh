@@ -119,13 +119,13 @@ if command -v cloudflared &>/dev/null; then
       # 1. Post to primary configured cloud URL
       curl -s -m 5 -X POST "${TARGET_CLOUD}/api/daemon/heartbeat" \
         -H "Content-Type: application/json" \
-        -d "{\"username\":\"$CURRENT_USER\",\"token\":\"$AUTH_TOKEN_PAYLOAD\",\"password\":\"$AUTH_TOKEN_PAYLOAD\",\"daemonUrl\":\"$WSS_URL\"}" >/dev/null 2>&1 &
+        -d "{\"username\":\"$CURRENT_USER\",\"token\":\"$AUTH_TOKEN_PAYLOAD\",\"password\":\"$AUTH_TOKEN_PAYLOAD\",\"daemonUrl\":\"$WSS_URL\",\"deviceType\":\"mobile\",\"deviceLabel\":\"Mobile (Termux)\"}" >/dev/null 2>&1 &
 
       # 2. Always also notify https://vista-afk.vercel.app
       if [ "$TARGET_CLOUD" != "https://vista-afk.vercel.app" ]; then
         curl -s -m 5 -X POST "https://vista-afk.vercel.app/api/daemon/heartbeat" \
           -H "Content-Type: application/json" \
-          -d "{\"username\":\"$CURRENT_USER\",\"token\":\"$AUTH_TOKEN_PAYLOAD\",\"password\":\"$AUTH_TOKEN_PAYLOAD\",\"daemonUrl\":\"$WSS_URL\"}" >/dev/null 2>&1 &
+          -d "{\"username\":\"$CURRENT_USER\",\"token\":\"$AUTH_TOKEN_PAYLOAD\",\"password\":\"$AUTH_TOKEN_PAYLOAD\",\"daemonUrl\":\"$WSS_URL\",\"deviceType\":\"mobile\",\"deviceLabel\":\"Mobile (Termux)\"}" >/dev/null 2>&1 &
       fi
     fi
 
@@ -144,5 +144,7 @@ if command -v cloudflared &>/dev/null; then
 fi
 
 # 9. Run the pre-compiled daemon directly (Zero compilation needed on mobile!)
-echo "✅ Launching 24/7 VistaAFK Daemon on port 8080..."
+export VISTAAFK_DEVICE_TYPE="mobile"
+export VISTAAFK_DEVICE_LABEL="Mobile (Termux)"
+echo "✅ Launching 24/7 VistaAFK Daemon on port 8080 (Mobile Termux)..."
 node dist/server.js

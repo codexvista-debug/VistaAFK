@@ -7,6 +7,8 @@ export interface UserProfile {
   id: string;
   username: string;
   daemonUrl?: string;
+  daemonDeviceType?: 'pc' | 'mobile';
+  daemonDeviceLabel?: string;
   secretToken?: string;
   lastHeartbeat?: number;
   savedAccounts?: SavedAccount[];

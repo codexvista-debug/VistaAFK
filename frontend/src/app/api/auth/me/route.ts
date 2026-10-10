@@ -26,6 +26,8 @@ export async function GET(req: Request) {
         id: user.id,
         username: user.username,
         daemonUrl: user.daemonUrl,
+        daemonDeviceType: user.daemonDeviceType,
+        daemonDeviceLabel: user.daemonDeviceLabel,
         secretToken: user.secretToken,
         lastHeartbeat: user.lastHeartbeat,
         savedAccounts: user.savedAccounts || [],

@@ -195,3 +195,13 @@ export interface VistaNotification {
   botId?: string;
 }
 
+export interface DaemonSystemInfo {
+  deviceType: 'pc' | 'mobile';
+  deviceLabel: string;
+  platform: string;
+  os: string;
+  hostname?: string;
+  version: string;
+}
+
+

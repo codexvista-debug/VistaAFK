@@ -12,6 +12,8 @@ export interface UserRecord {
   createdAt: number;
   updatedAt: number;
   daemonUrl?: string;
+  daemonDeviceType?: 'pc' | 'mobile';
+  daemonDeviceLabel?: string;
   secretToken?: string;
   lastHeartbeat?: number;
   savedAccounts?: SavedAccount[];
@@ -135,6 +137,8 @@ function mapRowToUser(row: any): UserRecord {
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
     daemonUrl: row.daemon_url || undefined,
+    daemonDeviceType: row.daemon_device_type || undefined,
+    daemonDeviceLabel: row.daemon_device_label || undefined,
     secretToken: row.secret_token || undefined,
     lastHeartbeat: row.last_heartbeat ? Number(row.last_heartbeat) : undefined,
     savedAccounts: Array.isArray(row.saved_accounts) ? row.saved_accounts : [],
@@ -158,6 +162,11 @@ export async function getUser(rawUsername: string): Promise<UserRecord | null> {
 
     if (!error && data) {
       const user = mapRowToUser(data);
+      const existing = memoryCache.get(username);
+      if (existing) {
+        if (!user.daemonDeviceType && existing.daemonDeviceType) user.daemonDeviceType = existing.daemonDeviceType;
+        if (!user.daemonDeviceLabel && existing.daemonDeviceLabel) user.daemonDeviceLabel = existing.daemonDeviceLabel;
+      }
       memoryCache.set(username, user);
       return user;
     }

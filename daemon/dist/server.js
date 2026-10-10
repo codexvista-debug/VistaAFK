@@ -4,8 +4,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DAEMON_VERSION = void 0;
+exports.getSystemInfo = getSystemInfo;
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
+const os_1 = __importDefault(require("os"));
 const ws_1 = require("ws");
 const botManager_js_1 = require("./botManager.js");
 const accountDiscovery_js_1 = require("./accountDiscovery.js");
@@ -258,14 +260,38 @@ wss.on('connection', (ws) => {
         sendInitialState(ws);
     }
 });
+function getSystemInfo() {
+    const isTermux = Boolean(process.env.TERMUX_VERSION ||
+        process.env.PREFIX?.includes('termux') ||
+        process.env.PREFIX?.includes('com.termux') ||
+        process.env.ANDROID_ROOT ||
+        process.platform === 'android');
+    const envType = process.env.VISTAAFK_DEVICE_TYPE;
+    const deviceType = envType || (isTermux ? 'mobile' : 'pc');
+    const deviceLabel = process.env.VISTAAFK_DEVICE_LABEL || (isTermux ? 'Mobile (Termux)' :
+        process.platform === 'win32' ? 'Windows PC' :
+            process.platform === 'darwin' ? 'macOS' :
+                process.platform === 'linux' ? 'Linux PC' : 'PC');
+    return {
+        deviceType,
+        deviceLabel,
+        platform: process.platform,
+        os: isTermux ? 'Android (Termux)' : (process.platform === 'win32' ? 'Windows' : process.platform),
+        hostname: os_1.default.hostname ? os_1.default.hostname() : '',
+        version: exports.DAEMON_VERSION,
+    };
+}
 function sendInitialState(ws) {
     if (ws.readyState === ws_1.WebSocket.OPEN) {
+        const system = getSystemInfo();
         const payload = {
             configs: botManager.getAllConfigs(),
             telemetry: botManager.getAllTelemetry(),
             activityLogs: botManager.getAllActivityLogs(),
+            system,
         };
         ws.send(JSON.stringify({ type: 'INIT_STATE', payload }));
+        ws.send(JSON.stringify({ type: 'SYSTEM_INFO', payload: system }));
         // Deliver active device code or freshly discovered profile to reconnected clients
         if (activeDiscoveryCode) {
             ws.send(JSON.stringify({
@@ -289,6 +315,7 @@ async function sendCloudHeartbeat() {
         return;
     const detectedTunnel = getDetectedTunnelUrl();
     const tunnelUrl = process.env.DAEMON_PUBLIC_URL || detectedTunnel || `ws://localhost:${PORT}`;
+    const system = getSystemInfo();
     const targetCloudUrls = new Set();
     if (creds.cloudUrl) {
         const clean = creds.cloudUrl.replace(/\/+$/, '');
@@ -312,11 +339,13 @@ async function sendCloudHeartbeat() {
                     token: creds.token,
                     daemonUrl: tunnelUrl,
                     secretToken: SECRET,
+                    deviceType: system.deviceType,
+                    deviceLabel: system.deviceLabel,
                     bots: botManager.getAllConfigs(),
                 }),
             });
             if (res.ok) {
-                console.log(`[Cloud Sync] ☁️ Heartbeat synced with ${cloudUrl} for "${creds.username}" (URL: ${tunnelUrl})`);
+                console.log(`[Cloud Sync] ☁️ Heartbeat synced with ${cloudUrl} for "${creds.username}" [${system.deviceLabel}] (URL: ${tunnelUrl})`);
             }
             else {
                 const err = await res.json().catch(() => ({}));

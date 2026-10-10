@@ -73,6 +73,8 @@ export async function POST(req: Request) {
         id: user.id,
         username: user.username,
         daemonUrl: user.daemonUrl,
+        daemonDeviceType: user.daemonDeviceType,
+        daemonDeviceLabel: user.daemonDeviceLabel,
         secretToken: user.secretToken,
         savedAccounts: user.savedAccounts || [],
         serverPresets: user.serverPresets || [],

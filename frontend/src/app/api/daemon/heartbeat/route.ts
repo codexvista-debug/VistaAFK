@@ -14,7 +14,7 @@ import {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { username, password, token, daemonUrl, secretToken, accounts, bots } = body;
+    const { username, password, token, daemonUrl, secretToken, accounts, bots, deviceType, deviceLabel } = body;
 
     const uVal = validateUsername(username);
     if (!uVal.valid) {
@@ -63,6 +63,8 @@ export async function POST(req: Request) {
         createdAt: Date.now(),
         updatedAt: Date.now(),
         daemonUrl,
+        daemonDeviceType: deviceType === 'mobile' ? 'mobile' : deviceType === 'pc' ? 'pc' : undefined,
+        daemonDeviceLabel: deviceLabel ? String(deviceLabel).slice(0, 50) : undefined,
         secretToken,
         lastHeartbeat: Date.now(),
         savedAccounts: Array.isArray(accounts) ? accounts : [],
@@ -90,6 +92,12 @@ export async function POST(req: Request) {
         if (!cleanUrl.startsWith('ws://') && !cleanUrl.startsWith('wss://')) cleanUrl = 'wss://' + cleanUrl;
       }
       user.daemonUrl = cleanUrl;
+    }
+    if (deviceType) {
+      user.daemonDeviceType = deviceType === 'mobile' ? 'mobile' : 'pc';
+    }
+    if (deviceLabel) {
+      user.daemonDeviceLabel = String(deviceLabel).slice(0, 50);
     }
     if (secretToken !== undefined) {
       user.secretToken = secretToken;

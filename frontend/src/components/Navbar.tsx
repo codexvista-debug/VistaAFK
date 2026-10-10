@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Play, Square, Plus, Settings, Wifi, WifiOff, Box, Server, Users, User, LogOut, ShieldCheck, ChevronDown, Lock, Menu, Layers } from 'lucide-react';
+import { Play, Square, Plus, Settings, Wifi, WifiOff, Box, Server, Users, User, LogOut, ShieldCheck, ChevronDown, Lock, Menu, Layers, Monitor, Smartphone } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/VistaAuthContext';
+import { useVistaWebSocket } from '../hooks/useVistaWebSocket';
 
 interface NavbarProps {
   isConnected: boolean;
@@ -31,6 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const pathname = usePathname();
   const { user, openAuthModal, logout } = useAuth();
+  const { daemonDeviceType, daemonDeviceLabel } = useVistaWebSocket();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const isVista = user?.username?.toLowerCase() === 'vista';
 
@@ -119,10 +121,28 @@ export const Navbar: React.FC<NavbarProps> = ({
                           <span className="inline-flex rounded-full h-2 w-2 bg-rose-500" />
                         )}
                       </span>
-                      <span className={`text-[11px] font-bold ${
+                      <span className={`text-[11px] font-bold flex items-center space-x-1 ${
                         isConnected ? 'text-emerald-400' : isConnecting ? 'text-amber-400' : 'text-rose-400'
                       }`}>
-                        Daemon: {isConnected ? 'Connected' : isConnecting ? 'Connecting...' : 'Disconnected'}
+                        <span>Daemon:</span>
+                        <span>
+                          {isConnected
+                            ? daemonDeviceType === 'pc'
+                              ? 'Connected (PC)'
+                              : daemonDeviceType === 'mobile'
+                              ? 'Connected (Mobile)'
+                              : 'Connected'
+                            : isConnecting
+                            ? 'Connecting...'
+                            : 'Disconnected'}
+                        </span>
+                        {isConnected && (
+                          daemonDeviceType === 'pc' ? (
+                            <Monitor className="h-3 w-3 text-blue-400 ml-0.5 inline shrink-0" />
+                          ) : daemonDeviceType === 'mobile' ? (
+                            <Smartphone className="h-3 w-3 text-emerald-400 ml-0.5 inline shrink-0" />
+                          ) : null
+                        )}
                       </span>
                     </div>
 

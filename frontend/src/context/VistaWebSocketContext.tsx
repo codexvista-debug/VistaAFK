@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, VistaNotification, SavedAccount, ServerPreset, MinecraftEdition } from '../types';
+import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, VistaNotification, SavedAccount, ServerPreset, MinecraftEdition, DaemonSystemInfo } from '../types';
 import { useAuth } from './VistaAuthContext';
 
 const DEFAULT_SERVER_PRESETS: ServerPreset[] = [
@@ -102,6 +102,9 @@ export interface VistaWebSocketContextType {
   connectionAttempts: number;
   isConnectionLocked: boolean;
   toggleConnectionLock: (locked?: boolean) => void;
+  daemonDeviceType: 'pc' | 'mobile' | null;
+  daemonDeviceLabel: string | null;
+  daemonSystemInfo: DaemonSystemInfo | null;
 }
 
 const VistaWebSocketContext = createContext<VistaWebSocketContextType | null>(null);
@@ -120,6 +123,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [connectionAttempts, setConnectionAttempts] = useState<number>(0);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [daemonSystemInfo, setDaemonSystemInfo] = useState<DaemonSystemInfo | null>(null);
 
   const retryCountRef = useRef<number>(0);
   const failedUrlRef = useRef<string>('');
@@ -590,6 +594,16 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
               if (msg.payload.activityLogs) {
                 setActivityLogs(msg.payload.activityLogs);
               }
+              if (msg.payload.system) {
+                setDaemonSystemInfo(msg.payload.system);
+              }
+              break;
+            }
+
+            case 'SYSTEM_INFO': {
+              if (msg.payload) {
+                setDaemonSystemInfo(msg.payload);
+              }
               break;
             }
 
@@ -709,6 +723,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         console.warn(`[VistaAFK WS Provider] Disconnected. Code: ${event.code}, Reason: "${event.reason}"`);
         setIsConnected(false);
         setIsConnecting(false);
+        setDaemonSystemInfo(null);
         wsRef.current = null;
         if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
@@ -1052,6 +1067,30 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     }, 500);
   };
 
+  const daemonDeviceType: 'pc' | 'mobile' | null = isConnected
+    ? daemonSystemInfo?.deviceType
+      ? daemonSystemInfo.deviceType
+      : (daemonUrl.includes('localhost') || daemonUrl.includes('127.0.0.1'))
+      ? 'pc'
+      : user?.daemonDeviceType
+      ? user.daemonDeviceType
+      : null
+    : null;
+
+  const daemonDeviceLabel: string | null = isConnected
+    ? daemonSystemInfo?.deviceLabel
+      ? daemonSystemInfo.deviceLabel
+      : (daemonUrl.includes('localhost') || daemonUrl.includes('127.0.0.1'))
+      ? 'Local PC'
+      : user?.daemonDeviceLabel
+      ? user.daemonDeviceLabel
+      : daemonDeviceType === 'pc'
+      ? 'Windows PC'
+      : daemonDeviceType === 'mobile'
+      ? 'Mobile (Termux)'
+      : null
+    : null;
+
   return (
     <VistaWebSocketContext.Provider
       value={{
@@ -1060,6 +1099,9 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         isConnected,
         isConnecting,
         authError,
+        daemonDeviceType,
+        daemonDeviceLabel,
+        daemonSystemInfo,
         configs,
         telemetry,
         chatLogs,

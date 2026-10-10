@@ -1,8 +1,9 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { WebSocketServer, WebSocket } from 'ws';
 import { BotManager } from './botManager.js';
-import { ClientMessage, ServerMessage } from './types.js';
+import { ClientMessage, ServerMessage, DaemonSystemInfo } from './types.js';
 import { discoverMicrosoftProfiles } from './accountDiscovery.js';
 
 export const DAEMON_VERSION = 'v1.2.4';
@@ -274,14 +275,44 @@ wss.on('connection', (ws) => {
   }
 });
 
+export function getSystemInfo(): DaemonSystemInfo {
+  const isTermux = Boolean(
+    process.env.TERMUX_VERSION ||
+    process.env.PREFIX?.includes('termux') ||
+    process.env.PREFIX?.includes('com.termux') ||
+    process.env.ANDROID_ROOT ||
+    process.platform === 'android'
+  );
+  const envType = process.env.VISTAAFK_DEVICE_TYPE as 'pc' | 'mobile' | undefined;
+  const deviceType: 'pc' | 'mobile' = envType || (isTermux ? 'mobile' : 'pc');
+  const deviceLabel: string = process.env.VISTAAFK_DEVICE_LABEL || (
+    isTermux ? 'Mobile (Termux)' :
+    process.platform === 'win32' ? 'Windows PC' :
+    process.platform === 'darwin' ? 'macOS' :
+    process.platform === 'linux' ? 'Linux PC' : 'PC'
+  );
+
+  return {
+    deviceType,
+    deviceLabel,
+    platform: process.platform,
+    os: isTermux ? 'Android (Termux)' : (process.platform === 'win32' ? 'Windows' : process.platform),
+    hostname: os.hostname ? os.hostname() : '',
+    version: DAEMON_VERSION,
+  };
+}
+
 function sendInitialState(ws: WebSocket) {
   if (ws.readyState === WebSocket.OPEN) {
+    const system = getSystemInfo();
     const payload = {
       configs: botManager.getAllConfigs(),
       telemetry: botManager.getAllTelemetry(),
       activityLogs: botManager.getAllActivityLogs(),
+      system,
     };
     ws.send(JSON.stringify({ type: 'INIT_STATE', payload } as ServerMessage));
+    ws.send(JSON.stringify({ type: 'SYSTEM_INFO', payload: system } as ServerMessage));
 
     // Deliver active device code or freshly discovered profile to reconnected clients
     if (activeDiscoveryCode) {
@@ -306,6 +337,7 @@ async function sendCloudHeartbeat() {
 
   const detectedTunnel = getDetectedTunnelUrl();
   const tunnelUrl = process.env.DAEMON_PUBLIC_URL || detectedTunnel || `ws://localhost:${PORT}`;
+  const system = getSystemInfo();
   
   const targetCloudUrls = new Set<string>();
   if (creds.cloudUrl) {
@@ -329,12 +361,14 @@ async function sendCloudHeartbeat() {
           token: creds.token,
           daemonUrl: tunnelUrl,
           secretToken: SECRET,
+          deviceType: system.deviceType,
+          deviceLabel: system.deviceLabel,
           bots: botManager.getAllConfigs(),
         }),
       });
 
       if (res.ok) {
-        console.log(`[Cloud Sync] ☁️ Heartbeat synced with ${cloudUrl} for "${creds.username}" (URL: ${tunnelUrl})`);
+        console.log(`[Cloud Sync] ☁️ Heartbeat synced with ${cloudUrl} for "${creds.username}" [${system.deviceLabel}] (URL: ${tunnelUrl})`);
       } else {
         const err = await res.json().catch(() => ({}));
         console.warn(`[Cloud Sync] ⚠️ Cloud heartbeat warning from ${cloudUrl}: ${err.error || res.statusText}`);

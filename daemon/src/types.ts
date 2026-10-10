@@ -189,11 +189,21 @@ export type ClientMessage =
   | { type: 'CANCEL_MICROSOFT_DISCOVERY' }
   | { type: 'LINK_ACCOUNT'; payload: { username: string; password: string; cloudUrl?: string } };
 
+export interface DaemonSystemInfo {
+  deviceType: 'pc' | 'mobile';
+  deviceLabel: string;
+  platform: string;
+  os: string;
+  hostname?: string;
+  version: string;
+}
+
 export type ServerMessage =
   | { type: 'AUTH_SUCCESS' }
   | { type: 'PONG' }
   | { type: 'AUTH_FAILED'; payload: { reason: string } }
-  | { type: 'INIT_STATE'; payload: { configs: BotConfig[]; telemetry: Record<string, BotTelemetry>; activityLogs?: Record<string, ActivityLog[]> } }
+  | { type: 'INIT_STATE'; payload: { configs: BotConfig[]; telemetry: Record<string, BotTelemetry>; activityLogs?: Record<string, ActivityLog[]>; system?: DaemonSystemInfo } }
+  | { type: 'SYSTEM_INFO'; payload: DaemonSystemInfo }
   | { type: 'BOT_CONFIG_ADDED'; payload: BotConfig }
   | { type: 'BOT_CONFIG_UPDATED'; payload: BotConfig }
   | { type: 'BOT_CONFIG_REMOVED'; payload: { botId: string } }
@@ -204,4 +214,5 @@ export type ServerMessage =
   | { type: 'MICROSOFT_DEVICE_CODE'; payload: { userCode: string; verificationUri: string; expiresIn: number } }
   | { type: 'MICROSOFT_PROFILES_DISCOVERED'; payload: { java?: { name: string; uuid: string }; bedrock?: { gamertag: string; xuid?: string } } }
   | { type: 'MICROSOFT_DISCOVERY_ERROR'; payload: { message: string } };
+
 

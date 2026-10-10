@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { X, Server, Key, Terminal, Smartphone, Monitor, Copy, Check, ExternalLink, BatteryCharging, Zap, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/VistaAuthContext';
-import { normalizeWsUrl } from '../context/VistaWebSocketContext';
+import { normalizeWsUrl, useVistaWebSocket } from '../hooks/useVistaWebSocket';
 
 interface DaemonSettingsModalProps {
   onClose: () => void;
@@ -19,6 +19,7 @@ export const DaemonSettingsModal: React.FC<DaemonSettingsModalProps> = ({
   onSave,
 }) => {
   const { user, token: authToken } = useAuth();
+  const { isConnected, daemonDeviceType, daemonDeviceLabel } = useVistaWebSocket();
   const [url, setUrl] = useState(currentUrl);
   const [token, setToken] = useState(currentToken);
   const [activeTab, setActiveTab] = useState<'connection' | 'termux' | 'pc'>('connection');
@@ -73,7 +74,21 @@ export const DaemonSettingsModal: React.FC<DaemonSettingsModalProps> = ({
               <Server className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight truncate">Bot Daemon Connection</h2>
+              <div className="flex items-center space-x-2">
+                <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight truncate">Bot Daemon Connection</h2>
+                {isConnected && (
+                  <span className={`inline-flex items-center space-x-1 text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
+                    daemonDeviceType === 'pc'
+                      ? 'bg-blue-100 text-blue-800 border-blue-300'
+                      : daemonDeviceType === 'mobile'
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : 'bg-slate-100 text-slate-800 border-slate-300'
+                  }`}>
+                    {daemonDeviceType === 'pc' ? <Monitor className="h-3 w-3 text-blue-600" /> : <Smartphone className="h-3 w-3 text-emerald-600" />}
+                    <span>{daemonDeviceLabel || (daemonDeviceType === 'pc' ? 'Windows PC' : 'Mobile (Termux)')}</span>
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">Connect web dashboard to phone or PC controller</p>
             </div>
           </div>

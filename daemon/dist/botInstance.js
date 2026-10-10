@@ -136,6 +136,8 @@ class BotInstance {
     reconnectAttempts = 0;
     patrolInterval = null;
     isPatrolling = false;
+    movementTimeouts = new Map();
+    movementTelemetryIntervals = new Map();
     farmingInterval = null;
     lastSwordEquipCheck = 0;
     lastMobAttackLogTime = 0;
@@ -1058,6 +1060,19 @@ class BotInstance {
         }
         try {
             console.log(`[VistaAFK Bot ${this.config.name}] Manual move: control=${control}, state=${state}, duration=${durationMs}ms`);
+            const clearMovementTimers = (target) => {
+                const timeout = this.movementTimeouts.get(target);
+                if (timeout)
+                    clearTimeout(timeout);
+                this.movementTimeouts.delete(target);
+                const interval = this.movementTelemetryIntervals.get(target);
+                if (interval)
+                    clearInterval(interval);
+                this.movementTelemetryIntervals.delete(target);
+            };
+            // Every new command replaces the previous timed command for this control.
+            // This prevents an old click timeout from stopping a later held key press.
+            clearMovementTimers(control);
             // 1. If user takes manual control, pause any automated patrol so they don't conflict
             if (state && this.isPatrolling) {
                 this.togglePatrol(false);
@@ -1065,7 +1080,9 @@ class BotInstance {
             // If engaging movement, clear opposite conflicting controls
             if (state) {
                 if (control === 'forward') {
+                    clearMovementTimers('back');
                     this.bot.setControlState('back', false);
+                    clearMovementTimers('sneak');
                     this.bot.setControlState('sneak', false);
                     try {
                         this.bot.setControlState('sprint', true);
@@ -1073,19 +1090,33 @@ class BotInstance {
                     catch (e) { }
                 }
                 else if (control === 'back') {
+                    clearMovementTimers('forward');
                     this.bot.setControlState('forward', false);
                     this.bot.setControlState('sprint', false);
+                    clearMovementTimers('sneak');
                     this.bot.setControlState('sneak', false);
                 }
                 else if (control === 'left') {
+                    clearMovementTimers('right');
                     this.bot.setControlState('right', false);
                 }
                 else if (control === 'right') {
+                    clearMovementTimers('left');
                     this.bot.setControlState('left', false);
                 }
             }
             // 2. Set Mineflayer movement control
             this.bot.setControlState(control, state);
+            if (!state) {
+                if (control === 'forward') {
+                    try {
+                        this.bot.setControlState('sprint', false);
+                    }
+                    catch (e) { }
+                }
+                this.emitTelemetry();
+                return;
+            }
             // Auto-jump assistance: If grounded and walking forward/back/strafing, check for collision
             if (state && (control === 'forward' || control === 'back' || control === 'left' || control === 'right')) {
                 const entAny = this.bot.entity;
@@ -1102,6 +1133,8 @@ class BotInstance {
             // 3. Emit telemetry repeatedly during sustained movements so coordinates update in real time
             if (state && durationMs && durationMs > 0) {
                 const emitInterval = setInterval(() => {
+                    if (!this.bot || this.currentStatus !== 'online')
+                        return;
                     this.emitTelemetry();
                     // Periodically check if auto-jump is needed while walking
                     const entAny = this.bot?.entity;
@@ -1118,8 +1151,10 @@ class BotInstance {
                         catch (e) { }
                     }
                 }, 150);
-                setTimeout(() => {
+                const stopTimeout = setTimeout(() => {
                     clearInterval(emitInterval);
+                    this.movementTelemetryIntervals.delete(control);
+                    this.movementTimeouts.delete(control);
                     try {
                         if (this.bot) {
                             this.bot.setControlState(control, false);
@@ -1130,6 +1165,8 @@ class BotInstance {
                     }
                     catch (e) { }
                 }, durationMs);
+                this.movementTelemetryIntervals.set(control, emitInterval);
+                this.movementTimeouts.set(control, stopTimeout);
             }
             else {
                 setTimeout(() => this.emitTelemetry(), 60);
@@ -1746,6 +1783,10 @@ class BotInstance {
             clearInterval(this.recurringCommandInterval);
         if (this.spawnCommandTimeout)
             clearTimeout(this.spawnCommandTimeout);
+        this.movementTimeouts.forEach((timeout) => clearTimeout(timeout));
+        this.movementTelemetryIntervals.forEach((interval) => clearInterval(interval));
+        this.movementTimeouts.clear();
+        this.movementTelemetryIntervals.clear();
         this.reconnectTimeout = null;
         this.antiAfkInterval = null;
         this.telemetryInterval = null;
