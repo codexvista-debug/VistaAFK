@@ -733,8 +733,10 @@ class BotInstance {
         });
     }
     setupAntiAfk() {
-        if (this.antiAfkInterval)
+        if (this.antiAfkInterval) {
             clearInterval(this.antiAfkInterval);
+            this.antiAfkInterval = null;
+        }
         if (!this.config.antiAfk.enabled)
             return;
         const intervalMs = Math.max(3, this.config.antiAfk.intervalSeconds || 10) * 1000;
@@ -764,7 +766,8 @@ class BotInstance {
             try {
                 const { rotateHead, jump, sneak, swingArm } = this.config.antiAfk;
                 // 1. Subtle head look rotation (natural motion)
-                if (rotateHead) {
+                // If farming is active, NEVER rotate head so the bot's crosshair stays locked on the grinder/farm chute
+                if (rotateHead && !this.config.farming?.enabled) {
                     const deltaYaw = (Math.random() - 0.5) * 0.6;
                     const deltaPitch = (Math.random() - 0.5) * 0.3;
                     const newYaw = this.bot.entity.yaw + deltaYaw;
@@ -1181,13 +1184,12 @@ class BotInstance {
                     });
                 }
                 if (targetEntity) {
-                    // Look gently at entity chest height (not snap force=true)
-                    try {
-                        await this.bot.lookAt(targetEntity.position.offset(0, targetEntity.height ? targetEntity.height * 0.5 : 0.9, 0), false);
-                    }
-                    catch (e) { }
+                    // Attack mob within reach directly without shifting head aim
                     if (targetEntity.isValid && this.bot.entity.position.distanceTo(targetEntity.position) <= 2.8) {
                         this.bot.attack(targetEntity);
+                    }
+                    else {
+                        this.bot.swingArm('right');
                     }
                 }
                 else if (targetMode === 'continuous') {
