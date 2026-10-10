@@ -5,30 +5,29 @@
 @tailwind utilities;
 
 :root {
-  --background: #111722;
-  --foreground: #f8fafc;
+  --background: #f1f5f9;
+  --foreground: #0f172a;
 }
 
 .font-minecraft {
   font-family: 'Silkscreen', 'VT323', 'Consolas', 'Courier New', monospace;
-  text-shadow: 1.5px 1.5px 0px #000000;
+  text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.3);
   letter-spacing: 0.02em;
 }
 
-
 body {
-  color: #f1f5f9;
-  background-color: #0b0f19;
+  color: #1e293b;
+  background-color: #0b121e;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   overflow-x: hidden;
-  /* Authentic subtle Minecraft textured stone/bedrock pattern */
+  /* Authentic High-Resolution Minecraft Scenic Panoramic Landscape Background */
   background-image: 
-    radial-gradient(ellipse at 50% 0%, rgba(16, 185, 129, 0.15) 0%, transparent 60%),
-    radial-gradient(ellipse at 80% 80%, rgba(14, 165, 233, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 20% 90%, rgba(99, 102, 241, 0.06) 0%, transparent 50%),
-    linear-gradient(rgba(11, 15, 25, 0.90), rgba(11, 15, 25, 0.95)),
-    url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h16v16H0V0zm16 16h16v16H16V16z' fill='%23192334' fill-opacity='0.45' fill-rule='evenodd'/%3E%3Cpath d='M0 16h16v16H0V16zm16-16h16v16H16V0z' fill='%23141d2c' fill-opacity='0.3' fill-rule='evenodd'/%3E%3C/svg%3E");
+    linear-gradient(rgba(241, 245, 249, 0.75), rgba(241, 245, 249, 0.82)),
+    url("/images/minecraft_bg.jpg");
+  background-size: cover;
+  background-position: center top;
   background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
 /* Custom modern sleek scrollbars */
@@ -37,10 +36,10 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0b111a;
+  background: #f1f5f9;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #cbd5e1;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {

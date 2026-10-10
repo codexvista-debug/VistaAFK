@@ -232,21 +232,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                     )}
                   </div>
 
-                  {/* Clean User Profile & Logout Footer */}
-                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between px-1">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-black uppercase ring-1 ring-emerald-400/50">
-                        {user.username.charAt(0)}
-                      </div>
-                      <span className="font-bold text-white text-xs">@{user.username}</span>
-                    </div>
-
+                  {/* Clean Logout Footer */}
+                  <div className="pt-2 border-t border-slate-800 flex items-center justify-end px-1">
                     <button
                       onClick={() => {
                         setIsUserMenuOpen(false);
                         logout();
                       }}
-                      className="px-3 py-1.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 hover:text-rose-300 rounded-xl transition flex items-center space-x-1.5 text-xs font-bold border border-rose-500/30"
+                      className="w-full justify-center px-3 py-2 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 hover:text-rose-300 rounded-xl transition flex items-center space-x-1.5 text-xs font-bold border border-rose-500/30"
                       title="Sign Out"
                     >
                       <LogOut className="h-3.5 w-3.5" />

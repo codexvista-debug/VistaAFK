@@ -19,7 +19,7 @@ export default function RootLayout({
       <head>
         <meta httpEquiv="Content-Security-Policy" content="upgrade-insecure-requests" />
       </head>
-      <body className="min-h-screen bg-[#0b0f19] text-slate-100 antialiased selection:bg-emerald-500 selection:text-white overflow-x-hidden w-full max-w-[100vw]">
+      <body className="min-h-screen text-slate-800 antialiased selection:bg-emerald-500 selection:text-white overflow-x-hidden w-full max-w-[100vw]">
         <VistaAuthProvider>
           <VistaWebSocketProvider>
             {children}
