@@ -44,6 +44,7 @@ export default function Dashboard() {
     moveBot,
     togglePatrol,
     lookAt,
+    attackBot,
     dismissNotification,
   } = useVistaWebSocket();
 
@@ -310,6 +311,7 @@ export default function Dashboard() {
           onMove={moveBot}
           onTogglePatrol={togglePatrol}
           onLook={lookAt}
+          onAttack={attackBot}
         />
       )}
 

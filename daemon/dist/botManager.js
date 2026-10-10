@@ -215,6 +215,12 @@ class BotManager {
             instance.look(yaw, pitch);
         }
     }
+    attackBot(botId) {
+        const instance = this.bots.get(botId);
+        if (instance) {
+            instance.manualAttack();
+        }
+    }
     moveSlotItem(botId, sourceSlot, targetSlot) {
         const instance = this.bots.get(botId);
         if (instance) {

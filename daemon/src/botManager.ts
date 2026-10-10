@@ -239,6 +239,13 @@ export class BotManager {
     }
   }
 
+  public attackBot(botId: string) {
+    const instance = this.bots.get(botId);
+    if (instance) {
+      instance.manualAttack();
+    }
+  }
+
   public moveSlotItem(botId: string, sourceSlot: number, targetSlot: number) {
     const instance = this.bots.get(botId);
     if (instance) {

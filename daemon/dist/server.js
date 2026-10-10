@@ -176,6 +176,9 @@ wss.on('connection', (ws) => {
                 case 'LOOK_AT':
                     botManager.lookAt(msg.payload.botId, msg.payload.yaw, msg.payload.pitch);
                     break;
+                case 'ATTACK_BOT':
+                    botManager.attackBot(msg.payload.botId);
+                    break;
                 case 'MOVE_INVENTORY_ITEM':
                     botManager.moveSlotItem(msg.payload.botId, msg.payload.sourceSlot, msg.payload.targetSlot);
                     break;

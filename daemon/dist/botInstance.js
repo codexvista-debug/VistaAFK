@@ -138,6 +138,7 @@ class BotInstance {
     isPatrolling = false;
     farmingInterval = null;
     lastSwordEquipCheck = 0;
+    lastMobAttackLogTime = 0;
     recurringCommandInterval = null;
     spawnCommandTimeout = null;
     lastChatText = '';
@@ -1169,64 +1170,101 @@ class BotInstance {
             if (this.connectStartTime && (Date.now() - this.connectStartTime) < 8000)
                 return;
             try {
-                // 1. Safe Sword Selection (Check Hotbar first, avoid inventory window desyncs)
+                // 1. Safe Weapon Selection (Swords & Axes - Check Hotbar first, avoid inventory window desyncs)
                 if (this.config.farming?.autoEquipSword && Date.now() - this.lastSwordEquipCheck > 3000) {
                     this.lastSwordEquipCheck = Date.now();
                     const heldItem = this.bot.heldItem;
-                    const isHoldingSword = heldItem && (heldItem.name.endsWith('_sword') || heldItem.name.includes('sword'));
-                    if (!isHoldingSword && this.bot.inventory) {
-                        const SWORD_NAMES = ['netherite_sword', 'diamond_sword', 'iron_sword', 'golden_sword', 'stone_sword', 'wooden_sword'];
+                    const isHoldingWeapon = heldItem && (heldItem.name.includes('sword') || heldItem.name.includes('axe'));
+                    if (!isHoldingWeapon && this.bot.inventory) {
+                        const WEAPON_NAMES = [
+                            'netherite_sword', 'diamond_sword', 'iron_sword', 'golden_sword', 'stone_sword', 'wooden_sword',
+                            'netherite_axe', 'diamond_axe', 'iron_axe', 'golden_axe', 'stone_axe', 'wooden_axe'
+                        ];
                         // First check hotbar slots (36 to 44 in mineflayer inventory)
-                        let hotbarSwordSlot = null;
+                        let hotbarWeaponSlot = null;
                         for (let i = 0; i < 9; i++) {
                             const item = this.bot.inventory.slots[36 + i];
-                            if (item && (SWORD_NAMES.includes(item.name) || item.name.endsWith('_sword'))) {
-                                hotbarSwordSlot = i;
+                            if (item && (WEAPON_NAMES.includes(item.name) || item.name.endsWith('_sword') || item.name.endsWith('_axe'))) {
+                                hotbarWeaponSlot = i;
                                 break;
                             }
                         }
-                        if (hotbarSwordSlot !== null) {
-                            this.bot.setQuickBarSlot(hotbarSwordSlot);
+                        if (hotbarWeaponSlot !== null) {
+                            this.bot.setQuickBarSlot(hotbarWeaponSlot);
                         }
                         else {
                             // Not on hotbar, find in main inventory and equip safely
                             const items = this.bot.inventory.items();
-                            const sword = items.find((i) => SWORD_NAMES.includes(i.name) || i.name.endsWith('_sword'));
-                            if (sword) {
-                                await this.bot.equip(sword, 'hand');
-                                this.emitActivity('survival', `⚔️ Equipped ${sword.displayName || sword.name} from inventory`);
+                            const weapon = items.find((i) => WEAPON_NAMES.includes(i.name) || i.name.endsWith('_sword') || i.name.endsWith('_axe'));
+                            if (weapon) {
+                                await this.bot.equip(weapon, 'hand');
+                                this.emitActivity('survival', `⚔️ Equipped ${weapon.displayName || weapon.name} from inventory`);
                             }
                         }
                     }
                 }
-                // 2. Mob Attack / Grinder Swing with GrimAC-safe reach & validation
+                // 2. Mob Attack / Grinder Strike with real raycast line-of-sight & 3.8m survival reach
                 const targetMode = this.config.farming?.targetMode || 'continuous';
-                // Check for nearby hostile entities within safe reach (<= 2.8 blocks, well within vanilla 3.0 limit)
-                let targetEntity = null;
+                const eyePos = this.bot.entity.position.offset(0, this.bot.entity.height || 1.62, 0);
+                const currentYaw = this.bot.entity.yaw;
+                const currentPitch = this.bot.entity.pitch;
+                const cosP = Math.cos(currentPitch);
+                const lookDir = {
+                    x: -Math.sin(currentYaw) * cosP,
+                    y: -Math.sin(currentPitch),
+                    z: -Math.cos(currentYaw) * cosP,
+                };
+                const IGNORED_NAMES = new Set([
+                    'item', 'experience_orb', 'arrow', 'spectral_arrow', 'trident',
+                    'armor_stand', 'boat', 'chest_boat', 'minecart', 'chest_minecart',
+                    'furnace_minecart', 'tnt_minecart', 'hopper_minecart', 'spawner_minecart',
+                    'painting', 'item_frame', 'glow_item_frame', 'leash_knot',
+                    'area_effect_cloud', 'eye_of_ender', 'end_crystal', 'firework_rocket'
+                ]);
+                let bestTarget = null;
+                let bestTargetPos = null;
+                let bestScore = -999;
+                let bestDist = 999;
                 if (this.bot.entities) {
-                    const entities = Object.values(this.bot.entities);
-                    targetEntity = entities.find((e) => {
-                        if (!e || e === this.bot?.entity || !e.position || !e.isValid)
-                            return false;
-                        const dist = this.bot.entity.position.distanceTo(e.position);
-                        if (dist > 2.8)
-                            return false;
-                        const name = (e.name || e.displayName || '').toLowerCase();
-                        const type = (e.type || '').toLowerCase();
-                        return type === 'hostile' || type === 'mob' || [
-                            'enderman', 'zombie', 'skeleton', 'creeper', 'spider', 'cave_spider',
-                            'zombified_piglin', 'blaze', 'piglin', 'wither_skeleton', 'slime', 'magma_cube',
-                            'drowned', 'husk', 'stray', 'witch', 'phantom', 'pillager', 'vindicator', 'ravager'
-                        ].some((m) => name.includes(m));
-                    });
-                }
-                if (targetEntity) {
-                    // Attack mob within reach directly without shifting head aim
-                    if (targetEntity.isValid && this.bot.entity.position.distanceTo(targetEntity.position) <= 2.8) {
-                        this.bot.attack(targetEntity);
+                    for (const e of Object.values(this.bot.entities)) {
+                        if (!e || e === this.bot.entity || !e.position || e.isValid === false)
+                            continue;
+                        if (e.type === 'player')
+                            continue;
+                        const rawName = (e.name || '').toLowerCase();
+                        if (IGNORED_NAMES.has(rawName))
+                            continue;
+                        if (['object', 'projectile', 'orb'].includes(e.type))
+                            continue;
+                        const targetPos = e.position.offset(0, Math.min(1.0, (e.height || 1.8) * 0.5), 0);
+                        const dx = targetPos.x - eyePos.x;
+                        const dy = targetPos.y - eyePos.y;
+                        const dz = targetPos.z - eyePos.z;
+                        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                        if (dist > 3.8)
+                            continue; // Out of survival reach
+                        const dirX = dx / (dist || 1);
+                        const dirY = dy / (dist || 1);
+                        const dirZ = dz / (dist || 1);
+                        const dot = lookDir.x * dirX + lookDir.y * dirY + lookDir.z * dirZ;
+                        // Prioritize mobs aligned with where the bot is looking (dot > 0), then distance
+                        const score = dot * 2.5 - (dist / 3.8);
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestTarget = e;
+                            bestTargetPos = targetPos;
+                            bestDist = dist;
+                        }
                     }
-                    else {
-                        this.bot.swingArm('right');
+                }
+                if (bestTarget && bestTargetPos) {
+                    // Look directly at target hitbox center so the server validates line-of-sight raycast
+                    await this.bot.lookAt(bestTargetPos, true);
+                    this.bot.attack(bestTarget);
+                    if (Date.now() - this.lastMobAttackLogTime > 4000) {
+                        this.lastMobAttackLogTime = Date.now();
+                        const mobName = (bestTarget.name || 'mob').replace(/_/g, ' ');
+                        this.emitActivity('survival', `⚔️ Slashed ${mobName} in farm chute (${bestDist.toFixed(1)}m away)`);
                     }
                 }
                 else if (targetMode === 'continuous') {
@@ -1247,6 +1285,85 @@ class BotInstance {
         }
         else {
             this.farmingInterval = setInterval(runFarmingTick, baseInterval);
+        }
+    }
+    async manualAttack() {
+        if (!this.bot || this.currentStatus !== 'online')
+            return;
+        try {
+            // Auto equip weapon if available
+            const held = this.bot.heldItem;
+            const isHoldingWeapon = held && (held.name.includes('sword') || held.name.includes('axe'));
+            if (!isHoldingWeapon && this.bot.inventory) {
+                const WEAPON_NAMES = ['netherite_sword', 'diamond_sword', 'iron_sword', 'golden_sword', 'stone_sword', 'wooden_sword', 'netherite_axe', 'diamond_axe', 'iron_axe', 'golden_axe', 'stone_axe', 'wooden_axe'];
+                for (let i = 0; i < 9; i++) {
+                    const item = this.bot.inventory.slots[36 + i];
+                    if (item && (WEAPON_NAMES.includes(item.name) || item.name.endsWith('_sword') || item.name.endsWith('_axe'))) {
+                        this.bot.setQuickBarSlot(i);
+                        break;
+                    }
+                }
+            }
+            const eyePos = this.bot.entity.position.offset(0, this.bot.entity.height || 1.62, 0);
+            const currentYaw = this.bot.entity.yaw;
+            const currentPitch = this.bot.entity.pitch;
+            const cosP = Math.cos(currentPitch);
+            const lookDir = {
+                x: -Math.sin(currentYaw) * cosP,
+                y: -Math.sin(currentPitch),
+                z: -Math.cos(currentYaw) * cosP,
+            };
+            const IGNORED_NAMES = new Set([
+                'item', 'experience_orb', 'arrow', 'spectral_arrow', 'trident',
+                'armor_stand', 'boat', 'chest_boat', 'minecart', 'chest_minecart',
+                'painting', 'item_frame', 'glow_item_frame', 'leash_knot',
+                'area_effect_cloud', 'eye_of_ender', 'end_crystal', 'firework_rocket'
+            ]);
+            let bestTarget = null;
+            let bestTargetPos = null;
+            let bestScore = -999;
+            if (this.bot.entities) {
+                for (const e of Object.values(this.bot.entities)) {
+                    if (!e || e === this.bot.entity || !e.position || e.isValid === false)
+                        continue;
+                    if (e.type === 'player')
+                        continue;
+                    const rawName = (e.name || '').toLowerCase();
+                    if (IGNORED_NAMES.has(rawName))
+                        continue;
+                    if (['object', 'projectile', 'orb'].includes(e.type))
+                        continue;
+                    const targetPos = e.position.offset(0, Math.min(1.0, (e.height || 1.8) * 0.5), 0);
+                    const dx = targetPos.x - eyePos.x;
+                    const dy = targetPos.y - eyePos.y;
+                    const dz = targetPos.z - eyePos.z;
+                    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    if (dist > 3.8)
+                        continue;
+                    const dirX = dx / (dist || 1);
+                    const dirY = dy / (dist || 1);
+                    const dirZ = dz / (dist || 1);
+                    const dot = lookDir.x * dirX + lookDir.y * dirY + lookDir.z * dirZ;
+                    const score = dot * 2.5 - (dist / 3.8);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestTarget = e;
+                        bestTargetPos = targetPos;
+                    }
+                }
+            }
+            if (bestTarget && bestTargetPos) {
+                await this.bot.lookAt(bestTargetPos, true);
+                this.bot.attack(bestTarget);
+                this.emitActivity('survival', `⚔️ Manual attack: Hit ${(bestTarget.name || 'mob').replace(/_/g, ' ')}`);
+            }
+            else {
+                this.bot.swingArm('right');
+            }
+            this.emitTelemetry();
+        }
+        catch (e) {
+            console.warn(`[VistaAFK Bot ${this.config.name}] Manual attack error:`, e);
         }
     }
     async moveSlotItem(sourceSlot, targetSlot) {
@@ -1438,8 +1555,15 @@ class BotInstance {
                     }
                 }
                 // 2. Collect nearby mobs (hostile or passive) up to 36 blocks
-                if (!isPlayer && dist <= 36) {
-                    const rawName = (ent.name || '').toLowerCase();
+                const rawName = (ent.name || '').toLowerCase();
+                const IGNORED_ENTITIES = new Set([
+                    'item', 'experience_orb', 'arrow', 'spectral_arrow', 'trident',
+                    'armor_stand', 'boat', 'chest_boat', 'minecart', 'chest_minecart',
+                    'furnace_minecart', 'tnt_minecart', 'hopper_minecart', 'spawner_minecart',
+                    'painting', 'item_frame', 'glow_item_frame', 'leash_knot',
+                    'area_effect_cloud', 'eye_of_ender', 'end_crystal', 'firework_rocket'
+                ]);
+                if (!isPlayer && dist <= 36 && !IGNORED_ENTITIES.has(rawName) && ent.type !== 'object' && ent.type !== 'projectile' && ent.type !== 'orb') {
                     const isHostile = HOSTILE_MOBS.has(rawName) || ent.type === 'hostile';
                     const rawDisplayName = ent.displayName?.text || ent.displayName || ent.name || 'Mob';
                     const cleanName = typeof rawDisplayName === 'string'

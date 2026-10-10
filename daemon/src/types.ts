@@ -182,6 +182,7 @@ export type ClientMessage =
   | { type: 'MOVE_BOT'; payload: { botId: string; control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak'; state: boolean; durationMs?: number } }
   | { type: 'TOGGLE_PATROL'; payload: { botId: string; enabled: boolean } }
   | { type: 'LOOK_AT'; payload: { botId: string; yaw: number; pitch: number } }
+  | { type: 'ATTACK_BOT'; payload: { botId: string } }
   | { type: 'MOVE_INVENTORY_ITEM'; payload: { botId: string; sourceSlot: number; targetSlot: number } }
   | { type: 'SET_QUICK_BAR_SLOT'; payload: { botId: string; slot: number } }
   | { type: 'DISCOVER_MICROSOFT_ACCOUNT'; payload?: { email?: string; editionFilter?: string } }

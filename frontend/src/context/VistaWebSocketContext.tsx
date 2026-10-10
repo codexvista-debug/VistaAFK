@@ -87,6 +87,7 @@ export interface VistaWebSocketContextType {
   moveBot: (botId: string, control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean, durationMs?: number) => void;
   togglePatrol: (botId: string, enabled: boolean) => void;
   lookAt: (botId: string, yaw: number, pitch: number) => void;
+  attackBot: (botId: string) => void;
   moveInventoryItem: (botId: string, sourceSlot: number, targetSlot: number) => void;
   setQuickBarSlot: (botId: string, slot: number) => void;
   dismissNotification: (id: string) => void;
@@ -865,6 +866,8 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     send({ type: 'TOGGLE_PATROL', payload: { botId, enabled } });
   const lookAt = (botId: string, yaw: number, pitch: number) =>
     send({ type: 'LOOK_AT', payload: { botId, yaw, pitch } });
+  const attackBot = (botId: string) =>
+    send({ type: 'ATTACK_BOT', payload: { botId } });
   const moveInventoryItem = (botId: string, sourceSlot: number, targetSlot: number) =>
     send({ type: 'MOVE_INVENTORY_ITEM', payload: { botId, sourceSlot, targetSlot } });
   const setQuickBarSlot = (botId: string, slot: number) =>
@@ -1082,6 +1085,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         moveBot,
         togglePatrol,
         lookAt,
+        attackBot,
         moveInventoryItem,
         setQuickBarSlot,
         dismissNotification,

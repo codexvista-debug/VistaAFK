@@ -19,6 +19,7 @@ import {
   Eye,
   Activity,
   Wind,
+  Swords,
 } from 'lucide-react';
 import { XaerosMinimap } from './XaerosMinimap';
 import { BotLookControl } from './BotLookControl';
@@ -31,6 +32,7 @@ interface BotVisualControlModalProps {
   onMove: (botId: string, control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean, durationMs?: number) => void;
   onTogglePatrol: (botId: string, enabled: boolean) => void;
   onLook: (botId: string, yaw: number, pitch: number) => void;
+  onAttack?: (botId: string) => void;
 }
 
 export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
@@ -40,6 +42,7 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
   onMove,
   onTogglePatrol,
   onLook,
+  onAttack,
 }) => {
   const isOnline = telemetry?.status === 'online';
   const yaw = telemetry?.yaw || 0;
@@ -80,6 +83,11 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
   useEffect(() => {
     isOnlineRef.current = isOnline;
   }, [isOnline]);
+
+  const onAttackRef = useRef(onAttack);
+  useEffect(() => {
+    onAttackRef.current = onAttack;
+  }, [onAttack]);
 
   const startMove = useCallback((control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak') => {
     if (!isOnlineRef.current) return;
@@ -190,6 +198,9 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
       } else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         e.preventDefault();
         handleControlDown('sneak');
+      } else if (e.code === 'KeyF') {
+        e.preventDefault();
+        onAttackRef.current?.(configIdRef.current);
       }
     };
 
@@ -483,12 +494,12 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
                   </button>
                 </div>
 
-                {/* Jump & Sneak */}
-                <div className="flex items-center space-x-2 pt-1 w-full justify-center">
+                {/* Jump, Sneak & Attack */}
+                <div className="flex flex-wrap items-center gap-2 pt-1 w-full justify-center">
                   <button
                     {...createButtonHandlers('jump')}
                     disabled={!isOnline}
-                    className={`px-4 py-2 rounded-xl font-bold text-xs border shadow-sm transition touch-none select-none ${
+                    className={`px-3 sm:px-4 py-2 rounded-xl font-bold text-xs border shadow-sm transition touch-none select-none ${
                       activeControls['jump']
                         ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400'
                         : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
@@ -500,7 +511,7 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
                   <button
                     {...createButtonHandlers('sneak')}
                     disabled={!isOnline}
-                    className={`px-4 py-2 rounded-xl font-bold text-xs border shadow-sm transition touch-none select-none ${
+                    className={`px-3 sm:px-4 py-2 rounded-xl font-bold text-xs border shadow-sm transition touch-none select-none ${
                       activeControls['sneak']
                         ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400'
                         : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
@@ -508,6 +519,16 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
                     title="Sneak (Shift / Hold)"
                   >
                     Sneak (Shift)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAttack?.(config.id)}
+                    disabled={!isOnline}
+                    className="px-3 sm:px-4 py-2 rounded-xl font-bold text-xs border border-rose-200 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 shadow-sm transition flex items-center space-x-1.5"
+                    title="Attack target in crosshair / swing sword (F or Click)"
+                  >
+                    <Swords className="h-3.5 w-3.5 text-rose-600" />
+                    <span>Attack (F)</span>
                   </button>
                 </div>
               </div>

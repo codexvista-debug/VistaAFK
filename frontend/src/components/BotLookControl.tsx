@@ -111,14 +111,14 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
   };
 
   return (
-    <div className="bg-[#18181b] border border-slate-700/80 rounded-2xl p-4 text-white shadow-lg space-y-3 select-none">
+    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-slate-800 shadow-sm space-y-3 select-none">
       {/* Title & Account Header */}
-      <div className="flex items-center justify-between border-b border-slate-700/60 pb-2">
+      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
         <div className="flex items-center space-x-2">
-          <Compass className="h-4 w-4 text-emerald-400" />
-          <span className="font-black text-sm text-white tracking-wide uppercase">Look</span>
+          <Compass className="h-4 w-4 text-emerald-600" />
+          <span className="font-bold text-xs text-slate-900 tracking-wider uppercase">Look</span>
         </div>
-        <div className="px-2.5 py-0.5 rounded-lg bg-slate-800 border border-slate-700 text-xs font-mono font-bold text-slate-300">
+        <div className="px-2.5 py-0.5 rounded-lg bg-white border border-slate-200 text-xs font-mono font-bold text-slate-700 shadow-2xs">
           {botName}
         </div>
       </div>
@@ -126,7 +126,7 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
       <div className="flex flex-col sm:flex-row items-center gap-4">
         {/* Left Side: Interactive Aim Compass Pad */}
         <div className="flex flex-col items-center">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 self-start">
+          <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5 self-start">
             Aim
           </span>
           <div
@@ -135,39 +135,39 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
-            className={`relative w-40 h-40 bg-[#27272a] border-2 rounded-2xl shadow-inner cursor-crosshair flex items-center justify-center touch-none transition-all ${
-              isAiming ? 'border-emerald-500 ring-2 ring-emerald-500/30' : 'border-slate-700 hover:border-slate-500'
+            className={`relative w-40 h-40 bg-white border-2 rounded-2xl shadow-inner cursor-crosshair flex items-center justify-center touch-none transition-all ${
+              isAiming ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-slate-300 hover:border-slate-400'
             }`}
           >
             {/* Cardinal Markers */}
             <span
               onClick={(e) => { e.stopPropagation(); snapDirection(180); }}
-              className={`absolute top-1.5 left-1/2 -translate-x-1/2 text-xs font-black cursor-pointer transition ${
-                isNorth ? 'text-emerald-400 font-bold scale-110 drop-shadow-[0_0_6px_rgba(52,211,153,0.8)]' : 'text-slate-400 hover:text-white'
+              className={`absolute top-1.5 left-1/2 -translate-x-1/2 text-xs font-black cursor-pointer transition select-none ${
+                isNorth ? 'text-emerald-600 scale-110 drop-shadow-sm font-black' : 'text-slate-400 hover:text-slate-800 font-bold'
               }`}
             >
               N
             </span>
             <span
               onClick={(e) => { e.stopPropagation(); snapDirection(0); }}
-              className={`absolute bottom-1.5 left-1/2 -translate-x-1/2 text-xs font-black cursor-pointer transition ${
-                isSouth ? 'text-emerald-400 font-bold scale-110 drop-shadow-[0_0_6px_rgba(52,211,153,0.8)]' : 'text-slate-400 hover:text-white'
+              className={`absolute bottom-1.5 left-1/2 -translate-x-1/2 text-xs font-black cursor-pointer transition select-none ${
+                isSouth ? 'text-emerald-600 scale-110 drop-shadow-sm font-black' : 'text-slate-400 hover:text-slate-800 font-bold'
               }`}
             >
               S
             </span>
             <span
               onClick={(e) => { e.stopPropagation(); snapDirection(90); }}
-              className={`absolute left-2 top-1/2 -translate-y-1/2 text-xs font-black cursor-pointer transition ${
-                isWest ? 'text-emerald-400 font-bold scale-110 drop-shadow-[0_0_6px_rgba(52,211,153,0.8)]' : 'text-slate-400 hover:text-white'
+              className={`absolute left-2 top-1/2 -translate-y-1/2 text-xs font-black cursor-pointer transition select-none ${
+                isWest ? 'text-emerald-600 scale-110 drop-shadow-sm font-black' : 'text-slate-400 hover:text-slate-800 font-bold'
               }`}
             >
               W
             </span>
             <span
               onClick={(e) => { e.stopPropagation(); snapDirection(270); }}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 text-xs font-black cursor-pointer transition ${
-                isEast ? 'text-emerald-400 font-bold scale-110 drop-shadow-[0_0_6px_rgba(52,211,153,0.8)]' : 'text-slate-400 hover:text-white'
+              className={`absolute right-2 top-1/2 -translate-y-1/2 text-xs font-black cursor-pointer transition select-none ${
+                isEast ? 'text-emerald-600 scale-110 drop-shadow-sm font-black' : 'text-slate-400 hover:text-slate-800 font-bold'
               }`}
             >
               E
@@ -177,8 +177,8 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onLook(botId, yaw, -Math.PI / 2); }}
-              className={`absolute top-2 right-2 text-[10px] font-bold px-1 rounded transition ${
-                currentPitchDeg <= -45 ? 'text-sky-400 font-black' : 'text-slate-500 hover:text-sky-300'
+              className={`absolute top-2 right-2 text-[10px] font-bold px-1 rounded transition select-none ${
+                currentPitchDeg <= -45 ? 'text-sky-600 font-black' : 'text-slate-500 hover:text-sky-600'
               }`}
               title="Look straight up (-90°)"
             >
@@ -187,8 +187,8 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onLook(botId, yaw, Math.PI / 2); }}
-              className={`absolute bottom-2 right-2 text-[10px] font-bold px-1 rounded transition ${
-                currentPitchDeg >= 45 ? 'text-amber-400 font-black' : 'text-slate-500 hover:text-amber-300'
+              className={`absolute bottom-2 right-2 text-[10px] font-bold px-1 rounded transition select-none ${
+                currentPitchDeg >= 45 ? 'text-amber-600 font-black' : 'text-slate-500 hover:text-amber-600'
               }`}
               title="Look down at feet (+90°)"
             >
@@ -204,11 +204,11 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
                   transform: `rotate(${currentYawDeg + 180}deg)`,
                 }}
               >
-                <div className="w-1 h-7 bg-gradient-to-t from-transparent via-emerald-400 to-emerald-300 rounded-full shadow-[0_0_8px_rgba(52,211,153,0.9)] transform -translate-y-4" />
+                <div className="w-1.5 h-7 bg-gradient-to-t from-transparent via-emerald-600 to-emerald-500 rounded-full shadow-[0_0_6px_rgba(16,185,129,0.5)] transform -translate-y-4" />
               </div>
 
               {/* Player Avatar */}
-              <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-800 border-2 border-slate-600 shadow-md">
+              <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 border-2 border-slate-300 shadow-sm">
                 <img
                   src={`https://mc-heads.net/avatar/${encodeURIComponent(botName)}/56`}
                   alt={botName}
@@ -226,7 +226,7 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
         <div className="flex-1 w-full space-y-3">
           {/* 1. Up / Down (Pitch) */}
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
               Up / Down (Pitch)
             </label>
             <div className="flex items-center space-x-2">
@@ -240,13 +240,13 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
                 onKeyDown={(e) => e.key === 'Enter' && handlePitchSubmit()}
                 disabled={disabled}
                 placeholder="0"
-                className="flex-1 bg-[#27272a] border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-emerald-500 transition shadow-inner"
+                className="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-mono font-bold focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition shadow-2xs"
               />
               <button
                 type="button"
                 onClick={resetPitch}
                 disabled={disabled}
-                className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-black rounded-xl shadow-md transition"
+                className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-black rounded-xl shadow-2xs transition"
               >
                 Reset
               </button>
@@ -255,7 +255,7 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
 
           {/* 2. Left / Right (Yaw) */}
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
               Left / Right (Yaw)
             </label>
             <div className="flex items-center space-x-2">
@@ -269,13 +269,13 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
                 onKeyDown={(e) => e.key === 'Enter' && handleYawSubmit()}
                 disabled={disabled}
                 placeholder="0"
-                className="flex-1 bg-[#27272a] border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-emerald-500 transition shadow-inner"
+                className="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-mono font-bold focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition shadow-2xs"
               />
               <button
                 type="button"
                 onClick={resetYaw}
                 disabled={disabled}
-                className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-black rounded-xl shadow-md transition"
+                className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-black rounded-xl shadow-2xs transition"
               >
                 Reset
               </button>
@@ -284,7 +284,7 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
 
           {/* Quick Aim Chips (Feet / Level / Sky) */}
           <div className="pt-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
               Quick Aim Presets
             </span>
             <div className="flex flex-wrap gap-1.5">
@@ -292,10 +292,10 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
                 type="button"
                 onClick={() => onLook(botId, yaw, Math.PI / 2)}
                 disabled={disabled}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition shadow-2xs ${
                   currentPitchDeg >= 80
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500'
-                    : 'bg-[#27272a] hover:bg-slate-700 text-slate-300 border-slate-700'
+                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                    : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
                 }`}
               >
                 Feet (+90°)
@@ -304,10 +304,10 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
                 type="button"
                 onClick={() => onLook(botId, yaw, 0)}
                 disabled={disabled}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition shadow-2xs ${
                   currentPitchDeg === 0
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500'
-                    : 'bg-[#27272a] hover:bg-slate-700 text-slate-300 border-slate-700'
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
                 }`}
               >
                 Level (0°)
@@ -316,10 +316,10 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
                 type="button"
                 onClick={() => onLook(botId, yaw, -Math.PI / 2)}
                 disabled={disabled}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition shadow-2xs ${
                   currentPitchDeg <= -80
-                    ? 'bg-sky-500/20 text-sky-300 border-sky-500'
-                    : 'bg-[#27272a] hover:bg-slate-700 text-slate-300 border-slate-700'
+                    ? 'bg-sky-100 text-sky-800 border-sky-300'
+                    : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
                 }`}
               >
                 Sky (-90°)
