@@ -89,31 +89,31 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 bg-slate-900/65 backdrop-blur-sm overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 bg-black/75 backdrop-blur-md overflow-y-auto"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="bg-white border-2 border-slate-300 rounded-3xl w-full max-w-xl flex flex-col shadow-2xl overflow-hidden my-auto max-h-[92vh]"
+        className="bg-[#0c1220] border border-slate-700/80 rounded-3xl w-full max-w-xl flex flex-col shadow-2xl shadow-black/60 overflow-hidden my-auto max-h-[92vh] text-slate-100"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 sm:px-6 py-4 border-b-2 border-slate-200 flex items-center justify-between bg-slate-100/90 gap-2">
+        <div className="px-5 sm:px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-[#11192e] gap-2">
           <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
-            <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-100 border-2 border-emerald-300 text-emerald-800 shrink-0">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-950/80 border border-emerald-700/60 text-emerald-400 shrink-0">
               <Bot className="h-5 w-5 stroke-[2.5]" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight truncate">
+              <h2 className="text-sm sm:text-base font-black text-white uppercase tracking-tight truncate">
                 {initialConfig ? 'Edit Bot Account' : 'Add Minecraft AFK Account'}
               </h2>
-              <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">Configure connection & survival routines</p>
+              <p className="text-[11px] sm:text-xs text-slate-400 font-medium truncate">Configure connection & survival routines</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-200 active:scale-95 transition shrink-0"
+            className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 active:scale-95 transition shrink-0"
             title="Close (Esc)"
           >
             <X className="h-5 w-5 stroke-[2.5]" />
@@ -121,12 +121,12 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-200 bg-slate-50 px-4 sm:px-6 space-x-3 sm:space-x-4 text-xs font-semibold overflow-x-auto scrollbar-none shrink-0" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex border-b border-slate-800 bg-[#090e1a] px-4 sm:px-6 space-x-3 sm:space-x-4 text-xs font-semibold overflow-x-auto scrollbar-none shrink-0" style={{ WebkitOverflowScrolling: 'touch' }}>
           <button
             type="button"
             onClick={() => setActiveTab('connection')}
             className={`py-3 flex items-center space-x-1.5 border-b-2 transition shrink-0 whitespace-nowrap ${
-              activeTab === 'connection' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+              activeTab === 'connection' ? 'border-emerald-500 text-emerald-400 font-bold' : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Server className="h-3.5 w-3.5 shrink-0" />
@@ -136,7 +136,7 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
             type="button"
             onClick={() => setActiveTab('antiAfk')}
             className={`py-3 flex items-center space-x-1.5 border-b-2 transition shrink-0 whitespace-nowrap ${
-              activeTab === 'antiAfk' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+              activeTab === 'antiAfk' ? 'border-emerald-500 text-emerald-400 font-bold' : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Zap className="h-3.5 w-3.5 shrink-0" />
@@ -146,7 +146,7 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
             type="button"
             onClick={() => setActiveTab('survival')}
             className={`py-3 flex items-center space-x-1.5 border-b-2 transition shrink-0 whitespace-nowrap ${
-              activeTab === 'survival' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+              activeTab === 'survival' ? 'border-emerald-500 text-emerald-400 font-bold' : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Heart className="h-3.5 w-3.5 shrink-0" />
@@ -156,7 +156,7 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
             type="button"
             onClick={() => setActiveTab('farming')}
             className={`py-3 flex items-center space-x-1.5 border-b-2 transition shrink-0 whitespace-nowrap ${
-              activeTab === 'farming' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+              activeTab === 'farming' ? 'border-emerald-500 text-emerald-400 font-bold' : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Swords className="h-3.5 w-3.5 shrink-0" />
@@ -166,7 +166,7 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
             type="button"
             onClick={() => setActiveTab('alerts')}
             className={`py-3 flex items-center space-x-1.5 border-b-2 transition shrink-0 whitespace-nowrap ${
-              activeTab === 'alerts' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+              activeTab === 'alerts' ? 'border-emerald-500 text-emerald-400 font-bold' : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Bell className="h-3.5 w-3.5 shrink-0" />

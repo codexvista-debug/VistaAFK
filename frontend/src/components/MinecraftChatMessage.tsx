@@ -8,62 +8,62 @@ interface MinecraftChatMessageProps {
   showTimestamp?: boolean;
 }
 
-// Light-mode optimized high-contrast Minecraft Rank colors
-const LIGHT_RANK_COLORS: Record<string, string> = {
-  TITAN: '#0284c7',     // Sky 600
-  KING: '#d97706',      // Amber 600
-  CHAMPION: '#b45309',  // Amber 700
-  KNIGHT: '#2563eb',    // Blue 600
-  EMPEROR: '#7c3aed',   // Purple 600
-  MEMBER: '#475569',    // Slate 600
-  VIP: '#059669',       // Emerald 600
-  'VIP+': '#059669',
-  MVP: '#0891b2',       // Cyan 600
-  'MVP+': '#0284c7',
-  ADMIN: '#dc2626',     // Red 600
-  OWNER: '#dc2626',
-  MOD: '#059669',
+// High-contrast Minecraft Rank colors for Dark Console
+const RANK_COLORS: Record<string, string> = {
+  TITAN: '#38bdf8',     // Sky 400
+  KING: '#fbbf24',      // Amber 400
+  CHAMPION: '#fb923c',  // Orange 400
+  KNIGHT: '#60a5fa',    // Blue 400
+  EMPEROR: '#c084fc',   // Purple 400
+  MEMBER: '#94a3b8',    // Slate 400
+  VIP: '#34d399',       // Emerald 400
+  'VIP+': '#34d399',
+  MVP: '#22d3ee',       // Cyan 400
+  'MVP+': '#38bdf8',
+  ADMIN: '#f87171',     // Red 400
+  OWNER: '#f87171',
+  MOD: '#34d399',
 };
 
-// Light-mode Minecraft Color Codes
-const LIGHT_MC_COLORS: Record<string, string> = {
-  '0': '#0f172a', // Black -> slate-900
-  '1': '#1e3a8a', // Dark Blue
-  '2': '#15803d', // Dark Green
-  '3': '#0e7490', // Dark Aqua
-  '4': '#b91c1c', // Dark Red
-  '5': '#6b21a8', // Dark Purple
-  '6': '#d97706', // Gold
-  '7': '#64748b', // Gray
-  '8': '#334155', // Dark Gray
-  '9': '#2563eb', // Blue
-  'a': '#16a34a', // Green
-  'b': '#0284c7', // Aqua
-  'c': '#dc2626', // Red
-  'd': '#c026d3', // Light Purple
-  'e': '#ca8a04', // Yellow
-  'f': '#0f172a', // White -> dark slate on light mode
+// Authentic Minecraft Color Codes for Dark Mode
+const MC_COLORS: Record<string, string> = {
+  '0': '#475569', // Black -> slate-600 for visibility
+  '1': '#2563eb', // Dark Blue
+  '2': '#16a34a', // Dark Green
+  '3': '#0891b2', // Dark Aqua
+  '4': '#dc2626', // Dark Red
+  '5': '#9333ea', // Dark Purple
+  '6': '#f59e0b', // Gold
+  '7': '#94a3b8', // Gray
+  '8': '#64748b', // Dark Gray
+  '9': '#60a5fa', // Blue
+  'a': '#4ade80', // Green
+  'b': '#38bdf8', // Aqua
+  'c': '#f87171', // Red
+  'd': '#f472b6', // Light Purple
+  'e': '#fde047', // Yellow
+  'f': '#f8fafc', // White
 };
 
-function parseLightMinecraftColorCodes(text: string): React.ReactNode {
+function parseMinecraftColorCodes(text: string): React.ReactNode {
   if (!text.includes('§')) return text;
 
   const parts = text.split(/(§[0-9a-fk-or])/gi);
-  let currentColor = '#0f172a';
+  let currentColor = '#f8fafc';
   let isBold = false;
   let isItalic = false;
 
   return parts.map((part, index) => {
     if (part.startsWith('§')) {
       const code = part.charAt(1).toLowerCase();
-      if (LIGHT_MC_COLORS[code]) {
-        currentColor = LIGHT_MC_COLORS[code];
+      if (MC_COLORS[code]) {
+        currentColor = MC_COLORS[code];
       } else if (code === 'l') {
         isBold = true;
       } else if (code === 'o') {
         isItalic = true;
       } else if (code === 'r') {
-        currentColor = '#0f172a';
+        currentColor = '#f8fafc';
         isBold = false;
         isItalic = false;
       }
@@ -96,13 +96,13 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   // If text has § color codes
   if (rawText.includes('§')) {
     return (
-      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-slate-100/70 rounded transition">
+      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-slate-800/60 rounded transition">
         {showTimestamp && (
-          <span className="text-slate-400 text-[10px] shrink-0 select-none">
+          <span className="text-slate-500 text-[10px] shrink-0 select-none">
             [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
           </span>
         )}
-        <span className="break-words select-text">{parseLightMinecraftColorCodes(rawText)}</span>
+        <span className="break-words select-text text-slate-100">{parseMinecraftColorCodes(rawText)}</span>
       </div>
     );
   }
@@ -131,19 +131,19 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
     const parts = formattedDeath.split(/(<CYAN>.*?<\/CYAN>)/g);
 
     return (
-      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-rose-50/50 rounded transition text-rose-600 font-medium">
+      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-rose-950/40 rounded transition text-rose-400 font-medium">
         {showTimestamp && (
-          <span className="text-slate-400 text-[10px] shrink-0 select-none">
+          <span className="text-slate-500 text-[10px] shrink-0 select-none">
             [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
           </span>
         )}
         <span className="break-words select-text">
-          <span className="mr-1 text-rose-500 font-bold">☠</span>
+          <span className="mr-1 text-rose-400 font-bold">☠</span>
           {parts.map((p, i) => {
             if (p.startsWith('<CYAN>')) {
               const weapon = p.replace('<CYAN>', '').replace('</CYAN>', '');
               return (
-                <span key={i} className="text-sky-600 font-black underline">
+                <span key={i} className="text-cyan-300 font-black underline">
                   {weapon}
                 </span>
               );
@@ -160,18 +160,18 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   if (isEconomy) {
     const parts = rawText.split(/(\$[0-9,]+(?:\/each)?)/g);
     return (
-      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-emerald-50/50 rounded transition text-emerald-700 font-medium">
+      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-emerald-950/40 rounded transition text-emerald-300 font-medium">
         {showTimestamp && (
-          <span className="text-slate-400 text-[10px] shrink-0 select-none">
+          <span className="text-slate-500 text-[10px] shrink-0 select-none">
             [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
           </span>
         )}
         <span className="break-words select-text">
-          <span className="mr-1 text-amber-600 font-bold">$</span>
+          <span className="mr-1 text-amber-400 font-bold">$</span>
           {parts.map((p, i) => {
             if (p.startsWith('$')) {
               return (
-                <span key={i} className="text-amber-600 font-black">
+                <span key={i} className="text-amber-300 font-black">
                   {p}
                 </span>
               );
@@ -187,9 +187,9 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   const isVault = /Successfully (?:opened|closed) vault|teleported|warp/i.test(rawText);
   if (isVault) {
     return (
-      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-amber-50/50 rounded transition text-amber-700 font-medium">
+      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-amber-950/40 rounded transition text-amber-300 font-medium">
         {showTimestamp && (
-          <span className="text-slate-400 text-[10px] shrink-0 select-none">
+          <span className="text-slate-500 text-[10px] shrink-0 select-none">
             [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
           </span>
         )}
@@ -204,9 +204,9 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   // 4. VistaAFK / System Bot Events (Emerald Green)
   if (message.sender === 'VistaAFK' || message.sender === 'AutoCommand') {
     return (
-      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-emerald-50/50 rounded transition text-emerald-700 font-medium">
+      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-emerald-950/40 rounded transition text-emerald-400 font-medium">
         {showTimestamp && (
-          <span className="text-slate-400 text-[10px] shrink-0 select-none">
+          <span className="text-slate-500 text-[10px] shrink-0 select-none">
             [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
           </span>
         )}
@@ -222,31 +222,31 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
     const rank = rankMatch[1].toUpperCase();
     const username = rankMatch[2];
     const chatContent = rankMatch[3];
-    const rankColor = LIGHT_RANK_COLORS[rank] || '#475569';
+    const rankColor = RANK_COLORS[rank] || '#94a3b8';
 
     return (
-      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-slate-100/70 rounded transition">
+      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-slate-800/60 rounded transition">
         {showTimestamp && (
-          <span className="text-slate-400 text-[10px] shrink-0 select-none">
+          <span className="text-slate-500 text-[10px] shrink-0 select-none">
             [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
           </span>
         )}
-        <div className="break-words select-text text-slate-800">
+        <div className="break-words select-text text-slate-200">
           <span
-            className="font-black mr-1 px-1.5 py-0.5 rounded text-[11px]"
+            className="font-black mr-1.5 px-1.5 py-0.5 rounded text-[11px]"
             style={{
               color: rankColor,
-              backgroundColor: `${rankColor}15`,
-              border: `1px solid ${rankColor}30`,
+              backgroundColor: `${rankColor}20`,
+              border: `1px solid ${rankColor}50`,
             }}
           >
             {rank}
           </span>
-          <span className="mr-1 font-bold text-slate-900">
+          <span className="mr-1.5 font-bold text-white">
             {username}
           </span>
-          <span className="text-slate-400 mr-1.5 font-bold">▶</span>
-          <span className="text-slate-800 font-medium">{chatContent}</span>
+          <span className="text-slate-500 mr-1.5 font-bold">▶</span>
+          <span className="text-slate-200 font-normal">{chatContent}</span>
         </div>
       </div>
     );
@@ -254,12 +254,12 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
 
   // 6. Default Server / Player Message
   const isServer = message.sender === 'Server';
-  const senderColor = isServer ? '#d97706' : LIGHT_RANK_COLORS[message.sender.toUpperCase()] || '#0284c7';
+  const senderColor = isServer ? '#f59e0b' : RANK_COLORS[message.sender.toUpperCase()] || '#38bdf8';
 
   return (
-    <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-slate-100/70 rounded transition text-slate-800">
+    <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-slate-800/60 rounded transition text-slate-200">
       {showTimestamp && (
-        <span className="text-slate-400 text-[10px] shrink-0 select-none">
+        <span className="text-slate-500 text-[10px] shrink-0 select-none">
           [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
         </span>
       )}
@@ -272,7 +272,7 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
             {message.isSystem ? `[${message.sender}]` : `<${message.sender}>`}
           </span>
         )}
-        <span className="text-slate-800 font-medium">{rawText}</span>
+        <span className="text-slate-200 font-normal">{rawText}</span>
       </div>
     </div>
   );

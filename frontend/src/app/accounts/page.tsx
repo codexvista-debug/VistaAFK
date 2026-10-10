@@ -204,7 +204,7 @@ export default function AccountsPage() {
 
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#e2e8f0] text-slate-800 font-sans">
+    <div className="min-h-screen flex flex-col bg-transparent text-slate-100 font-sans">
       {/* Navbar with active Accounts Vault tab */}
       <Navbar
         isConnected={isConnected}
@@ -218,16 +218,16 @@ export default function AccountsPage() {
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page Title & Action Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b-2 border-slate-300 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b-2 border-slate-800 gap-4">
           <div className="flex items-center space-x-3">
-            <div className="h-12 w-12 rounded-2xl bg-emerald-100 text-emerald-800 border-2 border-emerald-300 flex items-center justify-center shadow-sm">
+            <div className="h-12 w-12 rounded-2xl bg-emerald-950/80 text-emerald-400 border border-emerald-700/60 flex items-center justify-center shadow-lg">
               <Users className="h-6 w-6 stroke-[2.5]" />
             </div>
             <div>
-              <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+              <h1 className="text-xl font-black text-white uppercase tracking-tight">
                 Accounts Vault
               </h1>
-              <p className="text-xs text-slate-600 font-medium">
+              <p className="text-xs text-slate-400 font-medium">
                 Save your Minecraft accounts once &bull; Deploy the same account to multiple servers anytime
               </p>
             </div>
@@ -236,7 +236,7 @@ export default function AccountsPage() {
           <div className="flex items-center space-x-3">
             <button
               onClick={handleOpenAddModal}
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center space-x-2"
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-950/50 transition flex items-center space-x-2"
             >
               <Plus className="h-4 w-4 stroke-[3]" />
               <span>Add Account to Vault</span>
@@ -247,21 +247,21 @@ export default function AccountsPage() {
         {/* Saved Accounts Grid */}
         <div className="mt-8 space-y-4">
           {savedAccounts.length === 0 ? (
-            <div className="p-12 bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl flex flex-col items-center justify-center text-center shadow-lg">
-              <div className="h-16 w-16 rounded-2xl bg-slate-100 border-2 border-slate-300 flex items-center justify-center text-slate-500 mb-4">
+            <div className="p-12 bg-[#111827]/90 border border-slate-800 rounded-3xl flex flex-col items-center justify-center text-center shadow-2xl shadow-black/40 backdrop-blur-sm">
+              <div className="h-16 w-16 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 mb-4 shadow-md">
                 <Users className="h-8 w-8 stroke-[1.5]" />
               </div>
-              <h3 className="text-lg font-black text-slate-900">
+              <h3 className="text-lg font-black text-white">
                 {!user ? 'Sign In to Access Accounts Vault' : 'Your Account Vault is Empty'}
               </h3>
-              <p className="text-xs text-slate-600 max-w-md mt-1 leading-relaxed font-medium">
+              <p className="text-xs text-slate-400 max-w-md mt-1 leading-relaxed font-medium">
                 {!user
                   ? 'Sign in to save your Minecraft gamertags securely and sync them across all your phones and computers.'
                   : 'Add your Minecraft Gamertags here once. They will stay saved permanently, so you can connect them to FreshSMP, Hypixel, or any server with one click!'}
               </p>
               <button
                 onClick={handleOpenAddModal}
-                className="mt-6 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition"
+                className="mt-6 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md transition"
               >
                 {!user ? 'Sign In / Register' : '+ Save Your First Account'}
               </button>
@@ -275,7 +275,7 @@ export default function AccountsPage() {
                 return (
                   <div
                     key={acc.id}
-                    className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-2xl p-5 shadow-md flex flex-col justify-between"
+                    className="bg-[#111827]/95 border border-slate-800 hover:border-slate-700/80 rounded-2xl p-5 shadow-xl shadow-black/30 flex flex-col justify-between backdrop-blur-sm"
                   >
                     <div>
                       <div className="flex items-start justify-between">
@@ -283,21 +283,21 @@ export default function AccountsPage() {
                           <img
                             src={`https://mc-heads.net/avatar/${acc.name}/64`}
                             alt={acc.name}
-                            className="w-12 h-12 rounded-xl border-2 border-slate-300 bg-slate-100 object-cover shadow-sm"
+                            className="w-12 h-12 rounded-xl border-2 border-slate-700 bg-slate-800 object-cover shadow-sm"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = 'https://mc-heads.net/avatar/MHF_Steve/64';
                             }}
                           />
                           <div>
-                            <h3 className="font-black text-slate-900 text-base">{acc.name}</h3>
+                            <h3 className="font-black text-white text-base">{acc.name}</h3>
                             <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border uppercase bg-emerald-50 text-emerald-800 border-emerald-300">
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border uppercase bg-emerald-950/80 text-emerald-300 border-emerald-700/60">
                                 ☕ Java
                               </span>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                                 {acc.authType === 'microsoft' ? 'MS OAuth' : 'Offline'}
                               </span>
-                              <span className="text-[10px] text-slate-500 font-medium">
+                              <span className="text-[10px] text-slate-400 font-medium">
                                 Saved {new Date(acc.createdAt).toLocaleDateString()}
                               </span>
                             </div>
@@ -306,7 +306,7 @@ export default function AccountsPage() {
 
                         <button
                           onClick={() => deleteSavedAccount(acc.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                          className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-950/60 rounded-lg transition"
                           title="Delete from Vault"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -314,24 +314,24 @@ export default function AccountsPage() {
                       </div>
 
                       {/* Active Server Deployments count */}
-                      <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
-                        <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">
+                      <div className="mt-4 p-3 bg-[#0a0f1d] border border-slate-800 rounded-xl text-xs space-y-1">
+                        <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                           Active Server Deployments: {activeDeployments.length}
                         </span>
                         {activeDeployments.length > 0 ? (
                           <div className="space-y-1 pt-1">
                             {activeDeployments.map((d) => (
-                              <div key={d.id} className="flex items-center justify-between text-[11px] font-mono font-medium text-slate-700">
+                              <div key={d.id} className="flex items-center justify-between text-[11px] font-mono font-medium text-slate-300">
                                 <span>&bull; {d.host}:{d.port}</span>
                                 <div className="flex items-center space-x-1.5">
-                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${telemetry[d.id]?.status === 'online' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${telemetry[d.id]?.status === 'online' ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-600/60' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
                                     {telemetry[d.id]?.status || 'offline'}
                                   </span>
                                   {telemetry[d.id]?.status === 'online' && (
                                     <button
                                       type="button"
                                       onClick={() => setInventoryModalBot(d)}
-                                      className="p-1 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded transition"
+                                      className="p-1 text-slate-400 hover:text-amber-400 hover:bg-amber-950/60 rounded transition"
                                       title="View Inventory, Items & Lore"
                                     >
                                       <Package className="h-3.5 w-3.5" />
@@ -348,10 +348,10 @@ export default function AccountsPage() {
                     </div>
 
                     {/* Deploy Action Button */}
-                    <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between">
+                    <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
                       <button
                         onClick={() => handleOpenDeploy(acc)}
-                        className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center space-x-2"
+                        className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-2"
                       >
                         <Server className="h-4 w-4" />
                         <span>Deploy to Server</span>
@@ -368,7 +368,7 @@ export default function AccountsPage() {
       {/* Add Account Modal (MinecraftAFK style) */}
       {isAddAccountModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
@@ -378,15 +378,15 @@ export default function AccountsPage() {
           }}
         >
           <div
-            className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl w-full max-w-md shadow-2xl my-auto max-h-[90vh] flex flex-col overflow-hidden"
+            className="bg-[#0c1220] border border-slate-700/80 rounded-3xl w-full max-w-md shadow-2xl shadow-black/60 my-auto max-h-[90vh] flex flex-col overflow-hidden text-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-start justify-between p-5 pb-3.5 border-b-2 border-slate-200 gap-2 shrink-0 bg-white">
+            <div className="flex items-start justify-between p-5 pb-3.5 border-b border-slate-800 gap-2 shrink-0 bg-[#11192e]">
               <div>
-                <h3 className="font-black text-slate-900 text-base">Add an account</h3>
-                <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                  Link an official Microsoft account or add an offline profile.
+                <h3 className="font-black text-white text-base">Add an account</h3>
+                <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                  Link an official Microsoft Minecraft Java account directly to your vault.
                 </p>
               </div>
               <button
@@ -395,7 +395,7 @@ export default function AccountsPage() {
                   setIsAddAccountModalOpen(false);
                   resetDiscovery();
                 }}
-                className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200 active:scale-95 transition shrink-0"
+                className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 active:scale-95 transition shrink-0"
                 title="Close (Esc)"
               >
                 <X className="h-5 w-5 stroke-[2.5]" />
@@ -404,18 +404,18 @@ export default function AccountsPage() {
 
             {/* Scrollable Body */}
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
-              {/* Waiting for popup confirmation (MinecraftAFK Screenshot 3) */}
+              {/* Waiting for popup confirmation */}
               {(discoveryStatus === 'waiting_code' || discoveryStatus === 'waiting_approval') ? (
               <div className="py-6 px-3 flex flex-col items-center justify-center text-center space-y-4">
-                <div className="w-12 h-12 rounded-full border-4 border-slate-200 border-t-emerald-500 animate-spin" />
+                <div className="w-12 h-12 rounded-full border-4 border-slate-700 border-t-emerald-500 animate-spin" />
                 <div className="space-y-1">
-                  <h3 className="text-base font-black text-slate-900">Authorize Microsoft Account</h3>
-                  <p className="text-xs text-slate-500 font-medium">Follow the link below to enter your device code on Microsoft.</p>
+                  <h3 className="text-base font-black text-white">Authorize Microsoft Account</h3>
+                  <p className="text-xs text-slate-400 font-medium">Follow the link below to enter your device code on Microsoft.</p>
                 </div>
 
                 {discoveryDeviceCode && (
                   <div className="w-full max-w-sm space-y-3 pt-1">
-                    <div className="p-3.5 bg-slate-900 border border-slate-700 rounded-xl text-center flex items-center justify-between">
+                    <div className="p-3.5 bg-[#0a0f1d] border border-slate-700 rounded-xl text-center flex items-center justify-between shadow-inner">
                       <div className="text-left">
                         <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Authorization Code</span>
                         <span className="font-mono text-2xl font-black text-emerald-400 tracking-widest">
@@ -442,7 +442,7 @@ export default function AccountsPage() {
                       <button
                         type="button"
                         onClick={() => copyAndOpenMicrosoft(discoveryDeviceCode.userCode, discoveryDeviceCode.verificationUri)}
-                        className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-black text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5"
+                        className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-black text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5"
                       >
                         <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                         <span>Open Microsoft Sign-In ↗</span>
@@ -457,31 +457,31 @@ export default function AccountsPage() {
                             setTimeout(() => setCopiedIncognito(false), 3000);
                           } catch (e) {}
                         }}
-                        className="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 active:scale-[0.99] text-slate-200 border border-slate-700 font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1.5"
+                        className="w-full py-2.5 px-3 bg-[#131d2e] hover:bg-slate-700 active:scale-[0.99] text-slate-200 border border-slate-700 font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1.5"
                       >
                         {copiedIncognito ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5 text-slate-300" />}
                         <span>{copiedIncognito ? 'Copied Incognito Link!' : 'Copy for Incognito Tab'}</span>
                       </button>
                     </div>
 
-                    <div className="p-3 bg-slate-100 border border-slate-300 rounded-xl text-left space-y-1.5 text-xs text-slate-800">
-                      <div className="font-bold text-[11px] text-slate-900 flex items-center space-x-1.5">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <div className="p-3 bg-[#0a0f1d] border border-slate-800 rounded-xl text-left space-y-1.5 text-xs text-slate-300">
+                      <div className="font-bold text-[11px] text-white flex items-center space-x-1.5">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
                         <span>How Microsoft Device Authentication Works:</span>
                       </div>
-                      <ol className="text-[10px] space-y-1 text-slate-700 list-decimal list-inside font-medium leading-relaxed">
-                        <li><strong>Step 1:</strong> On Microsoft, enter code <span className="font-mono font-bold text-slate-900 bg-slate-200 px-1 py-0.5 rounded">{discoveryDeviceCode.userCode}</span> and click Allow access.</li>
+                      <ol className="text-[10px] space-y-1 text-slate-400 list-decimal list-inside font-medium leading-relaxed">
+                        <li><strong>Step 1:</strong> On Microsoft, enter code <span className="font-mono font-bold text-emerald-400 bg-slate-800 px-1 py-0.5 rounded border border-slate-700">{discoveryDeviceCode.userCode}</span> and click Allow access.</li>
                         <li><strong>Step 2:</strong> Microsoft will then ask you to sign in with your Minecraft email &amp; password.</li>
                         <li><strong>Step 3:</strong> Once signed in, this window will detect your gamertag and save it permanently!</li>
                       </ol>
                     </div>
 
-                    <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-left space-y-1">
-                      <div className="flex items-center space-x-1.5 text-amber-800 font-black text-[11px]">
-                        <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                    <div className="p-2.5 bg-amber-950/60 border border-amber-600/70 rounded-xl text-left space-y-1">
+                      <div className="flex items-center space-x-1.5 text-amber-300 font-black text-[11px]">
+                        <AlertCircle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
                         <span>Adding an Alt or Second Account?</span>
                       </div>
-                      <p className="text-[10px] text-amber-900/90 leading-relaxed font-medium">
+                      <p className="text-[10px] text-amber-200/90 leading-relaxed font-medium">
                         Click <strong>Copy for Incognito Tab</strong> and open a <strong>Private / Incognito window</strong>. Microsoft will prompt you for code first, then let you sign in with your other account!
                       </p>
                     </div>
@@ -495,7 +495,7 @@ export default function AccountsPage() {
                       if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
                       resetDiscovery();
                     }}
-                    className="px-6 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition"
+                    className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition"
                   >
                     Cancel
                   </button>
@@ -504,25 +504,25 @@ export default function AccountsPage() {
             ) : discoveryStatus === 'success' && discoveryProfiles ? (
               /* Success View */
               <div className="py-6 px-2 space-y-4">
-                <div className="flex items-center space-x-2 text-emerald-800 font-black text-sm">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                <div className="flex items-center space-x-2 text-emerald-400 font-black text-sm">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-400" />
                   <span>Account Linked Successfully!</span>
                 </div>
                 <div className="space-y-2">
                   {discoveryProfiles.java?.name && (
-                    <div className="p-3 bg-emerald-50/50 border border-emerald-200 rounded-xl flex items-center justify-between">
+                    <div className="p-3 bg-emerald-950/80 border border-emerald-700/60 rounded-xl flex items-center justify-between">
                       <div className="flex items-center space-x-2.5">
                         <img
                           src={`https://mc-heads.net/avatar/${discoveryProfiles.java.name}/48`}
                           alt=""
-                          className="w-8 h-8 rounded-lg border border-slate-200"
+                          className="w-8 h-8 rounded-lg border border-slate-700"
                         />
                         <div>
-                          <span className="font-black text-slate-900 text-xs block">{discoveryProfiles.java.name}</span>
-                          <span className="text-[10px] text-emerald-700 font-bold">☕ Java Edition Profile</span>
+                          <span className="font-black text-white text-xs block">{discoveryProfiles.java.name}</span>
+                          <span className="text-[10px] text-emerald-300 font-bold">☕ Java Edition Profile</span>
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] font-bold text-emerald-300 bg-emerald-900/80 border border-emerald-600/60 px-2 py-0.5 rounded-full">
                         Saved ✅
                       </span>
                     </div>
@@ -536,7 +536,7 @@ export default function AccountsPage() {
                     setIsAddAccountModalOpen(false);
                     resetDiscovery();
                   }}
-                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition"
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition"
                 >
                   Done & View in Vault
                 </button>
@@ -544,22 +544,22 @@ export default function AccountsPage() {
             ) : discoveryStatus === 'error' ? (
               /* Error View */
               <div className="py-6 space-y-3">
-                <div className="p-3.5 bg-rose-50 border-2 border-rose-200 rounded-xl text-rose-800 text-xs font-bold flex items-center space-x-2">
-                  <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                <div className="p-3.5 bg-rose-950/60 border border-rose-800 rounded-xl text-rose-300 text-xs font-bold flex items-center space-x-2">
+                  <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
                   <span>{discoveryError || 'Failed to authenticate with Microsoft'}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
                     type="button"
                     onClick={() => resetDiscovery()}
-                    className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+                    className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl"
                   >
                     Back
                   </button>
                   <button
                     type="button"
                     onClick={() => discoverMicrosoftAccount(undefined, 'java')}
-                    className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl"
+                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl"
                   >
                     Try Again
                   </button>
@@ -568,20 +568,20 @@ export default function AccountsPage() {
             ) : (
               /* Form View: Direct 1-Click Microsoft Java Connect */
               <div className="mt-4 space-y-4">
-                <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl text-xs text-emerald-800 font-medium leading-relaxed">
+                <div className="p-3.5 bg-[#0a0f1d] border border-slate-800 rounded-2xl text-xs text-slate-300 font-medium leading-relaxed">
                   ☕ <strong>Official Minecraft Java Sign-In:</strong> Click below to generate your secure Microsoft device authorization code and link your Minecraft Java account directly to your vault.
                 </div>
 
                 <button
                   type="button"
                   onClick={() => handleAddAccountSubmit()}
-                  className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-700/25 flex items-center justify-center space-x-2 transition"
+                  className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-950/50 flex items-center justify-center space-x-2 transition"
                 >
                   <ShieldCheck className="h-5 w-5" />
                   <span>Connect Microsoft Java Account</span>
                 </button>
 
-                <div className="flex items-center justify-end pt-2 border-t border-slate-200">
+                <div className="flex items-center justify-end pt-2 border-t border-slate-800">
                   <button
                     type="button"
                     onClick={() => {
@@ -589,7 +589,7 @@ export default function AccountsPage() {
                       setIsAddAccountModalOpen(false);
                       resetDiscovery();
                     }}
-                    className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+                    className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition"
                   >
                     Cancel
                   </button>
@@ -604,7 +604,7 @@ export default function AccountsPage() {
       {/* Deploy Account to Server Modal */}
       {isDeployModalOpen && selectedAccountForDeploy && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setIsDeployModalOpen(false);
@@ -613,40 +613,23 @@ export default function AccountsPage() {
           }}
         >
           <div
-            className="bg-white border-4 border-t-white border-l-white border-b-slate-400 border-r-slate-400 rounded-3xl w-full max-w-lg shadow-2xl my-auto max-h-[90vh] flex flex-col overflow-hidden"
+            className="bg-[#0c1220] border border-slate-700/80 rounded-3xl w-full max-w-lg shadow-2xl shadow-black/60 my-auto max-h-[90vh] flex flex-col overflow-hidden text-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between p-4 sm:p-5 pb-3 border-b-2 border-slate-200 gap-2 shrink-0 bg-white">
+            <div className="flex items-center justify-between p-4 sm:p-5 pb-3 border-b border-slate-800 gap-2 shrink-0 bg-[#11192e]">
               <div className="flex items-center space-x-2.5 min-w-0">
                 <img
                   src={`https://mc-heads.net/avatar/${selectedAccountForDeploy.name}/48`}
                   alt=""
-                  className="w-8 h-8 rounded-lg border border-slate-300 shrink-0"
+                  className="w-8 h-8 rounded-lg border border-slate-700 shrink-0"
                 />
                 <div className="min-w-0">
                   <div className="flex items-center space-x-2">
-                    <h3 className="font-black text-slate-900 text-base truncate">
-                      Deploy <span className="text-emerald-700">{selectedAccountForDeploy.name}</span>
+                    <h3 className="font-black text-white text-base truncate">
+                      Deploy <span className="text-emerald-400">{selectedAccountForDeploy.name}</span>
                     </h3>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newEd = selectedAccountForDeploy.edition === 'bedrock' ? 'java' : 'bedrock';
-                        setSelectedAccountForDeploy({ ...selectedAccountForDeploy, edition: newEd });
-                        if (newEd === 'bedrock' && targetServerPort === 25565) setTargetServerPort(19132);
-                        if (newEd === 'java' && targetServerPort === 19132) setTargetServerPort(25565);
-                      }}
-                      title="Click to toggle between Bedrock and Java"
-                      className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border transition hover:scale-105 cursor-pointer shrink-0 ${
-                        selectedAccountForDeploy.edition === 'bedrock'
-                          ? 'bg-sky-50 text-sky-700 border-sky-300 hover:bg-sky-100'
-                          : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
-                      }`}
-                    >
-                      {selectedAccountForDeploy.edition === 'bedrock' ? '🧱 Bedrock' : '☕ Java'}
-                    </button>
                   </div>
-                  <p className="text-[11px] text-slate-500 font-medium">Select a server to launch this bot instance</p>
+                  <p className="text-[11px] text-slate-400 font-medium">Select a server to launch this bot instance</p>
                 </div>
               </div>
               <button
@@ -654,7 +637,7 @@ export default function AccountsPage() {
                   setIsDeployModalOpen(false);
                   setSelectedAccountForDeploy(null);
                 }}
-                className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200 active:scale-95 transition shrink-0"
+                className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 active:scale-95 transition shrink-0"
                 title="Close (Esc)"
               >
                 <X className="h-5 w-5 stroke-[2.5]" />
@@ -683,12 +666,12 @@ export default function AccountsPage() {
                       }}
                       className={`p-2 rounded-xl border text-left text-xs transition ${
                         isSelected
-                          ? 'bg-emerald-50 border-emerald-500 font-bold text-emerald-900 shadow-2xs'
-                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                          ? 'bg-emerald-950/80 border-emerald-500 font-bold text-emerald-300 shadow-sm'
+                          : 'bg-[#0d1424] border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white'
                       }`}
                     >
                       <span className="block truncate font-bold">{preset.name}</span>
-                      <span className="text-[10px] text-slate-500 font-mono block truncate">
+                      <span className="text-[10px] text-slate-400 font-mono block truncate">
                         {preset.host || 'Any custom IP'}
                       </span>
                     </button>
@@ -699,11 +682,11 @@ export default function AccountsPage() {
 
             {/* DonutSMP Safe Mode Notice */}
             {targetServerHost.toLowerCase().includes('donut') && (
-              <div className="mt-3 p-3 bg-emerald-50 border-2 border-emerald-300 rounded-2xl flex items-start space-x-2 text-xs text-emerald-950">
-                <ShieldCheck className="h-4 w-4 text-emerald-700 shrink-0 mt-0.5" />
+              <div className="mt-3 p-3 bg-emerald-950/60 border border-emerald-700/60 rounded-2xl flex items-start space-x-2 text-xs text-emerald-300">
+                <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-bold block text-emerald-900">DonutSMP Safe AFK Mode Active</span>
-                  <span className="text-[11px] text-emerald-800 leading-tight block mt-0.5">
+                  <span className="font-bold block text-emerald-300">DonutSMP Safe AFK Mode Active</span>
+                  <span className="text-[11px] text-emerald-400/90 leading-tight block mt-0.5">
                     Anti-AFK movements, auto-eat, and auto-totem are <strong>turned OFF by default</strong> for DonutSMP to prevent anti-cheat kicks. You can enable them manually in bot settings if needed.
                   </span>
                 </div>
@@ -713,7 +696,7 @@ export default function AccountsPage() {
             <form onSubmit={handleDeploySubmit} className="mt-4 space-y-4">
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Server Host / IP</label>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Server Host / IP</label>
                   <input
                     type="text"
                     required
@@ -724,44 +707,44 @@ export default function AccountsPage() {
                       const matched = serverPresets.find((p) => p.host && p.host.toLowerCase() === val.trim().toLowerCase());
                       setSelectedPresetId(matched ? matched.id : 'custom');
                     }}
-                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-600"
+                    className="w-full bg-[#070b14] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-emerald-500 shadow-inner"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Port</label>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Port</label>
                   <input
                     type="number"
                     value={targetServerPort}
                     onChange={(e) => setTargetServerPort(parseInt(e.target.value, 10) || 25565)}
-                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-600"
+                    className="w-full bg-[#070b14] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-emerald-500 shadow-inner"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Version Override <span className="font-normal text-slate-400">(leave blank for auto-detect)</span>
+                <label className="block text-xs font-bold text-slate-400 mb-1">
+                  Version Override <span className="font-normal text-slate-500">(leave blank for auto-detect)</span>
                 </label>
                 <input
                   type="text"
                   placeholder="Auto-detect (recommended, leave blank)"
                   value={targetServerVersion}
                   onChange={(e) => setTargetServerVersion(e.target.value)}
-                  className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-600 font-mono"
+                  className="w-full bg-[#070b14] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-emerald-500 font-mono shadow-inner"
                 />
               </div>
 
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-end space-x-2">
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-end space-x-2">
                 <button
                   type="button"
                   onClick={() => setIsDeployModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center space-x-1.5"
+                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-950/50 transition flex items-center space-x-1.5"
                 >
                   <Play className="h-3.5 w-3.5 fill-current" />
                   <span>Launch Bot Now</span>

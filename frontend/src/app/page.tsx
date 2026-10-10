@@ -78,7 +78,7 @@ export default function Dashboard() {
   const onlineCount = isConnected ? Object.values(telemetry).filter((t) => t.status === 'online').length : 0;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f8fafc] text-slate-800">
+    <div className="min-h-screen flex flex-col bg-transparent text-slate-100">
       {/* Navigation Bar */}
       <Navbar
         isConnected={isConnected}
@@ -94,22 +94,19 @@ export default function Dashboard() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Auth Error Banner */}
         {authError && (
-          <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center justify-between text-xs shadow-sm">
+          <div className="mb-6 p-4 rounded-2xl bg-rose-950/50 border border-rose-800 text-rose-300 flex items-center justify-between text-xs shadow-md">
             <div className="flex items-center space-x-2.5">
-              <AlertTriangle className="h-4 w-4 text-rose-600" />
+              <AlertTriangle className="h-4 w-4 text-rose-400" />
               <span className="font-medium">Authentication Error: {authError}</span>
             </div>
             <Link
               href="/settings"
-              className="font-bold underline hover:text-rose-900"
+              className="font-bold underline text-rose-200 hover:text-white"
             >
               Open Settings
             </Link>
           </div>
         )}
-
-
-
 
         {/* Stats Overview */}
         <StatsOverview configs={configs} telemetry={telemetry} savedAccountsCount={savedAccounts.length} isDaemonConnected={isConnected} />
@@ -118,9 +115,9 @@ export default function Dashboard() {
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div className="flex items-center space-x-2">
-              <Layers className="h-4 w-4 text-emerald-600 shrink-0" />
-              <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight uppercase">Server Fleet Deployments</h2>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono border border-slate-200 shrink-0">
+              <Layers className="h-4 w-4 text-emerald-400 shrink-0" />
+              <h2 className="text-sm sm:text-base font-black text-white tracking-tight uppercase">Server Fleet Deployments</h2>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#1b263b] text-emerald-300 font-mono border border-slate-700 shrink-0">
                 {configs.length} active
               </span>
             </div>
@@ -129,7 +126,7 @@ export default function Dashboard() {
               <button
                 onClick={() => setIsDeployModalOpen(true)}
                 disabled={!isConnected}
-                className="w-full sm:w-auto flex items-center justify-center space-x-1.5 px-3.5 py-2 sm:py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition active:scale-95"
+                className="w-full sm:w-auto flex items-center justify-center space-x-1.5 px-3.5 py-2 sm:py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition active:scale-95"
               >
                 <Plus className="h-3.5 w-3.5 stroke-[3]" />
                 <span>Deploy Another Server</span>
@@ -141,13 +138,13 @@ export default function Dashboard() {
             /* Contextual Empty State */
             savedAccounts.length > 0 ? (
               /* User HAS accounts in Vault - Offer Quick Server Connect */
-              <div className="p-8 sm:p-10 border-2 border-slate-300 rounded-3xl bg-white shadow-sm flex flex-col items-center text-center">
-                <div className="h-16 w-16 rounded-2xl bg-emerald-100 border-2 border-emerald-300 flex items-center justify-center text-emerald-800 mb-4 shadow-sm">
+              <div className="p-8 sm:p-10 border border-slate-800 rounded-3xl bg-[#111827]/90 backdrop-blur-md shadow-2xl shadow-black/40 flex flex-col items-center text-center">
+                <div className="h-16 w-16 rounded-2xl bg-emerald-950/80 border-2 border-emerald-500/50 flex items-center justify-center text-emerald-400 mb-4 shadow-lg shadow-emerald-950/50">
                   <Server className="h-8 w-8 stroke-[2.2]" />
                 </div>
-                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">No Active Server Connections</h3>
-                <p className="text-xs text-slate-600 max-w-lg mt-2 font-medium leading-relaxed">
-                  You have <span className="font-bold text-emerald-700">{savedAccounts.length} Minecraft account{savedAccounts.length > 1 ? 's' : ''}</span> saved in your Accounts Vault ({savedAccounts.map((a) => a.name).join(', ')}). Choose which server you want to deploy to:
+                <h3 className="text-xl font-black text-white uppercase tracking-tight">No Active Server Connections</h3>
+                <p className="text-xs text-slate-400 max-w-lg mt-2 font-medium leading-relaxed">
+                  You have <span className="font-bold text-emerald-400">{savedAccounts.length} Minecraft account{savedAccounts.length > 1 ? 's' : ''}</span> saved in your Accounts Vault ({savedAccounts.map((a) => a.name).join(', ')}). Choose which server you want to deploy to:
                 </p>
 
                 {/* Quick Server Preset Launch Cards */}
@@ -159,24 +156,24 @@ export default function Dashboard() {
                     return (
                       <div
                         key={preset.id}
-                        className="p-4 rounded-2xl bg-slate-50 border-2 border-slate-200 text-left hover:border-emerald-500 transition-all flex flex-col justify-between"
+                        className="p-4 rounded-2xl bg-[#0e1626] border border-slate-800 text-left hover:border-emerald-500/70 transition-all flex flex-col justify-between shadow-md"
                       >
                         <div>
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-sm text-slate-900">{preset.name}</span>
+                            <span className="font-bold text-sm text-white">{preset.name}</span>
                             <span
                               className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold border ${
                                 isDonut
-                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60'
                                   : isCustom
-                                  ? 'bg-slate-100 text-slate-700 border-slate-300'
-                                  : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                  ? 'bg-slate-800 text-slate-300 border-slate-700'
+                                  : 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60'
                               }`}
                             >
                               {isDonut ? 'Safe AFK' : isCustom ? 'Custom IP' : 'Auto'}
                             </span>
                           </div>
-                          <span className="text-xs font-mono text-slate-500 mt-1 block truncate">
+                          <span className="text-xs font-mono text-slate-400 mt-1 block truncate">
                             {preset.host || 'Any custom IP & port'}
                           </span>
                         </div>
@@ -193,7 +190,7 @@ export default function Dashboard() {
                             }
                           }}
                           disabled={!isConnected}
-                          className="mt-4 w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center space-x-1.5"
+                          className="mt-4 w-full py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5"
                         >
                           <Play className="h-3.5 w-3.5 fill-current" />
                           <span>{isCustom ? 'Enter IP & Deploy' : `Deploy ${savedAccounts[0]?.name || 'Bot'}`}</span>
@@ -207,14 +204,14 @@ export default function Dashboard() {
                   <button
                     onClick={() => setIsDeployModalOpen(true)}
                     disabled={!isConnected}
-                    className="px-5 py-2.5 bg-[#1b2637] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center space-x-2"
+                    className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 shadow-md transition flex items-center space-x-2"
                   >
                     <Plus className="h-4 w-4 stroke-[3]" />
                     <span>Deploy Custom Server</span>
                   </button>
                   <Link
                     href="/accounts"
-                    className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border-2 border-slate-300 transition flex items-center space-x-1.5"
+                    className="px-5 py-2.5 bg-[#141d2f] hover:bg-slate-800 text-slate-300 hover:text-white font-bold text-xs rounded-xl border border-slate-700 transition flex items-center space-x-1.5"
                   >
                     <Users className="h-4 w-4" />
                     <span>Manage Accounts Vault</span>
@@ -223,14 +220,14 @@ export default function Dashboard() {
               </div>
             ) : (
               /* User has NO accounts in Vault */
-              <div className="p-10 border-2 border-dashed border-slate-300 rounded-3xl flex flex-col items-center justify-center text-center bg-white shadow-sm">
-                <div className="h-16 w-16 rounded-2xl bg-slate-100 border-2 border-slate-300 flex items-center justify-center text-slate-600 mb-4 shadow-sm">
+              <div className="p-10 border border-slate-800 rounded-3xl flex flex-col items-center justify-center text-center bg-[#111827]/90 backdrop-blur-md shadow-2xl shadow-black/40">
+                <div className="h-16 w-16 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 mb-4 shadow-md">
                   <Users className="h-8 w-8 stroke-[2.2]" />
                 </div>
-                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                <h3 className="text-xl font-black text-white uppercase tracking-tight">
                   {!user ? 'Sign In to Deploy Server Bots' : 'No Accounts Saved in Vault'}
                 </h3>
-                <p className="text-xs text-slate-500 max-w-md mt-2 font-medium leading-relaxed">
+                <p className="text-xs text-slate-400 max-w-md mt-2 font-medium leading-relaxed">
                   {!user
                     ? 'Log in to connect your phone daemon, add your Minecraft accounts, and sync your bot fleet seamlessly across all devices.'
                     : 'Save your Minecraft Java account once in the Accounts Vault, then deploy it across any server fleet with one click.'}
@@ -238,7 +235,7 @@ export default function Dashboard() {
                 {!user ? (
                   <button
                     onClick={openAuthModal}
-                    className="mt-6 flex items-center space-x-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition"
+                    className="mt-6 flex items-center space-x-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition"
                   >
                     <Users className="h-4 w-4 stroke-[2.5]" />
                     <span>Sign In / Create Account</span>
@@ -246,7 +243,7 @@ export default function Dashboard() {
                 ) : (
                   <Link
                     href="/accounts"
-                    className="mt-6 flex items-center space-x-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition"
+                    className="mt-6 flex items-center space-x-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition"
                   >
                     <Plus className="h-4 w-4 stroke-[3]" />
                     <span>Go to Accounts Vault (+ Add Account)</span>

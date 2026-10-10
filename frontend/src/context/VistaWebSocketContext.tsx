@@ -895,6 +895,24 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     setDiscoveryProfiles(null);
     setDiscoveryError(null);
 
+    // If connected to the AFK daemon, route discovery through the daemon so credentials & MSAL tokens
+    // are stored directly in the daemon's local token folder (Mineflayer cache). This eliminates the
+    // second authentication prompt when connecting to a server!
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      try {
+        wsRef.current.send(JSON.stringify({
+          type: 'DISCOVER_MICROSOFT_ACCOUNT',
+          payload: {
+            email: email ? email.trim() : undefined,
+            editionFilter,
+          },
+        }));
+        return;
+      } catch (err: any) {
+        console.warn('[VistaAFK] Daemon discovery trigger failed, falling back to cloud:', err);
+      }
+    }
+
     try {
       const res = await fetch('/api/accounts/device-code', {
         method: 'POST',
