@@ -311,6 +311,95 @@ export function sampleTerrainGrid(bot: any, radius = 14): TerrainGridData | null
     // Graceful fallback if world blocks unavailable during world transition
   }
 
+  // 4. Landscape Environment & Sky Clearance Analysis
+  let timeOfDay = 'Day';
+  try {
+    if (bot.time) {
+      const t = (bot.time as any).timeOfDay ?? 6000;
+      if (t >= 0 && t < 12000) {
+        const hour = Math.floor((t / 1000 + 6) % 24);
+        timeOfDay = `Day (${hour}:00)`;
+      } else if (t >= 12000 && t < 13800) {
+        timeOfDay = 'Sunset 🌇';
+      } else if (t >= 13800 && t < 22200) {
+        timeOfDay = 'Night 🌙';
+      } else {
+        timeOfDay = 'Sunrise 🌅';
+      }
+    }
+  } catch (e) {}
+
+  let weather = 'Clear ☀️';
+  try {
+    if (bot.isRaining) {
+      weather = (bot as any).thunderState > 0 ? 'Thunderstorm ⚡' : 'Raining 🌧️';
+    }
+  } catch (e) {}
+
+  let lightLevel = 15;
+  try {
+    probeVec.set(bx, by, bz);
+    const blk = bot.blockAt ? bot.blockAt(probeVec) : null;
+    if (blk && typeof blk.light === 'number') {
+      lightLevel = blk.light;
+    }
+  } catch (e) {}
+
+  let skyClearance = 'Open Sky 🌤️';
+  try {
+    for (let wy = by + 2; wy <= Math.min(by + 35, 319); wy++) {
+      probeVec.set(bx, wy, bz);
+      const b = bot.blockAt ? bot.blockAt(probeVec) : null;
+      if (b && b.name !== 'air' && b.name !== 'cave_air' && b.name !== 'void_air') {
+        skyClearance = `Ceiling at Y: ${wy} (${formatName(b.name)})`;
+        break;
+      }
+    }
+  } catch (e) {}
+
+  // 5. Landscape Block Composition & Dominant Terrain Summary
+  const counts = new Map<number, number>();
+  let solidCount = 0;
+  for (let i = 0; i < totalCells; i++) {
+    const palId = cells[i];
+    if (palId > 0) {
+      counts.set(palId, (counts.get(palId) || 0) + 1);
+      solidCount++;
+    }
+  }
+
+  const landscapeSummary: Array<{ name: string; percentage: number; color: string }> = [];
+  if (solidCount > 0) {
+    const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    for (const [palId, cnt] of sorted) {
+      const item = palette[palId];
+      if (item) {
+        landscapeSummary.push({
+          name: item.name,
+          percentage: Math.round((cnt / solidCount) * 100),
+          color: item.color,
+        });
+      }
+    }
+  }
+
+  // 6. Hazard & Environmental Proximity Scanner
+  const hazards: string[] = [];
+  try {
+    let hasLava = false;
+    let hasWater = false;
+    for (const [palId] of counts.entries()) {
+      const item = palette[palId];
+      if (!item) continue;
+      const lower = item.name.toLowerCase();
+      if (lower.includes('lava') || lower.includes('magma')) hasLava = true;
+      if (lower.includes('water')) hasWater = true;
+    }
+    if (hasLava) hazards.push('⚠️ Lava detected within 14 blocks');
+    if (hasWater) hazards.push('💧 Water body in immediate area');
+    if (hazards.length === 0) hazards.push('🛡️ Area clear of immediate hazards');
+  } catch (e) {}
+
   return {
     radius,
     size,
@@ -319,5 +408,13 @@ export function sampleTerrainGrid(bot: any, radius = 14): TerrainGridData | null
     palette,
     cells,
     heights,
+    timeOfDay,
+    weather,
+    lightLevel,
+    groundElevation: by,
+    seaLevelDelta: by - 63,
+    skyClearance,
+    landscapeSummary,
+    hazards,
   };
 }

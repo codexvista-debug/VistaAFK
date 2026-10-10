@@ -1105,14 +1105,37 @@ export class BotInstance {
   public move(control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean) {
     if (!this.bot || this.currentStatus !== 'online') return;
     try {
+      // 1. If user takes manual control, pause any automated patrol so they don't conflict
+      if (state && this.isPatrolling) {
+        this.togglePatrol(false);
+      }
+
+      // 2. Set Mineflayer movement control
       this.bot.setControlState(control, state);
-    } catch (e) {}
+
+      // 3. Auto-jump assistance for 1-block elevations, carpets, slabs or entity collisions
+      if (state && (control === 'forward' || control === 'back' || control === 'left' || control === 'right')) {
+        const entAny = this.bot.entity as any;
+        if (entAny?.isCollidedHorizontally && entAny?.onGround) {
+          this.bot.setControlState('jump', true);
+          setTimeout(() => {
+            try { this.bot?.setControlState('jump', false); } catch (e) {}
+          }, 250);
+        }
+      }
+
+      // 4. Emit telemetry quickly so coordinates update on the UI radar
+      setTimeout(() => this.emitTelemetry(), 60);
+    } catch (e) {
+      console.warn(`[VistaAFK Bot ${this.config.name}] Movement error:`, e);
+    }
   }
 
   public look(yaw: number, pitch: number) {
     if (!this.bot || this.currentStatus !== 'online') return;
     try {
       this.bot.look(yaw, pitch, true);
+      setTimeout(() => this.emitTelemetry(), 50);
     } catch (e) {}
   }
 

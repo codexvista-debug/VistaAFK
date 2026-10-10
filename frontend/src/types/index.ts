@@ -105,6 +105,14 @@ export interface TerrainGridData {
   palette: TerrainPaletteItem[];
   cells: number[];
   heights: number[];
+  timeOfDay?: string;
+  weather?: string;
+  lightLevel?: number;
+  groundElevation?: number;
+  seaLevelDelta?: number;
+  skyClearance?: string;
+  landscapeSummary?: Array<{ name: string; percentage: number; color: string }>;
+  hazards?: string[];
 }
 
 export interface BotTelemetry {
