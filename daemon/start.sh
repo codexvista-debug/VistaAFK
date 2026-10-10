@@ -36,6 +36,20 @@ if [ ! -d "node_modules/bedrock-protocol" ]; then
   npm install bedrock-protocol --ignore-scripts --omit=optional
 fi
 
+# Rebuild every time so git-pulled daemon fixes are actually used.
+if [ ! -x "node_modules/.bin/tsc" ]; then
+  echo "📦 Installing daemon build dependencies..."
+  npm install --include=dev --ignore-scripts --omit=optional || {
+    echo "❌ Could not install TypeScript build dependencies; daemon was not started."
+    exit 1
+  }
+fi
+echo "🔨 Compiling the latest daemon source..."
+npm run build || {
+  echo "❌ Daemon build failed; daemon was not started."
+  exit 1
+}
+
 # 6. Ensure Cloudflare Tunnel is available for remote PC/laptop connection
 if ! command -v cloudflared &>/dev/null; then
   echo "🌐 Installing Cloudflare tunnel for remote access from PC..."

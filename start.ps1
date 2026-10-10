@@ -72,18 +72,23 @@ if ($Reset) {
     Write-Host "[+] Account credentials linked to $Username (Cloud: $cleanCloud)!" -ForegroundColor Green
 }
 
-# 5. Check dependencies in daemon
+# 5. Check dependencies and rebuild the daemon so source updates are used immediately.
 Set-Location $DaemonDir
 
-if (-not (Test-Path "node_modules")) {
-    Write-Host "[*] Installing daemon dependencies..." -ForegroundColor Yellow
-    npm install --omit=optional
+if (-not (Test-Path "node_modules\.bin\tsc.cmd")) {
+    Write-Host "[*] Installing daemon dependencies and TypeScript build tools..." -ForegroundColor Yellow
+    npm install --include=dev --omit=optional
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[!] Dependency installation failed. Daemon was not started." -ForegroundColor Red
+        exit 1
+    }
 }
 
-# Ensure dist exists (build if needed)
-if (-not (Test-Path "dist\server.js")) {
-    Write-Host "[*] Compiling TypeScript daemon..." -ForegroundColor Yellow
-    npm run build
+Write-Host "[*] Compiling the latest daemon source..." -ForegroundColor Yellow
+npm run build
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[!] Daemon build failed. Daemon was not started." -ForegroundColor Red
+    exit 1
 }
 
 # 6. Start Cloudflare Tunnel for secure cloud access
