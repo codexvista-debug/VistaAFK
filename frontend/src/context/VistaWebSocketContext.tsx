@@ -7,7 +7,7 @@ import { useAuth } from './VistaAuthContext';
 const DEFAULT_SERVER_PRESETS: ServerPreset[] = [
   { id: 'donutsmp', name: 'DonutSMP', host: 'donutsmp.net', port: 25565, version: '' },
   { id: 'freshsmp', name: 'FreshSMP', host: 'play.freshsmp.fun', port: 25565, version: '' },
-  { id: 'custom', name: 'Other / Custom Server', host: '', port: 25565, version: '' },
+  { id: 'custom', name: 'Custom Server', host: '', port: 25565, version: '' },
 ];
 
 export function normalizeWsUrl(raw: string): string {
@@ -327,6 +327,8 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         } catch (e) {}
       }
     }
+    // Clean up any legacy naming
+    presetsToLoad = presetsToLoad.map((p) => (p.name.includes('Other /') ? { ...p, name: 'Custom Server' } : p));
     setServerPresets(presetsToLoad);
   }, [user]);
 

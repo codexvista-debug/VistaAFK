@@ -125,6 +125,7 @@ export default function AccountsPage() {
   }, [isAddAccountModalOpen, isDeployModalOpen, resetDiscovery]);
 
   // Deploy to Server Form State
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('donutsmp');
   const [targetServerHost, setTargetServerHost] = useState('play.freshsmp.fun');
   const [targetServerPort, setTargetServerPort] = useState(25565);
   const [targetServerVersion, setTargetServerVersion] = useState('');
@@ -204,9 +205,11 @@ export default function AccountsPage() {
     if (account.edition === 'bedrock') {
       setTargetServerHost('play.freshsmp.fun');
       setTargetServerPort(19132);
+      setSelectedPresetId('freshsmp');
     } else {
       setTargetServerHost('donutsmp.net');
       setTargetServerPort(25565);
+      setSelectedPresetId('donutsmp');
     }
     setTargetServerVersion('');
     setIsDeployModalOpen(true);
@@ -838,27 +841,31 @@ export default function AccountsPage() {
                 Quick Server Presets:
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {serverPresets.map((preset) => (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => {
-                      setTargetServerHost(preset.host);
-                      setTargetServerPort(preset.port);
-                      setTargetServerVersion(preset.version || '');
-                    }}
-                    className={`p-2 rounded-xl border text-left text-xs transition ${
-                      preset.host ? targetServerHost === preset.host : (!targetServerHost || preset.id === 'custom')
-                        ? 'bg-emerald-50 border-emerald-500 font-bold text-emerald-900 shadow-2xs'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="block truncate font-bold">{preset.name}</span>
-                    <span className="text-[10px] text-slate-500 font-mono block truncate">
-                      {preset.host || 'Any custom IP'}
-                    </span>
-                  </button>
-                ))}
+                {serverPresets.map((preset) => {
+                  const isSelected = selectedPresetId === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPresetId(preset.id);
+                        setTargetServerHost(preset.host);
+                        setTargetServerPort(preset.port);
+                        setTargetServerVersion(preset.version || '');
+                      }}
+                      className={`p-2 rounded-xl border text-left text-xs transition ${
+                        isSelected
+                          ? 'bg-emerald-50 border-emerald-500 font-bold text-emerald-900 shadow-2xs'
+                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="block truncate font-bold">{preset.name}</span>
+                      <span className="text-[10px] text-slate-500 font-mono block truncate">
+                        {preset.host || 'Any custom IP'}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -883,7 +890,12 @@ export default function AccountsPage() {
                     type="text"
                     required
                     value={targetServerHost}
-                    onChange={(e) => setTargetServerHost(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTargetServerHost(val);
+                      const matched = serverPresets.find((p) => p.host && p.host.toLowerCase() === val.trim().toLowerCase());
+                      setSelectedPresetId(matched ? matched.id : 'custom');
+                    }}
                     className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-600"
                   />
                 </div>

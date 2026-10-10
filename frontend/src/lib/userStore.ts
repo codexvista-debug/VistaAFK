@@ -188,7 +188,7 @@ export async function getUser(rawUsername: string): Promise<UserRecord | null> {
       serverPresets: [
         { id: 'donutsmp', name: 'DonutSMP', host: 'donutsmp.net', port: 25565, version: '' },
         { id: 'freshsmp', name: 'FreshSMP', host: 'play.freshsmp.fun', port: 25565, version: '' },
-        { id: 'custom', name: 'Other / Custom Server', host: '', port: 25565, version: '' },
+        { id: 'custom', name: 'Custom Server', host: '', port: 25565, version: '' },
       ],
       botConfigs: [],
     };

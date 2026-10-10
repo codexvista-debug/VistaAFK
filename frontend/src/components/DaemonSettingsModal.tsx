@@ -80,43 +80,43 @@ export const DaemonSettingsModal: React.FC<DaemonSettingsModalProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b-2 border-slate-200 bg-slate-100/70 px-6 pt-2 space-x-2">
+        <div className="flex border-b-2 border-slate-200 bg-slate-100/70 px-4 sm:px-6 pt-2 space-x-2 overflow-x-auto scrollbar-none shrink-0" style={{ WebkitOverflowScrolling: 'touch' }}>
           <button
             type="button"
             onClick={() => setActiveTab('connection')}
-            className={`pb-2.5 px-3 font-bold text-xs flex items-center space-x-1.5 border-b-2 transition ${
+            className={`pb-2.5 px-3 font-bold text-xs flex items-center space-x-1.5 border-b-2 transition shrink-0 whitespace-nowrap ${
               activeTab === 'connection'
                 ? 'border-emerald-600 text-emerald-700'
                 : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Server className="h-4 w-4" />
+            <Server className="h-4 w-4 shrink-0" />
             <span>Connection URL</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('termux')}
-            className={`pb-2.5 px-3 font-bold text-xs flex items-center space-x-1.5 border-b-2 transition ${
+            className={`pb-2.5 px-3 font-bold text-xs flex items-center space-x-1.5 border-b-2 transition shrink-0 whitespace-nowrap ${
               activeTab === 'termux'
                 ? 'border-emerald-600 text-emerald-700'
                 : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Smartphone className="h-4 w-4 text-emerald-600" />
+            <Smartphone className="h-4 w-4 text-emerald-600 shrink-0" />
             <span>Android / Termux 24/7 Guide</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('pc')}
-            className={`pb-2.5 px-3 font-bold text-xs flex items-center space-x-1.5 border-b-2 transition ${
+            className={`pb-2.5 px-3 font-bold text-xs flex items-center space-x-1.5 border-b-2 transition shrink-0 whitespace-nowrap ${
               activeTab === 'pc'
                 ? 'border-emerald-600 text-emerald-700'
                 : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Monitor className="h-4 w-4 text-blue-600" />
+            <Monitor className="h-4 w-4 text-blue-600 shrink-0" />
             <span>PC / VPS Guide</span>
           </button>
         </div>

@@ -29,6 +29,11 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
     initialAcc?.edition || (initialAcc?.id.includes('bedrock') ? 'bedrock' : 'java')
   );
 
+  const [selectedPresetId, setSelectedPresetId] = useState<string>(() => {
+    if (initialAcc?.edition === 'bedrock') return 'freshsmp';
+    return serverPresets.length > 0 ? serverPresets[0].id : 'custom';
+  });
+
   const [targetServerHost, setTargetServerHost] = useState(
     initialAcc?.edition === 'bedrock' ? 'play.freshsmp.fun' : (serverPresets.length > 0 ? serverPresets[0].host : 'donutsmp.net')
   );
@@ -49,8 +54,10 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
       setTargetServerPort(19132);
       if (targetServerHost === 'donutsmp.net') {
         setTargetServerHost('bedrock.donutsmp.net');
+        setSelectedPresetId('donutsmp');
       } else if (!targetServerHost) {
         setTargetServerHost('play.freshsmp.fun');
+        setSelectedPresetId('freshsmp');
       }
     } else {
       if (targetServerPort === 19132) {
@@ -58,11 +65,13 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
       }
       if (targetServerHost === 'bedrock.donutsmp.net') {
         setTargetServerHost('donutsmp.net');
+        setSelectedPresetId('donutsmp');
       }
     }
   };
 
   const handlePresetSelect = (preset: ServerPreset) => {
+    setSelectedPresetId(preset.id);
     let host = preset.host;
     let port = preset.port;
     if (edition === 'bedrock') {
@@ -221,7 +230,10 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
                 onClick={() => {
                   setEdition('java');
                   if (targetServerPort === 19132) setTargetServerPort(25565);
-                  if (targetServerHost === 'bedrock.donutsmp.net') setTargetServerHost('donutsmp.net');
+                  if (targetServerHost === 'bedrock.donutsmp.net') {
+                    setTargetServerHost('donutsmp.net');
+                    setSelectedPresetId('donutsmp');
+                  }
                 }}
                 className={`p-3 rounded-2xl border-2 text-left flex items-center justify-between transition-all ${
                   edition === 'java'
@@ -241,7 +253,10 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
                 onClick={() => {
                   setEdition('bedrock');
                   if (targetServerPort === 25565) setTargetServerPort(19132);
-                  if (targetServerHost === 'donutsmp.net') setTargetServerHost('bedrock.donutsmp.net');
+                  if (targetServerHost === 'donutsmp.net') {
+                    setTargetServerHost('bedrock.donutsmp.net');
+                    setSelectedPresetId('donutsmp');
+                  }
                 }}
                 className={`p-3 rounded-2xl border-2 text-left flex items-center justify-between transition-all ${
                   edition === 'bedrock'
@@ -266,7 +281,7 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {serverPresets.map((preset) => {
-                const isSelected = preset.host ? targetServerHost === preset.host : (!targetServerHost || preset.id === 'custom');
+                const isSelected = selectedPresetId === preset.id;
                 return (
                   <button
                     key={preset.id}
@@ -311,7 +326,17 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
                   required
                   placeholder="e.g. donutsmp.net or play.freshsmp.fun"
                   value={targetServerHost}
-                  onChange={(e) => setTargetServerHost(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setTargetServerHost(val);
+                    const matched = serverPresets.find(
+                      (p) =>
+                        p.host &&
+                        (p.host.toLowerCase() === val.trim().toLowerCase() ||
+                          (p.id === 'donutsmp' && val.trim().toLowerCase() === 'bedrock.donutsmp.net'))
+                    );
+                    setSelectedPresetId(matched ? matched.id : 'custom');
+                  }}
                   className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-600"
                 />
               </div>

@@ -121,55 +121,55 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-200 bg-slate-50 px-6 space-x-4 text-xs font-semibold">
+        <div className="flex border-b border-slate-200 bg-slate-50 px-4 sm:px-6 space-x-3 sm:space-x-4 text-xs font-semibold overflow-x-auto scrollbar-none shrink-0" style={{ WebkitOverflowScrolling: 'touch' }}>
           <button
             type="button"
             onClick={() => setActiveTab('connection')}
-            className={`py-3 flex items-center space-x-1.5 border-b-2 transition ${
+            className={`py-3 flex items-center space-x-1.5 border-b-2 transition shrink-0 whitespace-nowrap ${
               activeTab === 'connection' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Server className="h-3.5 w-3.5" />
+            <Server className="h-3.5 w-3.5 shrink-0" />
             <span>Connection</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('antiAfk')}
-            className={`py-3 flex items-center space-x-1.5 border-b-2 transition ${
+            className={`py-3 flex items-center space-x-1.5 border-b-2 transition shrink-0 whitespace-nowrap ${
               activeTab === 'antiAfk' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Zap className="h-3.5 w-3.5" />
+            <Zap className="h-3.5 w-3.5 shrink-0" />
             <span>Anti-AFK</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('survival')}
-            className={`py-3 flex items-center space-x-1.5 border-b-2 transition ${
+            className={`py-3 flex items-center space-x-1.5 border-b-2 transition shrink-0 whitespace-nowrap ${
               activeTab === 'survival' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Heart className="h-3.5 w-3.5" />
+            <Heart className="h-3.5 w-3.5 shrink-0" />
             <span>Survival</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('farming')}
-            className={`py-3 flex items-center space-x-1.5 border-b-2 transition ${
+            className={`py-3 flex items-center space-x-1.5 border-b-2 transition shrink-0 whitespace-nowrap ${
               activeTab === 'farming' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Swords className="h-3.5 w-3.5" />
+            <Swords className="h-3.5 w-3.5 shrink-0" />
             <span>Farming</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('alerts')}
-            className={`py-3 flex items-center space-x-1.5 border-b-2 transition ${
+            className={`py-3 flex items-center space-x-1.5 border-b-2 transition shrink-0 whitespace-nowrap ${
               activeTab === 'alerts' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Bell className="h-3.5 w-3.5" />
+            <Bell className="h-3.5 w-3.5 shrink-0" />
             <span>Alerts</span>
           </button>
         </div>
