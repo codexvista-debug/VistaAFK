@@ -20,6 +20,7 @@ import { BotConfig, BotTelemetry } from '../types';
 interface BotVisualControlModalProps {
   config: BotConfig;
   telemetry?: BotTelemetry;
+  daemonConnected: boolean;
   onClose: () => void;
   onMove: (botId: string, control: 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', state: boolean, durationMs?: number) => void;
   onTogglePatrol: (botId: string, enabled: boolean) => void;
@@ -30,6 +31,7 @@ interface BotVisualControlModalProps {
 export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
   config,
   telemetry,
+  daemonConnected,
   onClose,
   onMove,
   onTogglePatrol,
@@ -37,6 +39,7 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
   onAttack,
 }) => {
   const isOnline = telemetry?.status === 'online';
+  const controlsAvailable = isOnline && daemonConnected;
   const yaw = telemetry?.yaw || 0;
   const pitch = telemetry?.pitch || 0;
   const targetBlock = telemetry?.targetBlock;
@@ -57,10 +60,10 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
     configIdRef.current = config.id;
   }, [config.id]);
 
-  const isOnlineRef = useRef(isOnline);
+  const isOnlineRef = useRef(controlsAvailable);
   useEffect(() => {
-    isOnlineRef.current = isOnline;
-  }, [isOnline]);
+    isOnlineRef.current = controlsAvailable;
+  }, [controlsAvailable]);
 
   const onAttackRef = useRef(onAttack);
   useEffect(() => {
@@ -320,10 +323,20 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
                 <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
                   Manual Movement (Click, Hold or WASD)
                 </span>
-                <span className="text-[10px] font-medium text-slate-500 bg-white px-2 py-0.5 rounded-lg border border-slate-200">
-                  Keyboard Enabled
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
+                  controlsAvailable
+                    ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                    : 'text-rose-700 bg-rose-50 border-rose-200'
+                }`}>
+                  {controlsAvailable ? 'Ready' : daemonConnected ? 'Bot Offline' : 'Daemon Disconnected'}
                 </span>
               </div>
+
+              {!controlsAvailable && (
+                <p className="text-[11px] text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-2.5 py-1.5">
+                  {daemonConnected ? 'Connect the bot to enable movement.' : 'Reconnect the daemon to send movement commands.'}
+                </p>
+              )}
 
               {/* Active Movement Toast */}
               {activeMovementLabels.length > 0 && (
@@ -337,58 +350,58 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
                 {/* Forward [W] */}
                 <button
                   {...createButtonHandlers('forward')}
-                  disabled={!isOnline}
-                  className={`w-14 h-12 rounded-xl font-bold border shadow-sm flex flex-col items-center justify-center transition active:scale-95 touch-none select-none ${
+                  disabled={!controlsAvailable}
+                  className={`w-14 h-12 rounded-xl font-bold border border-b-4 shadow-md flex flex-col items-center justify-center transition active:translate-y-0.5 active:border-b-2 touch-none select-none disabled:opacity-50 disabled:cursor-not-allowed ${
                     activeControls['forward']
-                      ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400'
-                      : 'bg-white hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 border-slate-300'
+                      ? 'translate-y-0.5 bg-emerald-600 text-white border-emerald-800 border-b-2 ring-2 ring-emerald-400 shadow-sm'
+                      : 'bg-gradient-to-b from-white to-slate-100 hover:from-emerald-50 hover:to-emerald-100 text-slate-800 border-slate-300 border-b-slate-400'
                   }`}
                   title="Forward (Click for step, hold to walk, or press W / ↑)"
                 >
                   <ArrowUp className="h-4 w-4" />
-                  <span className="text-[10px] font-mono">W</span>
+                  <kbd className="min-w-5 px-1 rounded border border-slate-300 border-b-2 bg-white/90 text-[9px] leading-3 font-black font-mono text-slate-600 shadow-sm">W</kbd>
                 </button>
 
                 {/* Left [A], Back [S], Right [D] */}
                 <div className="flex items-center space-x-2">
                   <button
                     {...createButtonHandlers('left')}
-                    disabled={!isOnline}
-                    className={`w-14 h-12 rounded-xl font-bold border shadow-sm flex flex-col items-center justify-center transition active:scale-95 touch-none select-none ${
+                    disabled={!controlsAvailable}
+                    className={`w-14 h-12 rounded-xl font-bold border border-b-4 shadow-md flex flex-col items-center justify-center transition active:translate-y-0.5 active:border-b-2 touch-none select-none disabled:opacity-50 disabled:cursor-not-allowed ${
                       activeControls['left']
-                        ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400'
-                        : 'bg-white hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 border-slate-300'
+                        ? 'translate-y-0.5 bg-emerald-600 text-white border-emerald-800 border-b-2 ring-2 ring-emerald-400 shadow-sm'
+                        : 'bg-gradient-to-b from-white to-slate-100 hover:from-emerald-50 hover:to-emerald-100 text-slate-800 border-slate-300 border-b-slate-400'
                     }`}
                     title="Strafe Left (Click for step, hold to strafe, or press A / ←)"
                   >
                     <ArrowLeft className="h-4 w-4" />
-                    <span className="text-[10px] font-mono">A</span>
+                    <kbd className="min-w-5 px-1 rounded border border-slate-300 border-b-2 bg-white/90 text-[9px] leading-3 font-black font-mono text-slate-600 shadow-sm">A</kbd>
                   </button>
                   <button
                     {...createButtonHandlers('back')}
-                    disabled={!isOnline}
-                    className={`w-14 h-12 rounded-xl font-bold border shadow-sm flex flex-col items-center justify-center transition active:scale-95 touch-none select-none ${
+                    disabled={!controlsAvailable}
+                    className={`w-14 h-12 rounded-xl font-bold border border-b-4 shadow-md flex flex-col items-center justify-center transition active:translate-y-0.5 active:border-b-2 touch-none select-none disabled:opacity-50 disabled:cursor-not-allowed ${
                       activeControls['back']
-                        ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400'
-                        : 'bg-white hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 border-slate-300'
+                        ? 'translate-y-0.5 bg-emerald-600 text-white border-emerald-800 border-b-2 ring-2 ring-emerald-400 shadow-sm'
+                        : 'bg-gradient-to-b from-white to-slate-100 hover:from-emerald-50 hover:to-emerald-100 text-slate-800 border-slate-300 border-b-slate-400'
                     }`}
                     title="Walk Back (Click for step, hold to walk, or press S / ↓)"
                   >
                     <ArrowDown className="h-4 w-4" />
-                    <span className="text-[10px] font-mono">S</span>
+                    <kbd className="min-w-5 px-1 rounded border border-slate-300 border-b-2 bg-white/90 text-[9px] leading-3 font-black font-mono text-slate-600 shadow-sm">S</kbd>
                   </button>
                   <button
                     {...createButtonHandlers('right')}
-                    disabled={!isOnline}
-                    className={`w-14 h-12 rounded-xl font-bold border shadow-sm flex flex-col items-center justify-center transition active:scale-95 touch-none select-none ${
+                    disabled={!controlsAvailable}
+                    className={`w-14 h-12 rounded-xl font-bold border border-b-4 shadow-md flex flex-col items-center justify-center transition active:translate-y-0.5 active:border-b-2 touch-none select-none disabled:opacity-50 disabled:cursor-not-allowed ${
                       activeControls['right']
-                        ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400'
-                        : 'bg-white hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 border-slate-300'
+                        ? 'translate-y-0.5 bg-emerald-600 text-white border-emerald-800 border-b-2 ring-2 ring-emerald-400 shadow-sm'
+                        : 'bg-gradient-to-b from-white to-slate-100 hover:from-emerald-50 hover:to-emerald-100 text-slate-800 border-slate-300 border-b-slate-400'
                     }`}
                     title="Strafe Right (Click for step, hold to strafe, or press D / →)"
                   >
                     <ArrowRight className="h-4 w-4" />
-                    <span className="text-[10px] font-mono">D</span>
+                    <kbd className="min-w-5 px-1 rounded border border-slate-300 border-b-2 bg-white/90 text-[9px] leading-3 font-black font-mono text-slate-600 shadow-sm">D</kbd>
                   </button>
                 </div>
 
@@ -396,37 +409,37 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
                 <div className="flex flex-wrap items-center gap-2 pt-1 w-full justify-center">
                   <button
                     {...createButtonHandlers('jump')}
-                    disabled={!isOnline}
-                    className={`px-3 sm:px-4 py-2 rounded-xl font-bold text-xs border shadow-sm transition touch-none select-none ${
+                    disabled={!controlsAvailable}
+                    className={`px-3 sm:px-4 py-2 rounded-xl font-bold text-xs border border-b-4 shadow-md transition active:translate-y-0.5 active:border-b-2 touch-none select-none disabled:opacity-50 disabled:cursor-not-allowed ${
                       activeControls['jump']
-                        ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400'
-                        : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                        ? 'translate-y-0.5 bg-emerald-600 text-white border-emerald-800 border-b-2 ring-2 ring-emerald-400 shadow-sm'
+                        : 'bg-gradient-to-b from-white to-slate-100 hover:from-emerald-50 hover:to-emerald-100 text-slate-700 border-slate-300 border-b-slate-400'
                     }`}
                     title="Jump (Space / Tap)"
                   >
-                    Jump (Space)
+                  <kbd className="mr-1.5 px-1.5 py-0.5 rounded border border-slate-300 border-b-2 bg-white/90 text-[9px] font-black font-mono shadow-sm">SPACE</kbd> Jump
                   </button>
                   <button
                     {...createButtonHandlers('sneak')}
-                    disabled={!isOnline}
-                    className={`px-3 sm:px-4 py-2 rounded-xl font-bold text-xs border shadow-sm transition touch-none select-none ${
+                    disabled={!controlsAvailable}
+                    className={`px-3 sm:px-4 py-2 rounded-xl font-bold text-xs border border-b-4 shadow-md transition active:translate-y-0.5 active:border-b-2 touch-none select-none disabled:opacity-50 disabled:cursor-not-allowed ${
                       activeControls['sneak']
-                        ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400'
-                        : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                        ? 'translate-y-0.5 bg-emerald-600 text-white border-emerald-800 border-b-2 ring-2 ring-emerald-400 shadow-sm'
+                        : 'bg-gradient-to-b from-white to-slate-100 hover:from-emerald-50 hover:to-emerald-100 text-slate-700 border-slate-300 border-b-slate-400'
                     }`}
                     title="Sneak (Shift / Hold)"
                   >
-                    Sneak (Shift)
+                  <kbd className="mr-1.5 px-1.5 py-0.5 rounded border border-slate-300 border-b-2 bg-white/90 text-[9px] font-black font-mono shadow-sm">SHIFT</kbd> Sneak
                   </button>
                   <button
                     type="button"
                     onClick={() => onAttack?.(config.id)}
-                    disabled={!isOnline}
-                    className="px-3 sm:px-4 py-2 rounded-xl font-bold text-xs border border-rose-200 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 shadow-sm transition flex items-center space-x-1.5"
+                    disabled={!controlsAvailable}
+                    className="px-3 sm:px-4 py-2 rounded-xl font-bold text-xs border border-rose-200 border-b-4 bg-gradient-to-b from-rose-50 to-rose-100 hover:from-rose-100 hover:to-rose-200 active:translate-y-0.5 active:border-b-2 text-rose-700 shadow-md transition flex items-center space-x-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Attack target in crosshair / swing sword (F or Click)"
                   >
                     <Swords className="h-3.5 w-3.5 text-rose-600" />
-                    <span>Attack (F)</span>
+                    <span>Attack</span><kbd className="ml-1 px-1 rounded border border-rose-200 border-b-2 bg-white text-[9px] font-black font-mono shadow-sm">F</kbd>
                   </button>
                 </div>
               </div>
@@ -440,7 +453,7 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
               yaw={yaw}
               pitch={pitch}
               onLook={onLook}
-              disabled={!isOnline}
+              disabled={!controlsAvailable}
             />
 
             {/* Auto Patrol Mode */}
@@ -454,7 +467,7 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
               </div>
               <button
                 onClick={() => onTogglePatrol(config.id, !isPatrolling)}
-                disabled={!isOnline}
+                disabled={!controlsAvailable}
                 className={`px-3 py-1.5 rounded-xl font-bold text-xs shadow-sm transition flex items-center space-x-1.5 ${
                   isPatrolling
                     ? 'bg-rose-600 hover:bg-rose-700 text-white'

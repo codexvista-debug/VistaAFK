@@ -126,6 +126,7 @@ export class BotInstance {
   private isManuallyStopped: boolean = false;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private antiAfkInterval: NodeJS.Timeout | null = null;
+  private antiAfkMovementTimeouts = new Set<NodeJS.Timeout>();
   private telemetryInterval: NodeJS.Timeout | null = null;
   private connectStartTime: number = 0;
   private currentStatus: BotTelemetry['status'] = 'offline';
@@ -136,6 +137,8 @@ export class BotInstance {
   private isPatrolling: boolean = false;
   private movementTimeouts = new Map<'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', NodeJS.Timeout>();
   private movementTelemetryIntervals = new Map<'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak', NodeJS.Timeout>();
+  private manualMovementControls = new Set<'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak'>();
+  private assistedJumpTimeouts = new Set<NodeJS.Timeout>();
   private farmingInterval: NodeJS.Timeout | null = null;
   private lastSwordEquipCheck: number = 0;
   private lastMobAttackLogTime: number = 0;
@@ -789,6 +792,8 @@ export class BotInstance {
     }
 
     this.antiAfkInterval = setInterval(() => {
+      // Manual input owns the movement controls until all held/stepped keys are released.
+      if (this.manualMovementControls.size > 0) return;
       if (this.bedrockClient && this.currentStatus === 'online') {
         try {
           if (this.config.antiAfk.swingArm && Math.random() > 0.3) {
@@ -821,13 +826,21 @@ export class BotInstance {
         // 2. Micro sneak
         if (sneak && Math.random() > 0.4) {
           this.bot.setControlState('sneak', true);
-          setTimeout(() => this.bot?.setControlState('sneak', false), 350);
+          const timeout = setTimeout(() => {
+            this.antiAfkMovementTimeouts.delete(timeout);
+            this.bot?.setControlState('sneak', false);
+          }, 350);
+          this.antiAfkMovementTimeouts.add(timeout);
         }
 
         // 3. Jump (if grounded)
         if (jump && (this.bot.entity as any).onGround && Math.random() > 0.6) {
           this.bot.setControlState('jump', true);
-          setTimeout(() => this.bot?.setControlState('jump', false), 250);
+          const timeout = setTimeout(() => {
+            this.antiAfkMovementTimeouts.delete(timeout);
+            this.bot?.setControlState('jump', false);
+          }, 250);
+          this.antiAfkMovementTimeouts.add(timeout);
         }
 
         // 4. Arm swing
@@ -1125,11 +1138,22 @@ export class BotInstance {
         const interval = this.movementTelemetryIntervals.get(target);
         if (interval) clearInterval(interval);
         this.movementTelemetryIntervals.delete(target);
+        this.manualMovementControls.delete(target);
       };
 
       // Every new command replaces the previous timed command for this control.
       // This prevents an old click timeout from stopping a later held key press.
       clearMovementTimers(control);
+
+      if (state) {
+        this.manualMovementControls.add(control);
+        this.clearAntiAfkMovementTimeouts();
+        if (control === 'jump') this.clearAssistedJumpTimeouts();
+        if (!this.manualMovementControls.has('sneak')) this.bot.setControlState('sneak', false);
+        if (!this.manualMovementControls.has('jump')) this.bot.setControlState('jump', false);
+      } else {
+        this.manualMovementControls.delete(control);
+      }
 
       // 1. If user takes manual control, pause any automated patrol so they don't conflict
       if (state && this.isPatrolling) {
@@ -1175,9 +1199,11 @@ export class BotInstance {
         const entAny = this.bot.entity as any;
         if (entAny?.onGround && entAny?.isCollidedHorizontally) {
           this.bot.setControlState('jump', true);
-          setTimeout(() => {
+          const timeout = setTimeout(() => {
+            this.assistedJumpTimeouts.delete(timeout);
             try { this.bot?.setControlState('jump', false); } catch (e) {}
           }, 300);
+          this.assistedJumpTimeouts.add(timeout);
         }
       }
 
@@ -1188,12 +1214,14 @@ export class BotInstance {
           this.emitTelemetry();
           // Periodically check if auto-jump is needed while walking
           const entAny = this.bot?.entity as any;
-          if (entAny?.onGround && entAny?.isCollidedHorizontally) {
+          if (entAny?.onGround && entAny?.isCollidedHorizontally && !this.manualMovementControls.has('jump')) {
             try {
               this.bot?.setControlState('jump', true);
-              setTimeout(() => {
+              const timeout = setTimeout(() => {
+                this.assistedJumpTimeouts.delete(timeout);
                 try { this.bot?.setControlState('jump', false); } catch (e) {}
               }, 250);
+              this.assistedJumpTimeouts.add(timeout);
             } catch (e) {}
           }
         }, 150);
@@ -1202,6 +1230,7 @@ export class BotInstance {
           clearInterval(emitInterval);
           this.movementTelemetryIntervals.delete(control);
           this.movementTimeouts.delete(control);
+          this.manualMovementControls.delete(control);
           try {
             if (this.bot) {
               this.bot.setControlState(control, false);
@@ -1245,6 +1274,7 @@ export class BotInstance {
 
     const runFarmingTick = async () => {
       if (!this.bot || !this.bot.entity || this.currentStatus !== 'online') return;
+      if (this.manualMovementControls.size > 0) return;
       if (this.isEatingFood) return; // Respect auto-eat priority
 
       // Ensure bot has been alive and in world for at least 8 seconds
@@ -1341,6 +1371,8 @@ export class BotInstance {
             }
           }
         }
+
+        if (this.manualMovementControls.size > 0) return;
 
         if (bestTarget && bestTargetPos) {
           // Look directly at target hitbox center so the server validates line-of-sight raycast
@@ -1830,10 +1862,13 @@ export class BotInstance {
     if (this.farmingInterval) clearInterval(this.farmingInterval);
     if (this.recurringCommandInterval) clearInterval(this.recurringCommandInterval);
     if (this.spawnCommandTimeout) clearTimeout(this.spawnCommandTimeout);
+    this.clearAntiAfkMovementTimeouts();
+    this.clearAssistedJumpTimeouts();
     this.movementTimeouts.forEach((timeout) => clearTimeout(timeout));
     this.movementTelemetryIntervals.forEach((interval) => clearInterval(interval));
     this.movementTimeouts.clear();
     this.movementTelemetryIntervals.clear();
+    this.manualMovementControls.clear();
     this.reconnectTimeout = null;
     this.antiAfkInterval = null;
     this.telemetryInterval = null;
@@ -1841,6 +1876,16 @@ export class BotInstance {
     this.farmingInterval = null;
     this.recurringCommandInterval = null;
     this.spawnCommandTimeout = null;
+  }
+
+  private clearAntiAfkMovementTimeouts() {
+    this.antiAfkMovementTimeouts.forEach((timeout) => clearTimeout(timeout));
+    this.antiAfkMovementTimeouts.clear();
+  }
+
+  private clearAssistedJumpTimeouts() {
+    this.assistedJumpTimeouts.forEach((timeout) => clearTimeout(timeout));
+    this.assistedJumpTimeouts.clear();
   }
 
   private setupAutoCommands() {

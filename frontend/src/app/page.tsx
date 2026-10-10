@@ -307,6 +307,7 @@ export default function Dashboard() {
         <BotVisualControlModal
           config={sightModalBot}
           telemetry={telemetry[sightModalBot.id]}
+          daemonConnected={isConnected}
           onClose={() => setSightModalBot(null)}
           onMove={moveBot}
           onTogglePatrol={togglePatrol}
