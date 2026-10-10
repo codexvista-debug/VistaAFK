@@ -6,15 +6,17 @@ import { BotConfig, BotTelemetry, InventoryItem } from '../types';
 import { useVistaWebSocket } from '../hooks/useVistaWebSocket';
 
 interface BotInventoryModalProps {
-  onClose: () => void;
+  onClose?: () => void;
   config: BotConfig;
   telemetry?: BotTelemetry;
+  embedded?: boolean;
 }
 
 export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
-  onClose,
+  onClose = () => {},
   config,
   telemetry,
+  embedded = false,
 }) => {
   const { moveInventoryItem, setQuickBarSlot } = useVistaWebSocket();
   const inventory = telemetry?.inventory || [];
@@ -30,12 +32,13 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
   }, [inventory]);
 
   useEffect(() => {
+    if (embedded) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [embedded, onClose]);
 
   // Selected item to display in the Lore & Details inspector
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number | null>(
@@ -214,13 +217,17 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/65 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
+      className={embedded
+        ? 'h-full min-h-0 flex flex-col bg-white'
+        : 'fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/65 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150'}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (!embedded && e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="bg-white border-2 border-slate-300 rounded-3xl w-full max-w-3xl flex flex-col shadow-2xl overflow-hidden my-auto max-h-[94vh]"
+        className={embedded
+          ? 'bg-white w-full h-full min-h-0 flex flex-col overflow-hidden'
+          : 'bg-white border-2 border-slate-300 rounded-3xl w-full max-w-3xl flex flex-col shadow-2xl overflow-hidden my-auto max-h-[94vh]'}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -249,13 +256,13 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
             </div>
           </div>
 
-          <button
+          {!embedded && <button
             onClick={onClose}
             className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-200 active:scale-95 transition shrink-0"
             title="Close (Esc)"
           >
             <X className="h-5 w-5 stroke-[2.5]" />
-          </button>
+          </button>}
         </div>
 
         {/* Interactive Move Instruction Banner */}
@@ -278,7 +285,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
         )}
 
         {/* Content Body: Split into Equipment/Grid + Item Lore Inspector */}
-        <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-5 overflow-y-auto">
+        <div className={`${embedded ? 'flex-1 min-h-0 ' : ''}p-4 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-5 overflow-y-auto`}>
           {/* Left 2 Cols: Minecraft Grid Layout */}
           <div className="md:col-span-2 space-y-4">
             {/* Equipment Row */}
@@ -557,7 +564,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t-2 border-slate-200 bg-slate-50 flex items-center justify-between">
+        {!embedded && <div className="px-5 py-3 border-t-2 border-slate-200 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center space-x-2 text-xs text-slate-500 font-medium">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>Interactive Inventory Manager</span>
@@ -569,7 +576,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
           >
             Close
           </button>
-        </div>
+        </div>}
       </div>
     </div>
   );
