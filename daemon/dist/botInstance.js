@@ -1735,19 +1735,41 @@ class BotInstance {
                     // Parse enchantments
                     const enchants = [];
                     try {
-                        const itemEnchants = it.enchants;
-                        if (Array.isArray(itemEnchants)) {
-                            for (const e of itemEnchants) {
-                                const enchantName = typeof e?.name === 'string' ? e.name.replace(/^minecraft:/, '') : '';
-                                const enchantLevel = Number(e?.lvl ?? e?.level);
-                                if (!enchantName || !Number.isFinite(enchantLevel) || enchantLevel < 1)
-                                    continue;
-                                enchants.push({
-                                    name: enchantName,
-                                    level: enchantLevel,
-                                    displayName: formatEnchantName(enchantName, enchantLevel),
-                                });
+                        const rawEnchants = it.enchants;
+                        let enchantEntries = [];
+                        if (Array.isArray(rawEnchants)) {
+                            enchantEntries = rawEnchants;
+                        }
+                        else if (rawEnchants instanceof Map) {
+                            enchantEntries = Array.from(rawEnchants.entries()).map(([name, level]) => ({ name, level }));
+                        }
+                        else if (rawEnchants && typeof rawEnchants === 'object') {
+                            const levelMap = rawEnchants.levels ?? rawEnchants.enchantments ?? rawEnchants;
+                            if (levelMap instanceof Map) {
+                                enchantEntries = Array.from(levelMap.entries()).map(([name, level]) => ({ name, level }));
                             }
+                            else if (levelMap && typeof levelMap === 'object' && !Array.isArray(levelMap)) {
+                                enchantEntries = Object.entries(levelMap).map(([name, level]) => ({ name, level }));
+                            }
+                        }
+                        for (const entry of enchantEntries) {
+                            const rawName = entry?.name ?? entry?.id ?? entry?.key;
+                            const enchantName = typeof rawName === 'string' ? rawName.replace(/^minecraft:/, '') : '';
+                            let rawLevel = entry?.lvl ?? entry?.level ?? entry?.value ?? entry;
+                            while (rawLevel && typeof rawLevel === 'object') {
+                                const nestedLevel = rawLevel.value ?? rawLevel.lvl ?? rawLevel.level;
+                                if (nestedLevel === undefined)
+                                    break;
+                                rawLevel = nestedLevel;
+                            }
+                            const enchantLevel = Number(rawLevel);
+                            if (!enchantName || !Number.isFinite(enchantLevel) || enchantLevel < 1)
+                                continue;
+                            enchants.push({
+                                name: enchantName,
+                                level: enchantLevel,
+                                displayName: formatEnchantName(enchantName, enchantLevel),
+                            });
                         }
                     }
                     catch (e) {
