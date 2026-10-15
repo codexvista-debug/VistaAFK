@@ -468,16 +468,16 @@ export class BotInstance {
       this.bedrockGuiRawSlots = [];
       this.bedrockGuiContainer = { container_id: 'container' };
 
+      const isMobileDaemon = process.env.VISTAAFK_DEVICE_TYPE === 'mobile';
       const clientOptions: Record<string, unknown> = {
         host,
         port,
         username: this.config.name,
         offline: this.config.authType === 'offline',
-        // Termux does not have a compatible raknet-native binary. Keep the
-        // Bedrock client on the bundled JS transport so Android can connect.
         transport: 'raknet',
-        raknetBackend: 'jsp-raknet',
-        useRaknetWorkers: false,
+        // Termux does not have a compatible raknet-native binary. Keep mobile
+        // on the bundled JS transport; desktop platforms use native RakNet.
+        ...(isMobileDaemon ? { raknetBackend: 'jsp-raknet', useRaknetWorkers: false } : {}),
         profilesFolder: tokenFolder,
         connectTimeout: 45000,
         onMsaCode: (data: any) => {
