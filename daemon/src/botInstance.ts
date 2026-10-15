@@ -314,6 +314,7 @@ export class BotInstance {
   private bedrockSelectedSlot: number = 0;
   private bedrockInventorySlots: any[] = Array(46).fill(null);
   private bedrockLastEatAt = 0;
+  private bedrockHandshakeTimeout: NodeJS.Timeout | null = null;
   private bedrockGuiWindow: BotGuiWindow | null = null;
   private bedrockItemNames = new Map<number, string>();
   private bedrockGuiRawSlots: any[] = [];
@@ -603,6 +604,14 @@ export class BotInstance {
       // the device code here prevents a later server/network error from being
       // mistaken for an OAuth flow that is still waiting for approval.
       client.once('session', () => {
+        if (this.bedrockHandshakeTimeout) clearTimeout(this.bedrockHandshakeTimeout);
+        this.bedrockHandshakeTimeout = setTimeout(() => {
+          if (this.bedrockClient !== client || this.currentStatus === 'online') return;
+          const reason = 'Bedrock server handshake timed out after Microsoft sign-in';
+          this.emitActivity('status', `⏱️ ${reason}; reconnecting...`);
+          this.updateStatus('error', reason);
+          client.close();
+        }, 90000);
         if (this.authCodeInfo) {
           this.authCodeInfo = undefined;
           this.updateStatus('connecting', 'Microsoft sign-in complete; joining Bedrock server...');
@@ -611,6 +620,8 @@ export class BotInstance {
       });
 
       client.on('join', () => {
+        if (this.bedrockHandshakeTimeout) clearTimeout(this.bedrockHandshakeTimeout);
+        this.bedrockHandshakeTimeout = null;
         if ((client as any).username && (client as any).username !== this.config.name) {
           console.log(`[VistaAFK Bedrock] In-game gamertag updated: ${this.config.name} -> ${(client as any).username}`);
           this.config.name = (client as any).username;
@@ -625,6 +636,8 @@ export class BotInstance {
       });
 
       client.on('spawn', () => {
+        if (this.bedrockHandshakeTimeout) clearTimeout(this.bedrockHandshakeTimeout);
+        this.bedrockHandshakeTimeout = null;
         if ((client as any).username && (client as any).username !== this.config.name) {
           this.config.name = (client as any).username;
           this.callbacks.onConfigUpdated?.(this.config);
@@ -806,6 +819,8 @@ export class BotInstance {
       });
 
       client.on('close', () => {
+        if (this.bedrockHandshakeTimeout) clearTimeout(this.bedrockHandshakeTimeout);
+        this.bedrockHandshakeTimeout = null;
         this.bedrockClient = null;
         this.bedrockGuiWindow = null;
         this.bedrockGuiRawSlots = [];
@@ -827,6 +842,8 @@ export class BotInstance {
       });
 
       client.on('error', (err: any) => {
+        if (this.bedrockHandshakeTimeout) clearTimeout(this.bedrockHandshakeTimeout);
+        this.bedrockHandshakeTimeout = null;
         const errorMsg = err?.message || 'Bedrock connection error';
         console.error(`[VistaAFK Bedrock] Connection error for ${this.config.name} (${host}:${port}):`, err);
         this.updateStatus('error', errorMsg);
@@ -2683,6 +2700,7 @@ export class BotInstance {
 
   private clearTimers() {
     if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
+    if (this.bedrockHandshakeTimeout) clearTimeout(this.bedrockHandshakeTimeout);
     if (this.antiAfkInterval) clearInterval(this.antiAfkInterval);
     if (this.telemetryInterval) clearInterval(this.telemetryInterval);
     if (this.patrolInterval) clearInterval(this.patrolInterval);
@@ -2697,6 +2715,7 @@ export class BotInstance {
     this.movementTelemetryIntervals.clear();
     this.manualMovementControls.clear();
     this.reconnectTimeout = null;
+    this.bedrockHandshakeTimeout = null;
     this.antiAfkInterval = null;
     this.telemetryInterval = null;
     this.patrolInterval = null;
