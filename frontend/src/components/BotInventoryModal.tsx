@@ -67,7 +67,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
     return `https://assets.mcasset.cloud/1.20.4/assets/minecraft/textures/block/${cleanName}.png`;
   };
 
-  const handleSlotClick = (slotNumber: number) => {
+  const handleSlotClick = (slotNumber: number, activateHotbar = false) => {
     // If we are currently in move mode
     if (movingSlot !== null) {
       if (movingSlot === slotNumber) {
@@ -82,6 +82,9 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
       return;
     }
 
+    if (activateHotbar && slotNumber >= 36 && slotNumber <= 44) {
+      setQuickBarSlot(config.id, slotNumber - 36);
+    }
     // Normal slot selection to inspect
     setSelectedSlotIndex(slotNumber);
   };
@@ -114,7 +117,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
     setMovingSlot(null);
   };
 
-  const renderSlot = (slotNumber: number, label?: string, isHotbarActive?: boolean) => {
+  const renderSlot = (slotNumber: number, label?: string, isHotbarActive?: boolean, activateHotbarOnClick = false) => {
     const item = slotMap.get(slotNumber);
     const isSelected = selectedSlotIndex === slotNumber;
     const isMovingThis = movingSlot === slotNumber;
@@ -125,7 +128,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
     return (
       <div
         key={slotNumber}
-        onClick={() => handleSlotClick(slotNumber)}
+        onClick={() => handleSlotClick(slotNumber, activateHotbarOnClick)}
         draggable={Boolean(item)}
         onDragStart={(e) => handleDragStart(e, slotNumber)}
         onDragOver={(e) => handleDragOver(e, slotNumber)}
@@ -146,7 +149,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
             ? 'bg-purple-50/70 border-purple-400 hover:border-purple-500'
             : 'bg-slate-100/80 border-slate-300 hover:border-slate-400 hover:bg-slate-200/60'
         }`}
-        title={item ? `${item.displayName} (x${item.count}) • Slot #${slotNumber}${isEnchanted ? ` • ${item.enchantments!.map(getEnchantLabel).join(', ')}` : ''}` : label || `Slot #${slotNumber}`}
+        title={`${item ? `${item.displayName} (x${item.count}) • ` : ''}Slot #${slotNumber}${activateHotbarOnClick ? ' • Click to make this the active hand item' : ''}${isEnchanted ? ` • ${item!.enchantments!.map(getEnchantLabel).join(', ')}` : ''}`}
       >
         {/* Placeholder Slot Label if empty */}
         {!item && label && (
@@ -342,12 +345,12 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                   </span>
                 </div>
                 <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
-                  Equipped in Hand
+                  Tap a slot to use it
                 </span>
               </div>
 
               <div className="grid grid-cols-9 gap-0.5 sm:gap-1.5 justify-items-center">
-                {Array.from({ length: 9 }, (_, i) => renderSlot(36 + i, undefined, i === selectedHotbarIndex))}
+                {Array.from({ length: 9 }, (_, i) => renderSlot(36 + i, undefined, i === selectedHotbarIndex, true))}
               </div>
             </div>
           </div>
@@ -459,13 +462,16 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                             if (activeItem.slot >= 36 && activeItem.slot <= 44) {
                               setQuickBarSlot(config.id, activeItem.slot - 36);
                             } else {
-                              moveInventoryItem(config.id, activeItem.slot, 36 + selectedHotbarIndex);
+                              const targetSlot = 36 + selectedHotbarIndex;
+                              moveInventoryItem(config.id, activeItem.slot, targetSlot);
+                              setSelectedSlotIndex(targetSlot);
                             }
                           }}
-                          className="py-1.5 px-2 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-300 transition flex items-center justify-center space-x-1"
+                          disabled={activeItem.slot === 36 + selectedHotbarIndex}
+                          className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition flex items-center justify-center space-x-1 ${activeItem.slot === 36 + selectedHotbarIndex ? 'cursor-default border-emerald-800 bg-emerald-950 text-emerald-300' : 'border-slate-700 bg-slate-800 text-emerald-300 hover:bg-slate-700'}`}
                         >
                           <Swords className="h-3 w-3" />
-                          <span>Equip Main</span>
+                          <span>{activeItem.slot === 36 + selectedHotbarIndex ? 'Already Active' : 'Set Active Hand'}</span>
                         </button>
                       </div>
 

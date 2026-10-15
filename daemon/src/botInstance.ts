@@ -2392,6 +2392,46 @@ export class BotInstance {
     }
   }
 
+  public async closeGuiWindow() {
+    if (this.bedrockClient && this.currentStatus === 'online') {
+      const window = this.bedrockGuiWindow;
+      if (!window) return;
+      try {
+        if (window.kind === 'form') {
+          this.bedrockClient.queue('modal_form_response', {
+            form_id: window.id,
+            has_response_data: false,
+            has_cancel_reason: true,
+            cancel_reason: 0,
+          });
+        } else {
+          this.bedrockClient.queue('container_close', {
+            window_id: window.id,
+            window_type: window.type || 'container',
+            server: false,
+          });
+        }
+        this.bedrockGuiWindow = null;
+        this.bedrockGuiRawSlots = [];
+        this.emitTelemetry();
+      } catch (err: any) {
+        console.error(`[VistaAFK] Failed to close Bedrock GUI for ${this.config.name}:`, err?.message || err);
+        this.callbacks.onNotification('error', `Failed to close Bedrock menu: ${err?.message || 'Unknown error'}`, this.config.id);
+      }
+      return;
+    }
+
+    const window = this.bot?.currentWindow;
+    if (!this.bot || this.currentStatus !== 'online' || !window) return;
+    try {
+      await this.bot.closeWindow(window);
+      this.emitTelemetry();
+    } catch (err: any) {
+      console.error(`[VistaAFK] Failed to close Java GUI for ${this.config.name}:`, err?.message || err);
+      this.callbacks.onNotification('error', `Failed to close menu: ${err?.message || 'Unknown error'}`, this.config.id);
+    }
+  }
+
   public async clickGuiWindowSlot(slot: number, mouseButton = 0) {
     if (this.bedrockClient && this.currentStatus === 'online') {
       const window = this.bedrockGuiWindow;

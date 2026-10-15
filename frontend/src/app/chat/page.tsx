@@ -51,6 +51,7 @@ function ChatContent() {
     lookAt,
     attackBot,
     clickGuiWindowSlot,
+    closeGuiWindow,
     respondGuiForm,
   } = useVistaWebSocket();
 
@@ -383,7 +384,7 @@ function ChatContent() {
             <div className="flex-1 min-h-0 min-w-0 overflow-y-auto p-2.5 sm:p-6 bg-slate-50">
               <div className="w-full max-w-6xl mx-auto space-y-4">
                 {currentConfig
-                  ? <BotPlayerPov telemetry={currentTelemetry} isOnline={isOnline} onClickGuiSlot={(slot, mouseButton) => clickGuiWindowSlot(currentConfig.id, slot, mouseButton)} onRespondForm={(response) => respondGuiForm(currentConfig.id, response)} />
+                  ? <BotPlayerPov telemetry={currentTelemetry} isOnline={isOnline} onClickGuiSlot={(slot, mouseButton) => clickGuiWindowSlot(currentConfig.id, slot, mouseButton)} onCloseWindow={() => closeGuiWindow(currentConfig.id)} onRespondForm={(response) => respondGuiForm(currentConfig.id, response)} />
                   : <EmptyWorkspace message="Select an account to view its POV." />}
               </div>
             </div>

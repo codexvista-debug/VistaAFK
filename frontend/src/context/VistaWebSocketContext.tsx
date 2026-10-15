@@ -91,6 +91,7 @@ export interface VistaWebSocketContextType {
   moveInventoryItem: (botId: string, sourceSlot: number, targetSlot: number) => void;
   setQuickBarSlot: (botId: string, slot: number) => void;
   clickGuiWindowSlot: (botId: string, slot: number, mouseButton?: number) => void;
+  closeGuiWindow: (botId: string) => void;
   respondGuiForm: (botId: string, response: boolean | number | Array<unknown>) => void;
   dismissNotification: (id: string) => void;
   clearNotifications: () => void;
@@ -933,6 +934,8 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     send({ type: 'SET_QUICK_BAR_SLOT', payload: { botId, slot } });
   const clickGuiWindowSlot = (botId: string, slot: number, mouseButton = 0) =>
     send({ type: 'CLICK_GUI_WINDOW', payload: { botId, slot, mouseButton } });
+  const closeGuiWindow = (botId: string) =>
+    send({ type: 'CLOSE_GUI_WINDOW', payload: { botId } });
   const respondGuiForm = (botId: string, response: boolean | number | Array<unknown>) =>
     send({ type: 'RESPOND_GUI_FORM', payload: { botId, response } });
   const dismissNotification = useCallback((id: string) => {
@@ -1097,6 +1100,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         moveInventoryItem,
         setQuickBarSlot,
         clickGuiWindowSlot,
+        closeGuiWindow,
         respondGuiForm,
         dismissNotification,
         clearNotifications,

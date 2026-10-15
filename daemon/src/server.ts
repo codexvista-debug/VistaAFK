@@ -195,6 +195,9 @@ wss.on('connection', (ws) => {
         case 'CLICK_GUI_WINDOW':
           botManager.clickGuiWindowSlot(msg.payload.botId, msg.payload.slot, msg.payload.mouseButton ?? 0);
           break;
+        case 'CLOSE_GUI_WINDOW':
+          botManager.closeGuiWindow(msg.payload.botId);
+          break;
         case 'RESPOND_GUI_FORM':
           botManager.respondGuiForm(msg.payload.botId, msg.payload.response);
           break;

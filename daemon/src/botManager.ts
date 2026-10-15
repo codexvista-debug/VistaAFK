@@ -267,6 +267,13 @@ export class BotManager {
     }
   }
 
+  public closeGuiWindow(botId: string) {
+    const instance = this.bots.get(botId);
+    if (instance) {
+      instance.closeGuiWindow();
+    }
+  }
+
   public respondGuiForm(botId: string, response: boolean | number | Array<unknown>) {
     const instance = this.bots.get(botId);
     if (instance) {

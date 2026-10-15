@@ -1,21 +1,31 @@
 'use client';
 
 import React from 'react';
-import { Camera, Crosshair, Eye, MousePointer2, Sparkles } from 'lucide-react';
+import { Camera, Crosshair, Eye, MousePointer2, Sparkles, X } from 'lucide-react';
 import { BotTelemetry, InventoryItem } from '../types';
 
 interface BotPlayerPovProps {
   telemetry?: BotTelemetry;
   isOnline: boolean;
   onClickGuiSlot: (slot: number, mouseButton?: number) => void;
+  onCloseWindow: () => void;
   onRespondForm: (response: boolean | number | Array<unknown>) => void;
 }
 
 const textureName = (name: string) => name.replace(/^minecraft:/, '').toLowerCase();
 const blockTexture = (name: string) => `https://assets.mcasset.cloud/1.20.4/assets/minecraft/textures/block/${encodeURIComponent(textureName(name))}.png`;
 const itemTexture = (name: string) => `https://assets.mcasset.cloud/1.20.4/assets/minecraft/textures/item/${encodeURIComponent(textureName(name))}.png`;
+const guiTextureCandidates = (name: string) => {
+  const cleanName = textureName(name);
+  const blockName = cleanName.endsWith('_pane') ? cleanName.slice(0, -5) : cleanName;
+  const candidates = [itemTexture(cleanName), blockTexture(cleanName), blockTexture(blockName)];
+  return candidates.filter((url, index) => candidates.indexOf(url) === index);
+};
 
 function GuiSlot({ item, slot, onClick, readOnly }: { item: InventoryItem | null; slot: number; onClick: () => void; readOnly?: boolean }) {
+  const [textureIndex, setTextureIndex] = React.useState(0);
+  React.useEffect(() => setTextureIndex(0), [item?.name]);
+  const textures = item ? guiTextureCandidates(item.name) : [];
   const details = [item?.displayName, item?.count && item.count > 1 ? `Count: ${item.count}` : '', ...(item?.lore || [])]
     .filter(Boolean)
     .join('\n');
@@ -31,11 +41,14 @@ function GuiSlot({ item, slot, onClick, readOnly }: { item: InventoryItem | null
     >
       {item && <>
         <img
-          src={itemTexture(item.name)}
+          src={textures[Math.min(textureIndex, textures.length - 1)]}
           alt=""
           aria-hidden="true"
           className="mx-auto h-full w-full object-contain [image-rendering:pixelated] drop-shadow-sm"
-          onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }}
+          onError={(event) => {
+            if (textureIndex < textures.length - 1) setTextureIndex(textureIndex + 1);
+            else event.currentTarget.style.visibility = 'hidden';
+          }}
         />
         <span className="absolute inset-x-0 bottom-0 truncate bg-white/80 px-0.5 text-[8px] font-semibold text-slate-700">{item.displayName}</span>
         {item.count > 1 && <span className="absolute right-0.5 top-0.5 rounded bg-slate-900/85 px-1 font-mono text-[9px] font-bold text-white">{item.count}</span>}
@@ -135,8 +148,11 @@ function TargetPreview({ telemetry, isOnline }: { telemetry?: BotTelemetry; isOn
   );
 }
 
-export function BotPlayerPov({ telemetry, isOnline, onClickGuiSlot, onRespondForm }: BotPlayerPovProps) {
+export function BotPlayerPov({ telemetry, isOnline, onClickGuiSlot, onCloseWindow, onRespondForm }: BotPlayerPovProps) {
   const window = telemetry?.openWindow;
+  const guiSlots = window?.inventoryStart !== undefined && window.inventoryStart > 0 && window.inventoryStart < window.slots.length
+    ? window.slots.slice(0, window.inventoryStart)
+    : window?.slots || [];
   const yaw = telemetry?.yaw;
   const pitch = telemetry?.pitch;
 
@@ -150,9 +166,12 @@ export function BotPlayerPov({ telemetry, isOnline, onClickGuiSlot, onRespondFor
             <p className="text-[10px] text-slate-500">Live Bedrock forms and server inventory menus</p>
           </div>
         </div>
-        <span className={`rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-wide ${isOnline ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500'}`}>
-          {isOnline ? 'Live' : 'Offline'}
-        </span>
+        <div className="flex items-center gap-2">
+          {window && <button type="button" onClick={onCloseWindow} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[10px] font-bold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100" title="Close the open game menu"><X className="h-3.5 w-3.5" />Close GUI</button>}
+          <span className={`rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-wide ${isOnline ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500'}`}>
+            {isOnline ? 'Live' : 'Offline'}
+          </span>
+        </div>
       </div>
 
       {window?.kind === 'form' ? (
@@ -166,9 +185,8 @@ export function BotPlayerPov({ telemetry, isOnline, onClickGuiSlot, onRespondFor
           <p className="mb-3 text-[10px] text-slate-500">{window.readOnly ? 'Bedrock server inventory menu captured from live packets. Item textures use the default Minecraft assets.' : 'Click a menu item to press it in game. Hover or focus an item to read its lore.'}</p>
           <div className="rounded-xl border border-slate-300 bg-[#c6c8c4] p-2 shadow-inner sm:p-3">
             <div className="grid grid-cols-9 gap-1 sm:gap-1.5">
-              {window.slots.map((item, slot) => (
-                <React.Fragment key={`${window.id}-${slot}`}>
-                  {slot === window.inventoryStart && slot > 0 && <div className="col-span-9 my-1 h-px bg-slate-400" aria-hidden="true" />}
+              {guiSlots.map((item, slot) => (
+                <React.Fragment key={`${window.id}-${slot}-${item?.name || 'empty'}`}>
                   <GuiSlot item={item} slot={slot} readOnly={window.readOnly} onClick={() => onClickGuiSlot(slot)} />
                 </React.Fragment>
               ))}

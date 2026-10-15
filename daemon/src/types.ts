@@ -213,6 +213,7 @@ export type ClientMessage =
   | { type: 'MOVE_INVENTORY_ITEM'; payload: { botId: string; sourceSlot: number; targetSlot: number } }
   | { type: 'SET_QUICK_BAR_SLOT'; payload: { botId: string; slot: number } }
   | { type: 'CLICK_GUI_WINDOW'; payload: { botId: string; slot: number; mouseButton?: number } }
+  | { type: 'CLOSE_GUI_WINDOW'; payload: { botId: string } }
   | { type: 'RESPOND_GUI_FORM'; payload: { botId: string; response: boolean | number | Array<unknown> } }
   | { type: 'DISCOVER_MICROSOFT_ACCOUNT'; payload?: { email?: string; editionFilter?: string } }
   | { type: 'CANCEL_MICROSOFT_DISCOVERY' }
