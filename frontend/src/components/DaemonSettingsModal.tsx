@@ -29,8 +29,8 @@ export const DaemonSettingsModal: React.FC<DaemonSettingsModalProps> = ({
   const cloudOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://vista-afk.vercel.app';
 
   const termuxCommand = user?.username
-    ? `pkg update -y && pkg install -y git nodejs cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git restore --worktree -- daemon/dist && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh ${user.username} ${authToken || ''} ${cloudOrigin}`
-    : `pkg update -y && pkg install -y git nodejs cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git restore --worktree -- daemon/dist && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh guest token ${cloudOrigin}`;
+    ? `pkg update -y && pkg install -y git nodejs-lts npm cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git restore --worktree -- daemon/dist && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh ${user.username} ${authToken || ''} ${cloudOrigin}`
+    : `pkg update -y && pkg install -y git nodejs-lts npm cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git restore --worktree -- daemon/dist && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh guest token ${cloudOrigin}`;
 
   const pcCommand = user?.username
     ? `if (Test-Path "$HOME\\VistaAFK") { Set-Location "$HOME\\VistaAFK"; git restore --worktree -- daemon/dist; if ($LASTEXITCODE -ne 0) { throw 'Could not reset generated daemon build files.' }; git pull origin main } else { git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME\\VistaAFK"; Set-Location "$HOME\\VistaAFK" }; powershell -ExecutionPolicy Bypass -File .\\start.ps1 "${user.username}" "${authToken || ''}" "${cloudOrigin}"`
@@ -436,10 +436,10 @@ export const DaemonSettingsModal: React.FC<DaemonSettingsModalProps> = ({
                   Open <strong>Termux</strong> on your Android phone and install Node.js, Git, and Cloudflared:
                 </p>
                 <div className="flex items-center justify-between bg-slate-900 text-emerald-400 p-2.5 rounded-xl font-mono text-[11px]">
-                  <code>pkg update -y && pkg install -y git nodejs-lts cloudflared</code>
+                  <code>pkg update -y && pkg install -y git nodejs-lts npm cloudflared</code>
                   <button
                     type="button"
-                    onClick={() => copyToClipboard('pkg update -y && pkg install -y git nodejs-lts cloudflared', 'step1')}
+                    onClick={() => copyToClipboard('pkg update -y && pkg install -y git nodejs-lts npm cloudflared', 'step1')}
                     className="p-1 text-slate-400 hover:text-white transition"
                     title="Copy command"
                   >

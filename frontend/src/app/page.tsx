@@ -8,9 +8,34 @@ import { BotCard } from '../components/BotCard';
 import { DeployServerModal } from '../components/DeployServerModal';
 import { NotificationToast } from '../components/NotificationToast';
 import { SavedAccount } from '../types';
-import { Plus, Server, AlertTriangle, RefreshCw, Layers, Users, Play } from 'lucide-react';
+import { Plus, Server, AlertTriangle, RefreshCw, Layers, Users, Play, Leaf } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '../context/VistaAuthContext';
+
+function ServerBrandMark({ presetId }: { presetId: string }) {
+  if (presetId === 'donutsmp') {
+    return (
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-rose-100 text-orange-600 shadow-inner">
+        <svg viewBox="0 0 32 32" className="h-7 w-7" aria-hidden="true">
+          <path d="M16 4.5a11.5 11.5 0 1 0 0 23 11.5 11.5 0 0 0 0-23Zm0 6.1a5.4 5.4 0 1 1 0 10.8 5.4 5.4 0 0 1 0-10.8Z" fill="currentColor" fillRule="evenodd" />
+          <path d="m8.3 8.9 2.1 1.1m11.8-.8 1.5-1.5M7 18l2.2-.4m11.2 7 .7-2.2m-6-16.9.4 2.3" stroke="#fff7ed" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      </div>
+    );
+  }
+  if (presetId === 'freshsmp') {
+    return (
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100 text-emerald-700 shadow-inner">
+        <Leaf className="h-7 w-7 stroke-[2.2]" aria-hidden="true" />
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 text-slate-600 shadow-inner">
+      <Server className="h-6 w-6" aria-hidden="true" />
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const { user, openAuthModal } = useAuth();
@@ -38,6 +63,7 @@ export default function Dashboard() {
   } = useVistaWebSocket();
 
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
+  const [selectedDeployAccounts, setSelectedDeployAccounts] = useState<Record<string, string>>({});
   const handleDismissNotification = (id: string) => {
     dismissNotification(id);
   };
@@ -118,52 +144,70 @@ export default function Dashboard() {
                 </p>
 
                 {/* Quick Server Preset Launch Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 w-full max-w-2xl mt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-4xl mt-6">
                   {serverPresets.map((preset) => {
                     const isCustom = !preset.host || preset.id === 'custom';
                     const isDonut = preset.host.toLowerCase().includes('donut');
+                    const defaultAccount = savedAccounts.find((account) => account.edition === 'java') || savedAccounts[0];
+                    const selectedAccount = savedAccounts.find((account) => account.id === selectedDeployAccounts[preset.id]) || defaultAccount;
+                    const selectedEdition = selectedAccount?.edition === 'bedrock' ? 'BEDROCK' : 'JAVA';
 
                     return (
                       <div
                         key={preset.id}
-                        className="p-4 rounded-2xl bg-slate-50 border-2 border-slate-200 text-left hover:border-emerald-500 transition-all flex flex-col justify-between"
+                        className="group overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-white to-slate-50 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-lg"
                       >
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-sm text-slate-900">{preset.name}</span>
-                            <span
-                              className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold border ${
-                                isDonut
-                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                                  : isCustom
-                                  ? 'bg-slate-100 text-slate-700 border-slate-300'
-                                  : 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                              }`}
-                            >
-                              {isDonut ? 'Safe AFK' : isCustom ? 'Custom IP' : 'Auto'}
+                        <div className="flex items-center gap-3">
+                          <ServerBrandMark presetId={preset.id} />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-black text-sm text-slate-900">{preset.name}</span>
+                              <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${isDonut ? 'border-orange-200 bg-orange-50 text-orange-700' : isCustom ? 'border-slate-200 bg-slate-100 text-slate-600' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                                {isDonut ? 'Safe AFK' : isCustom ? 'Custom IP' : 'Network'}
+                              </span>
+                            </div>
+                            <span className="mt-1 block truncate font-mono text-[11px] text-slate-500">
+                              {preset.host || 'Any custom IP & port'}{preset.host && preset.port ? ` · ${preset.port}` : ''}
                             </span>
                           </div>
-                          <span className="text-xs font-mono text-slate-500 mt-1 block truncate">
-                            {preset.host || 'Any custom IP & port'}
-                          </span>
                         </div>
+
+                        {!isCustom && (
+                          <label className="mt-4 block">
+                            <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Account to deploy</span>
+                            <select
+                              value={selectedAccount?.id || ''}
+                              onChange={(event) => setSelectedDeployAccounts((current) => ({ ...current, [preset.id]: event.target.value }))}
+                              aria-label={`Account to deploy to ${preset.name}`}
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                            >
+                              {savedAccounts.map((account) => (
+                                <option key={account.id} value={account.id}>
+                                  {(account.edition === 'bedrock' ? 'BEDROCK' : 'JAVA')} · {account.gamertag || account.name}
+                                </option>
+                              ))}
+                            </select>
+                            <span className="mt-1.5 block text-[10px] text-slate-500">{selectedEdition} account · {selectedAccount?.gamertag || selectedAccount?.name}</span>
+                          </label>
+                        )}
+
                         <button
                           onClick={() => {
                             if (isCustom) {
                               setIsDeployModalOpen(true);
-                            } else if (savedAccounts.length > 0) {
-                              deployAccountToServer(savedAccounts[0], {
+                            } else if (selectedAccount) {
+                              deployAccountToServer(selectedAccount, {
                                 host: preset.host,
                                 port: preset.port,
                                 version: preset.version || undefined,
                               });
                             }
                           }}
-                          disabled={!isConnected}
-                          className="mt-4 w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center space-x-1.5"
+                          disabled={!isConnected || (!isCustom && !selectedAccount)}
+                          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-900/10 transition hover:from-emerald-700 hover:to-teal-700 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Play className="h-3.5 w-3.5 fill-current" />
-                          <span>{isCustom ? 'Enter IP & Deploy' : `Deploy ${savedAccounts[0]?.name || 'Bot'}`}</span>
+                          <span>{isCustom ? 'Enter IP & Deploy' : `Deploy ${selectedEdition} · ${selectedAccount?.gamertag || selectedAccount?.name || 'account'}`}</span>
                         </button>
                       </div>
                     );

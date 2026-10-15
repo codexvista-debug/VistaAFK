@@ -600,22 +600,27 @@ class BotInstance {
                 }
                 else {
                     this.bedrockClient.queue('text', {
+                        category: 'authored',
                         type: 'chat',
                         needs_translation: false,
                         source_name: this.config.name,
                         message,
-                        xuid: '',
+                        xuid: String(this.bedrockClient.profile?.xuid || '0'),
                         platform_chat_id: '',
+                        has_filtered_message: false,
+                        filtered_message: '',
                     });
                     this.emitActivity('chat', `💬 Sent chat: "${message}"`);
                 }
-                this.callbacks.onChatMessage({
-                    botId: this.config.id,
-                    timestamp: Date.now(),
-                    sender: message.startsWith('/') ? 'VistaAFK' : this.config.name,
-                    message: message.startsWith('/') ? `⚡ Sent command: ${message}` : message,
-                    isSystem: message.startsWith('/'),
-                });
+                if (message.startsWith('/')) {
+                    this.callbacks.onChatMessage({
+                        botId: this.config.id,
+                        timestamp: Date.now(),
+                        sender: 'VistaAFK',
+                        message: `⚡ Sent command: ${message}`,
+                        isSystem: true,
+                    });
+                }
             }
             catch (e) {
                 const error = e?.message || 'Unknown Bedrock send error';

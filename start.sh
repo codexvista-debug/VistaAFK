@@ -39,7 +39,25 @@ fi
 
 NODE_MAJOR_VERSION=$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)
 if [ "$NODE_MAJOR_VERSION" -lt 24 ]; then
-  echo "⚠️ Bedrock connections require Node.js 24 or newer. Update Node.js to enable Bedrock bots."
+  if command -v pkg &>/dev/null; then
+    echo "📦 Updating Termux to Node.js LTS (24+) and npm for Bedrock support..."
+    pkg install nodejs-lts npm -y || true
+    NODE_MAJOR_VERSION=$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)
+  fi
+  if [ "$NODE_MAJOR_VERSION" -lt 24 ]; then
+    echo "❌ Bedrock connections require Node.js 24 or newer. Install Termux packages nodejs-lts and npm, then run start.sh again."
+    exit 1
+  fi
+fi
+if ! command -v npm &>/dev/null; then
+  if command -v pkg &>/dev/null; then
+    echo "📦 Installing npm..."
+    pkg install npm -y || true
+  fi
+  if ! command -v npm &>/dev/null; then
+    echo "❌ npm is required to build the Bedrock-compatible daemon. Install the Termux npm package and run start.sh again."
+    exit 1
+  fi
 fi
 
 # 5. Ensure Bedrock protocol dependencies are installed
