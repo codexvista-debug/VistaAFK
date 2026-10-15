@@ -229,6 +229,50 @@ function parseMinecraftChat(raw: any): string {
   return typeof raw === 'object' ? JSON.stringify(raw) : String(raw);
 }
 
+function parseBedrockChatPacket(packet: any): Pick<ChatMessage, 'sender' | 'message' | 'isSystem'> {
+  const type = String(packet?.type || 'system');
+  const source = typeof packet?.source_name === 'string' ? packet.source_name.trim() : '';
+  const rawMessage = typeof packet?.message === 'string' ? packet.message : '';
+  const parameters = Array.isArray(packet?.parameters)
+    ? packet.parameters.map((value: unknown) => String(value ?? ''))
+    : [];
+
+  // Bedrock servers commonly encode player chat as a translation packet rather
+  // than a `chat` packet. Decode those known keys so it appears as player chat
+  // instead of a server/system line containing the untranslated key.
+  let sender = source || 'Server';
+  let message = rawMessage;
+  let translatedPlayerChat = false;
+  if (type === 'translation' && parameters.length >= 2) {
+    if (rawMessage === 'chat.type.text' || rawMessage === 'chat.type.emote') {
+      sender = parameters[0] || sender;
+      message = parameters.slice(1).join(' ');
+      translatedPlayerChat = true;
+    } else if (rawMessage === 'commands.message.display.incoming') {
+      sender = parameters[0] || sender;
+      message = `whispers to you: ${parameters.slice(1).join(' ')}`;
+      translatedPlayerChat = true;
+    } else if (rawMessage === 'commands.message.display.outgoing') {
+      sender = 'You';
+      message = `whisper to ${parameters[0]}: ${parameters.slice(1).join(' ')}`;
+      translatedPlayerChat = true;
+    } else if (parameters.length) {
+      message = `${rawMessage}: ${parameters.join(' ')}`.trim();
+    }
+  }
+
+  // Preserve the actual chat text for regular Bedrock chat/whisper packets.
+  const isPlayerChat = translatedPlayerChat || type === 'chat' || type === 'whisper';
+  if (!message && parameters.length) message = parameters.join(' ');
+  if (!message) message = ' '; // Keep an otherwise valid empty chat event visible.
+
+  return {
+    sender: sender || 'Server',
+    message,
+    isSystem: !isPlayerChat,
+  };
+}
+
 export class BotInstance {
   public config: BotConfig;
   private bot: Bot | null = null;
@@ -689,13 +733,11 @@ export class BotInstance {
       });
 
       client.on('text', (packet: any) => {
-        const msg = packet.message || packet.source_name ? `${packet.source_name}: ${packet.message}` : String(packet);
+        const parsed = parseBedrockChatPacket(packet);
         this.callbacks.onChatMessage({
           botId: this.config.id,
           timestamp: Date.now(),
-          sender: packet.source_name || 'Server',
-          message: packet.message || msg,
-          isSystem: packet.type === 'system' || !packet.source_name,
+          ...parsed,
         });
       });
 
