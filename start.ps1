@@ -44,11 +44,11 @@ if ($ScriptDir) {
 try {
     if (Test-Path ".git") {
         Write-Host "[*] Checking for latest VistaAFK updates..." -ForegroundColor Gray
-        # The daemon build rewrites these tracked, generated JavaScript files.
-        # Discard only those build outputs so they cannot block the next pull.
-        git restore --worktree -- daemon/dist 2>$null
+        # Reset generated daemon outputs and the npm-managed lockfile so local
+        # install/build changes cannot block the update.
+        git restore --worktree -- daemon/dist daemon/package-lock.json 2>$null
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "[!] Could not reset generated daemon build files. Update stopped." -ForegroundColor Red
+            Write-Host "[!] Could not reset generated daemon build files and lockfile. Update stopped." -ForegroundColor Red
             exit 1
         }
         git pull origin main 2>$null
