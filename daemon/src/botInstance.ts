@@ -229,9 +229,10 @@ function parseMinecraftChat(raw: any): string {
   return typeof raw === 'object' ? JSON.stringify(raw) : String(raw);
 }
 
-function parseBedrockChatPacket(packet: any): Pick<ChatMessage, 'sender' | 'message' | 'isSystem'> {
+function parseBedrockChatPacket(packet: any, usernameForXuid?: (xuid: string) => string | undefined): Pick<ChatMessage, 'sender' | 'message' | 'isSystem'> {
   const type = String(packet?.type || 'system');
   const source = typeof packet?.source_name === 'string' ? packet.source_name.trim() : '';
+  const xuid = typeof packet?.xuid === 'string' ? packet.xuid.trim() : '';
   const rawMessage = typeof packet?.message === 'string' ? packet.message : '';
   const parameters = Array.isArray(packet?.parameters)
     ? packet.parameters.map((value: unknown) => String(value ?? ''))
@@ -262,9 +263,25 @@ function parseBedrockChatPacket(packet: any): Pick<ChatMessage, 'sender' | 'mess
   }
 
   // Preserve the actual chat text for regular Bedrock chat/whisper packets.
-  const isPlayerChat = translatedPlayerChat || type === 'chat' || type === 'whisper';
+  const isPlayerChat = translatedPlayerChat || type === 'chat' || type === 'whisper' || type === 'announcement' || Boolean(xuid);
   if (!message && parameters.length) message = parameters.join(' ');
   if (!message) message = ' '; // Keep an otherwise valid empty chat event visible.
+
+  // Some server chat formats send the rank as source_name and the text as
+  // message, omitting the actual gamertag from the rendered line. Bedrock's
+  // player_list records map that packet XUID back to the player's username.
+  const username = xuid ? usernameForXuid?.(xuid) : undefined;
+  const rankPattern = '(?:TITAN|KING|CHAMPION|KNIGHT|EMPEROR|OVERLORD\\+{0,2}|LORD|JESTER|MEMBER|VIP\\+?|MVP\\+?|ADMIN|OWNER|MOD)';
+  const rankOnly = new RegExp(`^\\[?${rankPattern}\\]?$`, 'i');
+  const rankMessage = new RegExp(`^\\[?(${rankPattern})\\]?\\s*(?:▶|>|:)\\s*(.*)$`, 'i');
+  const knownRank = rankOnly.test(source) ? source : (rankOnly.test(sender) ? sender : null);
+  const formattedRankMessage = message.match(rankMessage);
+  if (isPlayerChat && username && (knownRank || formattedRankMessage)) {
+    const rank = knownRank || formattedRankMessage?.[1] || '';
+    const body = knownRank ? message.replace(/^\s*(?:▶|>|:)\s*/, '') : (formattedRankMessage?.[2] || '');
+    sender = '';
+    message = `${rank} ${username} ▶ ${body}`.trim();
+  }
 
   return {
     sender: sender || 'Server',
@@ -310,7 +327,10 @@ export class BotInstance {
   private bedrockClient: any = null;
   private bedrockPosition: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
   private bedrockHealth: number = 20;
+  private bedrockMaxHealth: number = 20;
   private bedrockFood: number = 20;
+  private bedrockXuidToUsername = new Map<string, string>();
+  private bedrockInventoryDiagnosticsLogged = false;
   private bedrockSelectedSlot: number = 0;
   private bedrockInventorySlots: any[] = Array(46).fill(null);
   private bedrockLastEatAt = 0;
@@ -520,6 +540,9 @@ export class BotInstance {
       this.bedrockSelectedSlot = 0;
       this.bedrockFood = 20;
       this.bedrockHealth = 20;
+      this.bedrockMaxHealth = 20;
+      this.bedrockXuidToUsername.clear();
+      this.bedrockInventoryDiagnosticsLogged = false;
 
       const isMobileDaemon = process.env.VISTAAFK_DEVICE_TYPE === 'mobile';
       let mobileRaknetBackend: 'raknet-native' | 'jsp-raknet' = 'jsp-raknet';
@@ -668,6 +691,17 @@ export class BotInstance {
         this.registerBedrockItemNames(packet?.itemstates);
       });
 
+      client.on('player_list', (packet: any) => {
+        const records = Array.isArray(packet?.records) ? packet.records : [];
+        for (const record of records) {
+          const xuid = typeof record?.xbox_user_id === 'string' ? record.xbox_user_id.trim() : '';
+          const username = typeof record?.username === 'string' ? record.username.trim() : '';
+          if (!xuid) continue;
+          if (record?.type === 'remove') this.bedrockXuidToUsername.delete(xuid);
+          else if (username) this.bedrockXuidToUsername.set(xuid, username);
+        }
+      });
+
       client.on('player_hotbar', (packet: any) => {
         const selectedSlot = Number(packet?.selected_slot);
         if (packet?.select_slot !== false && Number.isInteger(selectedSlot) && selectedSlot >= 0 && selectedSlot <= 8) {
@@ -678,11 +712,43 @@ export class BotInstance {
 
       client.on('update_attributes', (packet: any) => {
         if (!Array.isArray(packet?.attributes)) return;
-        const hunger = packet.attributes.find((attribute: any) => /(?:player\.)?hunger$/i.test(String(attribute?.name || '')));
-        const value = Number(hunger?.current);
-        if (Number.isFinite(value)) {
-          this.bedrockFood = Math.max(0, Math.min(20, value));
+        const playerRuntimeId = client.entityId ?? client.startGameData?.runtime_entity_id;
+        const packetRuntimeId = packet?.runtime_entity_id;
+        if (playerRuntimeId != null && packetRuntimeId != null && String(playerRuntimeId) !== String(packetRuntimeId)) return;
+
+        const normalizedName = (attribute: any) => String(attribute?.name || '')
+          .toLowerCase()
+          .replace(/^minecraft:/, '')
+          .replace(/^player\./, '');
+        const health = packet.attributes.find((attribute: any) => normalizedName(attribute) === 'health');
+        const healthValue = Number(health?.current);
+        const maxHealth = Number(health?.max);
+        let changed = false;
+        if (Number.isFinite(maxHealth) && maxHealth > 0 && maxHealth <= 2048 && maxHealth !== this.bedrockMaxHealth) {
+          this.bedrockMaxHealth = maxHealth;
+          this.bedrockHealth = Math.min(this.bedrockHealth, maxHealth);
+          changed = true;
+        }
+        if (Number.isFinite(healthValue)) {
+          const nextHealth = Math.round(Math.max(0, Math.min(this.bedrockMaxHealth, healthValue)) * 10) / 10;
+          if (nextHealth !== this.bedrockHealth) {
+            this.bedrockHealth = nextHealth;
+            changed = true;
+          }
+        }
+
+        const hunger = packet.attributes.find((attribute: any) => normalizedName(attribute) === 'hunger');
+        const foodValue = Number(hunger?.current);
+        if (Number.isFinite(foodValue)) {
+          const nextFood = Math.max(0, Math.min(20, foodValue));
+          if (nextFood !== this.bedrockFood) {
+            this.bedrockFood = nextFood;
+            changed = true;
+          }
+        }
+        if (changed) {
           this.emitTelemetry();
+          this.checkSurvivalActions();
         }
       });
 
@@ -704,12 +770,18 @@ export class BotInstance {
 
       client.on('inventory_content', (packet: any) => {
         const windowId = Number(packet?.window_id);
-        this.updateBedrockPlayerInventory(packet?.container?.container_id, packet?.input, windowId);
+        const containerId = packet?.container?.container_id;
+        const items = Array.isArray(packet?.input) ? packet.input : [];
+        this.updateBedrockPlayerInventory(containerId, items, windowId);
+        if (!this.bedrockInventoryDiagnosticsLogged) {
+          this.bedrockInventoryDiagnosticsLogged = true;
+          const nonEmpty = items.filter((item: any) => Number(item?.network_id) !== 0 && Number(item?.count) > 0).length;
+          console.log(`[VistaAFK Bedrock] Inventory snapshot for ${this.config.name}: container=${String(containerId ?? 'unknown')}, window=${String(packet?.window_id ?? 'unknown')}, slots=${items.length}, non-empty=${nonEmpty}`);
+        }
         if (this.bedrockGuiWindow?.kind !== 'container' || this.bedrockGuiWindow.id !== windowId) {
           this.emitTelemetry();
           return;
         }
-        const items = Array.isArray(packet?.input) ? packet.input : [];
         this.bedrockGuiRawSlots = [...items];
         const container = packet?.container;
         if (container && typeof container.container_id === 'string') {
@@ -729,7 +801,12 @@ export class BotInstance {
       client.on('inventory_slot', (packet: any) => {
         const windowId = Number(packet?.window_id);
         const slot = Number(packet?.slot);
-        this.updateBedrockPlayerInventorySlot(packet?.container?.container_id, slot, packet?.item, windowId);
+        const containerId = packet?.container?.container_id;
+        this.updateBedrockPlayerInventorySlot(containerId, slot, packet?.item, windowId);
+        if (!this.bedrockInventoryDiagnosticsLogged) {
+          this.bedrockInventoryDiagnosticsLogged = true;
+          console.log(`[VistaAFK Bedrock] Inventory slot update for ${this.config.name}: container=${String(containerId ?? 'unknown')}, window=${String(packet?.window_id ?? 'unknown')}, slot=${String(packet?.slot ?? 'unknown')}, item=${String(packet?.item?.network_id ?? 'unknown')}x${String(packet?.item?.count ?? 0)}`);
+        }
         if (this.bedrockGuiWindow?.kind !== 'container' || this.bedrockGuiWindow.id !== windowId || !Number.isInteger(slot) || slot < 0) {
           this.emitTelemetry();
           return;
@@ -773,14 +850,16 @@ export class BotInstance {
       });
 
       client.on('set_health', (packet: any) => {
-        if (typeof packet?.health === 'number') {
-          this.bedrockHealth = Math.round(packet.health * 10) / 10;
+        const health = Number(packet?.health);
+        if (Number.isFinite(health)) {
+          this.bedrockHealth = Math.round(Math.max(0, Math.min(this.bedrockMaxHealth, health)) * 10) / 10;
           this.emitTelemetry();
+          this.checkSurvivalActions();
         }
       });
 
       client.on('text', (packet: any) => {
-        const parsed = parseBedrockChatPacket(packet);
+        const parsed = parseBedrockChatPacket(packet, (xuid) => this.bedrockXuidToUsername.get(xuid));
         this.callbacks.onChatMessage({
           botId: this.config.id,
           timestamp: Date.now(),
@@ -1987,7 +2066,12 @@ export class BotInstance {
   }
 
   private normalizeBedrockContainerId(containerId: unknown, windowId?: unknown): string | null {
-    if (typeof containerId === 'string') return containerId.toLowerCase();
+    if (typeof containerId === 'string') {
+      const normalized = containerId.trim().toLowerCase();
+      if (!/^\d+$/.test(normalized)) return normalized || null;
+      const mapped: Record<number, string> = { 6: 'armor', 12: 'hotbar_and_inventory', 28: 'hotbar', 29: 'inventory', 34: 'offhand' };
+      return mapped[Number(normalized)] || null;
+    }
     if (typeof containerId === 'number') {
       const mapped: Record<number, string> = { 6: 'armor', 12: 'hotbar_and_inventory', 28: 'hotbar', 29: 'inventory', 34: 'offhand' };
       return mapped[containerId] || null;
@@ -2065,7 +2149,7 @@ export class BotInstance {
       'melon_slice', 'pumpkin_pie', 'honey_bottle', 'cookie', 'dried_kelp', 'beetroot', 'mushroom_stew',
       'rabbit_stew', 'beetroot_soup', 'potato', 'beef', 'porkchop', 'mutton', 'chicken', 'salmon', 'cod', 'rabbit',
     ];
-    const injured = this.bedrockHealth < 20;
+    const injured = this.bedrockHealth < this.bedrockMaxHealth;
     const hungry = this.bedrockFood < 20;
     if (!hungry && !injured) return;
     const canSwapInventory = Boolean((this.bedrockClient.startGameData as any)?.server_authoritative_inventory);
@@ -2174,7 +2258,7 @@ export class BotInstance {
           },
         },
       });
-      this.emitActivity('survival', `🍖 Auto-eat: Using ${item.displayName} (HP: ${this.bedrockHealth}/20, Hunger: ${this.bedrockFood}/20)`);
+      this.emitActivity('survival', `🍖 Auto-eat: Using ${item.displayName} (HP: ${this.bedrockHealth}/${this.bedrockMaxHealth}, Hunger: ${this.bedrockFood}/20)`);
       setTimeout(() => {
         if (!this.bedrockClient || this.currentStatus !== 'online') {
           this.isEatingFood = false;
@@ -2312,7 +2396,8 @@ export class BotInstance {
   public getTelemetry(): BotTelemetry {
     if (this.bedrockClient) {
       const pos = this.bedrockPosition || { x: 0, y: 0, z: 0 };
-      const hp = this.bedrockHealth ?? 20;
+      const hp = this.bedrockHealth ?? this.bedrockMaxHealth;
+      const maxHp = this.bedrockMaxHealth ?? 20;
       const hearts = Math.round((hp / 2) * 10) / 10;
       return {
         id: this.config.id,
@@ -2321,9 +2406,9 @@ export class BotInstance {
         statusMessage: this.statusMessage,
         authCodeInfo: this.authCodeInfo,
         health: hp,
-        maxHealth: 20,
+        maxHealth: maxHp,
         hearts,
-        maxHearts: 10,
+        maxHearts: Math.round((maxHp / 2) * 10) / 10,
         food: this.bedrockFood,
         coordinates: pos,
         dimension: 'overworld',

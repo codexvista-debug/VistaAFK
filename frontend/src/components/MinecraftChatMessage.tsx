@@ -15,6 +15,10 @@ const LIGHT_RANK_COLORS: Record<string, string> = {
   CHAMPION: '#b45309',  // Amber 700
   KNIGHT: '#2563eb',    // Blue 600
   EMPEROR: '#7c3aed',   // Purple 600
+  'OVERLORD++': '#7c3aed',
+  OVERLORD: '#7c3aed',
+  LORD: '#7c3aed',
+  JESTER: '#c026d3',
   MEMBER: '#475569',    // Slate 600
   VIP: '#059669',       // Emerald 600
   'VIP+': '#059669',
@@ -217,7 +221,7 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
 
   // 5. Player Chat with Rank Badges
   // Matches: "TITAN ANK_PATRICK ▶ Check Ank2 orders" or "EMPEROR PluhWalkk ▶ Selling..."
-  const rankMatch = rawText.match(/^(?:\[?(TITAN|KING|CHAMPION|KNIGHT|EMPEROR|MEMBER|VIP\+?|MVP\+?|ADMIN|OWNER|MOD)\]?)\s+([a-zA-Z0-9_]{3,16})\s*(?:▶|>|:)\s*(.*)$/i);
+  const rankMatch = rawText.match(/^(?:\[?(TITAN|KING|CHAMPION|KNIGHT|EMPEROR|OVERLORD\+{0,2}|LORD|JESTER|MEMBER|VIP\+?|MVP\+?|ADMIN|OWNER|MOD)\]?)\s+([a-zA-Z0-9_]{3,16})\s*(?:▶|>|:)\s*(.*)$/i);
   if (rankMatch) {
     const rank = rankMatch[1].toUpperCase();
     const username = rankMatch[2];
