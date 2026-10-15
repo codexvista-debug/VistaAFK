@@ -2535,7 +2535,7 @@ export class BotInstance {
     const pitch = this.bot.entity.pitch || 0;
 
     // Calculate Cardinal direction
-    const deg = (((-yaw * 180 / Math.PI) % 360) + 360) % 360;
+    const deg = (((180 - yaw * 180 / Math.PI) % 360) + 360) % 360;
     let facing = 'South';
     if (deg >= 315 || deg < 45) facing = 'South';
     else if (deg >= 45 && deg < 135) facing = 'West';
@@ -2590,7 +2590,7 @@ export class BotInstance {
 
           if (username && username.toLowerCase() !== myUsername) {
             const entYaw = ent.yaw || 0;
-            const entDeg = (((-entYaw * 180 / Math.PI) % 360) + 360) % 360;
+            const entDeg = (((180 - entYaw * 180 / Math.PI) % 360) + 360) % 360;
             let entFacing = 'South';
             if (entDeg >= 315 || entDeg < 45) entFacing = 'South';
             else if (entDeg >= 45 && entDeg < 135) entFacing = 'West';

@@ -20,23 +20,41 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
   onLook,
   disabled = false,
 }) => {
-  // Convert radians to user-friendly degrees
-  const currentPitchDeg = Math.round((pitch * 180) / Math.PI);
-  // Minecraft Yaw: 0 = South, 90 = West, 180 = North, 270 = East
-  const currentYawDeg = Math.round((((-yaw * 180) / Math.PI) % 360 + 360) % 360);
+  // The UI uses compass headings (0 = South, 90 = West) and pitch where
+  // positive values look down. Mineflayer's internal yaw/pitch use the
+  // opposite conventions: yaw 0 faces North, and positive pitch looks up.
+  const normalizeDegrees = (degrees: number) => ((degrees % 360) + 360) % 360;
+  const headingToYaw = (heading: number) => ((180 - heading) * Math.PI) / 180;
+  const yawToHeading = (radians: number) => normalizeDegrees(180 - (radians * 180) / Math.PI);
+  const uiPitchToMineflayer = (degrees: number) => (-degrees * Math.PI) / 180;
+  const currentPitchDeg = Math.round((-pitch * 180) / Math.PI);
+  const currentYawDeg = Math.round(yawToHeading(yaw));
 
   const [inputPitch, setInputPitch] = useState<string>(String(currentPitchDeg));
   const [inputYaw, setInputYaw] = useState<string>(String(currentYawDeg));
   const [isAiming, setIsAiming] = useState<boolean>(false);
+  const [draftAim, setDraftAim] = useState<{ yaw: number; pitch: number } | null>(null);
   const padRef = useRef<HTMLDivElement | null>(null);
+  const faceRef = useRef<HTMLDivElement | null>(null);
+  const faceDragHeadingRef = useRef(currentYawDeg);
 
   // Sync inputs with telemetry when not actively typing/aiming
   useEffect(() => {
-    if (!isAiming) {
+    if (!isAiming && !draftAim) {
       setInputPitch(String(currentPitchDeg));
       setInputYaw(String(currentYawDeg));
     }
-  }, [currentPitchDeg, currentYawDeg, isAiming]);
+  }, [currentPitchDeg, currentYawDeg, isAiming, draftAim]);
+
+  // Keep the face aim marker visible at the last requested point until the
+  // daemon telemetry catches up with the look command.
+  useEffect(() => {
+    if (!draftAim) return;
+    const yawDelta = Math.atan2(Math.sin(yaw - draftAim.yaw), Math.cos(yaw - draftAim.yaw));
+    if (Math.abs(yawDelta) < 0.03 && Math.abs(pitch - draftAim.pitch) < 0.03) {
+      setDraftAim(null);
+    }
+  }, [yaw, pitch, draftAim]);
 
   // Determine active cardinal for highlight
   const isSouth = currentYawDeg >= 315 || currentYawDeg < 45;
@@ -54,10 +72,10 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
 
     // Angle in screen space: 0 is East (+X), Math.PI/2 is South (+Y), -Math.PI/2 is North (-Y), Math.PI is West (-X)
     let screenDeg = (Math.atan2(dy, dx) * 180) / Math.PI; // -180 to 180
-    // Convert to Minecraft cardinal: 0 = South (+Y), 90 = West (-X), 180 = North (-Y), 270 = East (+X)
+    // Convert screen angle to the UI compass heading: 0 = South, 90 = West,
+    // 180 = North, 270 = East.
     let mcYawDeg = Math.round(((screenDeg - 90) % 360 + 360) % 360);
-    // Convert mcYawDeg back to radians:
-    const targetRad = (-mcYawDeg * Math.PI) / 180;
+    const targetRad = headingToYaw(mcYawDeg);
     onLook(botId, targetRad, pitch);
   };
 
@@ -80,7 +98,7 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
     const val = parseFloat(inputPitch);
     if (!isNaN(val)) {
       const clamped = Math.max(-90, Math.min(90, val));
-      const rad = (clamped * Math.PI) / 180;
+      const rad = uiPitchToMineflayer(clamped);
       onLook(botId, yaw, rad);
     }
   };
@@ -88,8 +106,8 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
   const handleYawSubmit = () => {
     const val = parseFloat(inputYaw);
     if (!isNaN(val)) {
-      const norm = ((val % 360) + 360) % 360;
-      const rad = (-norm * Math.PI) / 180;
+      const norm = normalizeDegrees(val);
+      const rad = headingToYaw(norm);
       onLook(botId, rad, pitch);
     }
   };
@@ -102,12 +120,55 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
   const resetYaw = () => {
     setInputYaw('0');
     // 0 deg is South
-    onLook(botId, 0, pitch);
+    onLook(botId, headingToYaw(0), pitch);
   };
 
   const snapDirection = (deg: number, newPitch?: number) => {
-    const rad = (-deg * Math.PI) / 180;
+    const rad = headingToYaw(deg);
     onLook(botId, rad, newPitch !== undefined ? newPitch : pitch);
+  };
+
+  const faceAim = draftAim || { yaw, pitch };
+  const faceHeading = yawToHeading(faceAim.yaw);
+  const facePitch = Math.round((-faceAim.pitch * 180) / Math.PI);
+  const headingOffset = ((faceHeading - currentYawDeg + 540) % 360) - 180;
+  const markerLeft = 50 + (Math.max(-90, Math.min(90, headingOffset)) / 90) * 34;
+  const markerTop = 50 + ((-faceAim.pitch * 180 / Math.PI) / 90) * 34;
+
+  const updateFaceAim = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!faceRef.current) return null;
+    const rect = faceRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    const heading = normalizeDegrees(faceDragHeadingRef.current + (x - 0.5) * 180);
+    const uiPitch = (y - 0.5) * 180;
+    const target = { yaw: headingToYaw(heading), pitch: uiPitchToMineflayer(uiPitch) };
+    setDraftAim(target);
+    setInputYaw(String(Math.round(heading)));
+    setInputPitch(String(Math.round(uiPitch)));
+    return target;
+  };
+
+  const handleFacePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    faceDragHeadingRef.current = currentYawDeg;
+    setIsAiming(true);
+    updateFaceAim(e);
+  };
+
+  const handleFacePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    if (isAiming) updateFaceAim(e);
+  };
+
+  const handleFacePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    if (!isAiming || disabled) return;
+    const target = updateFaceAim(e);
+    if (target) onLook(botId, target.yaw, target.pitch);
+    setIsAiming(false);
   };
 
   return (
@@ -176,7 +237,7 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
             {/* Corner Quick Tilt Labels: Up & Down */}
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onLook(botId, yaw, -Math.PI / 2); }}
+              onClick={(e) => { e.stopPropagation(); onLook(botId, yaw, Math.PI / 2); }}
               className={`absolute top-2 right-2 text-[10px] font-bold px-1 rounded transition select-none ${
                 currentPitchDeg <= -45 ? 'text-sky-600 font-black' : 'text-slate-500 hover:text-sky-600'
               }`}
@@ -186,7 +247,7 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
             </button>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onLook(botId, yaw, Math.PI / 2); }}
+              onClick={(e) => { e.stopPropagation(); onLook(botId, yaw, -Math.PI / 2); }}
               className={`absolute bottom-2 right-2 text-[10px] font-bold px-1 rounded transition select-none ${
                 currentPitchDeg >= 45 ? 'text-amber-600 font-black' : 'text-slate-500 hover:text-amber-600'
               }`}
@@ -195,29 +256,35 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
               Down
             </button>
 
-            {/* Player Head in Center with Aim Pointer */}
-            <div className="relative flex items-center justify-center pointer-events-none">
-              {/* Aim Pointer Needle Line */}
+            {/* Tap or drag the face to set heading and pitch together. */}
+            <div className="relative flex flex-col items-center justify-center">
               <div
-                className="absolute w-16 h-16 flex items-center justify-center transition-transform duration-100"
-                style={{
-                  transform: `rotate(${currentYawDeg + 180}deg)`,
-                }}
+                ref={faceRef}
+                onPointerDown={handleFacePointerDown}
+                onPointerMove={handleFacePointerMove}
+                onPointerUp={handleFacePointerUp}
+                onPointerCancel={handleFacePointerUp}
+                role="group"
+                aria-label="Aim heading and pitch; center is current direction and level"
+                className={`relative w-20 h-20 rounded-2xl touch-none cursor-crosshair flex items-center justify-center ${disabled ? 'opacity-60' : ''}`}
+                title="Tap or drag: center faces forward/level; right and left adjust heading, up and down adjust pitch"
               >
-                <div className="w-1.5 h-7 bg-gradient-to-t from-transparent via-emerald-600 to-emerald-500 rounded-full shadow-[0_0_6px_rgba(16,185,129,0.5)] transform -translate-y-4" />
+                <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-slate-100 border-2 border-slate-300 shadow-sm pointer-events-none">
+                  <img
+                    src={`https://mc-heads.net/avatar/${encodeURIComponent(botName)}/56`}
+                    alt={botName}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://mc-heads.net/avatar/MHF_Steve/56';
+                    }}
+                  />
+                  <span
+                    className="absolute w-3 h-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-emerald-500 shadow-[0_0_0_2px_rgba(5,150,105,0.45)] transition-[left,top] duration-75"
+                    style={{ left: `${markerLeft}%`, top: `${markerTop}%` }}
+                  />
+                </div>
               </div>
-
-              {/* Player Avatar */}
-              <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 border-2 border-slate-300 shadow-sm">
-                <img
-                  src={`https://mc-heads.net/avatar/${encodeURIComponent(botName)}/56`}
-                  alt={botName}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://mc-heads.net/avatar/MHF_Steve/56';
-                  }}
-                />
-              </div>
+              <span className="-mt-1 text-[9px] font-medium text-slate-500">Drag face • center = forward / level</span>
             </div>
           </div>
         </div>
@@ -290,7 +357,7 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
             <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
-                onClick={() => onLook(botId, yaw, Math.PI / 2)}
+                onClick={() => onLook(botId, yaw, uiPitchToMineflayer(90))}
                 disabled={disabled}
                 className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition shadow-2xs ${
                   currentPitchDeg >= 80
@@ -314,7 +381,7 @@ export const BotLookControl: React.FC<BotLookControlProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => onLook(botId, yaw, -Math.PI / 2)}
+                onClick={() => onLook(botId, yaw, uiPitchToMineflayer(-90))}
                 disabled={disabled}
                 className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition shadow-2xs ${
                   currentPitchDeg <= -80

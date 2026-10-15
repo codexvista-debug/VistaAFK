@@ -31,7 +31,7 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
   const [activeFeedTab, setActiveFeedTab] = useState<'players' | 'mobs'>('players');
 
   const yaw = telemetry?.yaw || 0;
-  const compassDeg = (((-yaw * 180 / Math.PI) % 360) + 360) % 360;
+  const compassDeg = (((180 - yaw * 180 / Math.PI) % 360) + 360) % 360;
   const facing = telemetry?.facing || 'South';
   const coords = telemetry?.coordinates || { x: 0, y: 0, z: 0 };
   const currentBiome = telemetry?.currentBiome || (telemetry?.dimension === 'the_nether' ? 'Nether Wastes' : 'Plains');
@@ -383,7 +383,7 @@ export const XaerosMinimap: React.FC<XaerosMinimapProps> = ({ telemetry, botName
             const clampedY = Math.max(6, Math.min(94, 50 + (rotDz / maxRange) * 44));
 
             // Player facing degree
-            const playerFacingDeg = (((-player.yaw * 180 / Math.PI) % 360) + 360) % 360;
+            const playerFacingDeg = (((180 - player.yaw * 180 / Math.PI) % 360) + 360) % 360;
             const effectivePlayerFacing = rotateWithPlayer
               ? (playerFacingDeg - compassDeg + 360) % 360
               : playerFacingDeg;
