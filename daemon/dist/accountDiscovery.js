@@ -68,7 +68,6 @@ async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email, editi
     };
     const flow = new prismarine_auth_1.Authflow(accountId, tokenFolder, {
         authTitle: prismarine_auth_1.Titles.MinecraftJava,
-        deviceType: 'Win32',
         flow: 'live',
         forceRefresh: true,
     }, onMicrosoftCode);
@@ -76,40 +75,25 @@ async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email, editi
     const lookupErrors = [];
     // 1. Discover Minecraft: Java Edition Profile (if requested)
     if (editionFilter === 'both' || editionFilter === 'java') {
+        let javaToken;
         try {
-            // prismarine-auth currently catches profile endpoint errors internally and
-            // returns an empty profile. Fetch the profile here so the UI can distinguish
-            // a missing profile from an API/auth failure.
-            const javaRes = await flow.getMinecraftJavaToken();
-            const profileResponse = await fetch('https://api.minecraftservices.com/minecraft/profile', {
-                headers: {
-                    Authorization: `Bearer ${javaRes.token}`,
-                    'User-Agent': 'MinecraftLauncher/2.2.10675',
-                },
-            });
-            if (profileResponse.ok) {
-                const profile = await profileResponse.json();
-                if (profile?.name && profile?.id) {
-                    result.java = {
-                        name: profile.name,
-                        uuid: profile.id,
-                    };
-                    console.log(`[VistaAFK Discovery] ✅ Discovered Java Profile: ${result.java.name} (${result.java.uuid})`);
-                }
-                else {
-                    console.log('[VistaAFK Discovery] Java profile endpoint returned no profile name or id');
-                }
+            // Keep the library's established auth flow and request its profile using
+            // the same headers/path used by its Minecraft Java token manager.
+            const javaRes = await flow.getMinecraftJavaToken({ fetchProfile: true, fetchEntitlements: true });
+            javaToken = javaRes?.token || undefined;
+            if (javaRes?.profile?.name && javaRes.profile.id) {
+                result.java = { name: javaRes.profile.name, uuid: javaRes.profile.id };
+                console.log(`[VistaAFK Discovery] ✅ Discovered Java Profile: ${result.java.name} (${result.java.uuid})`);
             }
-            else if (profileResponse.status === 404) {
-                console.log('[VistaAFK Discovery] Account has no active Minecraft Java profile');
+            else if (!javaToken) {
+                throw new Error('Minecraft Java authentication did not return an access token.');
             }
             else {
-                const responseText = await profileResponse.text();
-                throw new Error(`Minecraft Java profile lookup failed (${profileResponse.status}): ${responseText.slice(0, 240)}`);
+                console.log('[VistaAFK Discovery] No Java profile was returned for this Microsoft account.');
             }
         }
         catch (err) {
-            console.warn('[VistaAFK Discovery] Java profile fetch error:', err.message);
+            console.warn('[VistaAFK Discovery] Java authentication/profile lookup error:', err.message);
             lookupErrors.push(`Java: ${err.message || 'profile lookup failed'}`);
         }
     }
@@ -123,7 +107,6 @@ async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email, editi
             syncMicrosoftTokens(tokenFolder, accountId, [bedrockAccountId]);
             const bedrockFlow = new prismarine_auth_1.Authflow(bedrockAccountId, tokenFolder, {
                 authTitle: prismarine_auth_1.Titles.MinecraftNintendoSwitch,
-                deviceType: 'Nintendo',
                 flow: 'live',
             }, onMicrosoftCode);
             const keyPair = crypto_1.default.generateKeyPairSync('ec', { namedCurve: 'secp384r1' });
@@ -162,6 +145,42 @@ async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email, editi
         catch (err) {
             console.warn('[VistaAFK Discovery] Bedrock discovery error:', err.message);
             lookupErrors.push(`Bedrock: ${err.message || 'Xbox profile lookup failed'}`);
+        }
+        // The Xbox profile service can still reveal a real Gamertag when the
+        // Bedrock Minecraft token endpoint rejects the token-chain request.
+        if (!result.bedrock) {
+            try {
+                const xboxToken = await flow.getXboxToken('http://xboxlive.com');
+                if (xboxToken?.userHash && xboxToken?.XSTSToken) {
+                    const profileResponse = await fetch('https://profile.xboxlive.com/users/me/profile/settings?settings=Gamertag', {
+                        headers: {
+                            'x-xbl-contract-version': '2',
+                            Authorization: `XBL3.0 x=${xboxToken.userHash};${xboxToken.XSTSToken}`,
+                            'User-Agent': 'Mozilla/5.0',
+                            Accept: 'application/json',
+                        },
+                        signal: AbortSignal.timeout(6000),
+                    });
+                    if (profileResponse.ok) {
+                        const profile = await profileResponse.json();
+                        const user = profile.profileUsers?.[0];
+                        const gamertag = user?.settings?.find((setting) => setting.id === 'Gamertag')?.value;
+                        if (gamertag) {
+                            result.bedrock = { gamertag, xuid: user?.id || xboxToken.userXUID };
+                            console.log(`[VistaAFK Discovery] ✅ Discovered Bedrock Gamertag via Xbox profile: ${gamertag}`);
+                        }
+                        else {
+                            console.warn(`[VistaAFK Discovery] Xbox profile lookup returned HTTP ${profileResponse.status} without a Gamertag.`);
+                        }
+                    }
+                    else {
+                        console.warn(`[VistaAFK Discovery] Xbox profile fallback returned HTTP ${profileResponse.status}.`);
+                    }
+                }
+            }
+            catch (fallbackError) {
+                console.warn('[VistaAFK Discovery] Xbox profile fallback error:', fallbackError?.message || fallbackError);
+            }
         }
     }
     // Copy the reusable Microsoft token so both clients can obtain their own
