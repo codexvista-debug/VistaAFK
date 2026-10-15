@@ -25,7 +25,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   isConnecting,
   onOpenAddModal,
   onOpenSettingsModal,
-  onRetryConnection,
   botCount,
   onlineCount,
   savedAccountCount,
@@ -117,60 +116,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <>
                 <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs" onClick={() => setIsUserMenuOpen(false)} />
                 <div className="fixed sm:absolute top-16 sm:top-auto sm:mt-2 right-2 sm:right-0 w-[calc(100vw-16px)] sm:w-72 max-w-sm bg-slate-900 border-2 border-slate-700 rounded-3xl shadow-2xl p-3 sm:p-4 z-50 text-xs space-y-2 animate-in fade-in duration-150">
-                  {/* Daemon Connection Pill */}
-                  <div className="flex items-center justify-between px-3 py-2 bg-slate-800/90 border border-slate-700/80 rounded-2xl mb-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="relative flex h-2 w-2">
-                        {isConnected ? (
-                          <>
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                          </>
-                        ) : isConnecting ? (
-                          <span className="inline-flex rounded-full h-2 w-2 bg-amber-400 animate-pulse" />
-                        ) : (
-                          <span className="inline-flex rounded-full h-2 w-2 bg-rose-500" />
-                        )}
-                      </span>
-                      <span className={`text-[11px] font-bold flex items-center space-x-1 ${
-                        isConnected ? 'text-emerald-400' : isConnecting ? 'text-amber-400' : 'text-rose-400'
-                      }`}>
-                        <span>Daemon:</span>
-                        <span>
-                          {isConnected
-                            ? daemonDeviceType === 'pc'
-                              ? 'Connected (PC)'
-                              : daemonDeviceType === 'mobile'
-                              ? 'Connected (Mobile)'
-                              : 'Connected'
-                            : isConnecting
-                            ? 'Connecting...'
-                            : 'Disconnected'}
-                        </span>
-                        {isConnected && (
-                          daemonDeviceType === 'pc' ? (
-                            <Monitor className="h-3 w-3 text-blue-400 ml-0.5 inline shrink-0" />
-                          ) : daemonDeviceType === 'mobile' ? (
-                            <Smartphone className="h-3 w-3 text-emerald-400 ml-0.5 inline shrink-0" />
-                          ) : null
-                        )}
-                      </span>
-                    </div>
-
-                    {!isConnected && !isConnecting && onRetryConnection && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRetryConnection();
-                        }}
-                        className="text-[10px] px-2.5 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600 font-bold transition"
-                      >
-                        Retry
-                      </button>
-                    )}
-                  </div>
-
                   {/* Clean Page Navigation Buttons */}
                   <div className="space-y-1">
                     <Link
