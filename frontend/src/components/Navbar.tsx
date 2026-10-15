@@ -93,6 +93,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </span>
 
+              {isConnected && daemonDeviceType === 'pc' && (
+                <span title={`Connected from ${daemonDeviceLabel || 'PC'}`} className="shrink-0" role="img" aria-label="Connected from PC">
+                  <Monitor className="h-3.5 w-3.5 text-blue-100" />
+                </span>
+              )}
+              {isConnected && daemonDeviceType === 'mobile' && (
+                <span title={`Connected from ${daemonDeviceLabel || 'mobile'}`} className="shrink-0" role="img" aria-label="Connected from mobile">
+                  <Smartphone className="h-3.5 w-3.5 text-emerald-100" />
+                </span>
+              )}
+
               {/* Username: Up to 5 Letters */}
               <span className="font-black text-xs tracking-tight text-white font-mono">
                 {user.username.slice(0, 5)}

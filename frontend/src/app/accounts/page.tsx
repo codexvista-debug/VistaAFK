@@ -144,6 +144,7 @@ export default function AccountsPage() {
   };
 
   const handleAddAccountSubmit = () => {
+    if (!isConnected) return;
     // One Microsoft sign-in discovers both Minecraft editions when they are available.
     const popup = window.open('about:blank', 'ms_oauth_popup', 'width=520,height=680,scrollbars=yes,resizable=yes');
     if (popup) {
@@ -209,7 +210,7 @@ export default function AccountsPage() {
       <Navbar
         isConnected={isConnected}
         isConnecting={isConnecting}
-        onOpenAddModal={() => setIsAddAccountModalOpen(true)}
+        onOpenAddModal={handleOpenAddModal}
         onRetryConnection={retryConnection}
         botCount={configs.length}
         onlineCount={onlineCount}
@@ -602,20 +603,46 @@ export default function AccountsPage() {
                 </div>
               </div>
             ) : (
-              /* Form View: Direct 1-Click Microsoft Java Connect */
+              /* Form View: require daemon because auth tokens are stored on that device */
               <div className="mt-4 space-y-4">
-                <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl text-xs text-emerald-800 font-medium leading-relaxed">
-                  🎮 <strong>Official Microsoft Sign-In:</strong> Link the Java profile and Xbox gamertag available on this Microsoft account in one step.
-                </div>
+                {!isConnected ? (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-3">
+                    <p className="text-xs text-amber-900 font-semibold leading-relaxed">
+                      Connect your PC or Termux daemon before adding an account. Microsoft sign-in runs on the daemon so its credentials are available when you deploy the bot.
+                    </p>
+                    <div className="flex gap-2">
+                      <Link
+                        href="/settings"
+                        onClick={() => setIsAddAccountModalOpen(false)}
+                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl text-center"
+                      >
+                        Connect daemon
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={retryConnection}
+                        className="px-4 py-2.5 bg-white border border-amber-300 text-amber-900 text-xs font-bold rounded-xl"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl text-xs text-emerald-800 font-medium leading-relaxed">
+                      🎮 <strong>Official Microsoft Sign-In:</strong> Link the Java profile and Xbox gamertag available on this Microsoft account in one step.
+                    </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleAddAccountSubmit()}
-                  className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-700/25 flex items-center justify-center space-x-2 transition"
-                >
-                  <ShieldCheck className="h-5 w-5" />
-                  <span>Connect Microsoft Account</span>
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddAccountSubmit()}
+                      className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-700/25 flex items-center justify-center space-x-2 transition"
+                    >
+                      <ShieldCheck className="h-5 w-5" />
+                      <span>Connect Microsoft Account</span>
+                    </button>
+                  </>
+                )}
 
                 <div className="flex items-center justify-end pt-2 border-t border-slate-200">
                   <button
