@@ -231,10 +231,11 @@ function parseMinecraftChat(raw: any): string {
   return typeof raw === 'object' ? JSON.stringify(raw) : String(raw);
 }
 
-function parseBedrockChatPacket(packet: any, usernameForXuid?: (xuid: string) => string | undefined): Pick<ChatMessage, 'sender' | 'message' | 'isSystem'> {
+function parseBedrockChatPacket(packet: any, usernameForIdentity?: (xuid: string, platformChatId: string) => string | undefined): Pick<ChatMessage, 'sender' | 'message' | 'isSystem'> {
   const type = String(packet?.type || 'system');
   const source = typeof packet?.source_name === 'string' ? packet.source_name.trim() : '';
   const xuid = typeof packet?.xuid === 'string' ? packet.xuid.trim() : '';
+  const platformChatId = typeof packet?.platform_chat_id === 'string' ? packet.platform_chat_id.trim() : '';
   const rawMessage = typeof packet?.message === 'string' ? packet.message : '';
   const parameters = Array.isArray(packet?.parameters)
     ? packet.parameters.map((value: unknown) => String(value ?? ''))
@@ -272,7 +273,7 @@ function parseBedrockChatPacket(packet: any, usernameForXuid?: (xuid: string) =>
   // Some server chat formats send the rank as source_name and the text as
   // message, omitting the actual gamertag from the rendered line. Bedrock's
   // player_list records map that packet XUID back to the player's username.
-  const username = xuid ? usernameForXuid?.(xuid) : undefined;
+  const username = usernameForIdentity?.(xuid, platformChatId);
   const rankPattern = '(?:TITAN|KING|CHAMPION|KNIGHT|EMPEROR|OVERLORD\\+{0,2}|LORD|JESTER|MEMBER|VIP\\+?|MVP\\+?|ADMIN|OWNER|MOD)';
   const rankOnly = new RegExp(`^\\[?${rankPattern}\\]?$`, 'i');
   const rankMessage = new RegExp(`^\\[?(${rankPattern})\\]?\\s*(?:▶|>|:)\\s*(.*)$`, 'i');
@@ -332,6 +333,7 @@ export class BotInstance {
   private bedrockMaxHealth: number = 20;
   private bedrockFood: number = 20;
   private bedrockXuidToUsername = new Map<string, string>();
+  private bedrockPlatformChatIdToUsername = new Map<string, string>();
   private bedrockInventoryDiagnosticsLogged = false;
   private bedrockSelectedSlot: number = 0;
   private bedrockInventorySlots: any[] = Array(46).fill(null);
@@ -544,6 +546,7 @@ export class BotInstance {
       this.bedrockHealth = 20;
       this.bedrockMaxHealth = 20;
       this.bedrockXuidToUsername.clear();
+      this.bedrockPlatformChatIdToUsername.clear();
       this.bedrockInventoryDiagnosticsLogged = false;
 
       const isMobileDaemon = process.env.VISTAAFK_DEVICE_TYPE === 'mobile';
@@ -697,10 +700,15 @@ export class BotInstance {
         const records = Array.isArray(packet?.records) ? packet.records : [];
         for (const record of records) {
           const xuid = typeof record?.xbox_user_id === 'string' ? record.xbox_user_id.trim() : '';
+          const platformChatId = typeof record?.platform_chat_id === 'string' ? record.platform_chat_id.trim() : '';
           const username = typeof record?.username === 'string' ? record.username.trim() : '';
-          if (!xuid) continue;
-          if (record?.type === 'remove') this.bedrockXuidToUsername.delete(xuid);
-          else if (username) this.bedrockXuidToUsername.set(xuid, username);
+          if (record?.type === 'remove') {
+            if (xuid) this.bedrockXuidToUsername.delete(xuid.toLowerCase());
+            if (platformChatId) this.bedrockPlatformChatIdToUsername.delete(platformChatId.toLowerCase());
+          } else if (username) {
+            if (xuid) this.bedrockXuidToUsername.set(xuid.toLowerCase(), username);
+            if (platformChatId) this.bedrockPlatformChatIdToUsername.set(platformChatId.toLowerCase(), username);
+          }
         }
       });
 
@@ -861,7 +869,10 @@ export class BotInstance {
       });
 
       client.on('text', (packet: any) => {
-        const parsed = parseBedrockChatPacket(packet, (xuid) => this.bedrockXuidToUsername.get(xuid));
+        const parsed = parseBedrockChatPacket(packet, (xuid, platformChatId) =>
+          (xuid ? this.bedrockXuidToUsername.get(xuid.toLowerCase()) : undefined)
+          || (platformChatId ? this.bedrockPlatformChatIdToUsername.get(platformChatId.toLowerCase()) : undefined)
+        );
         this.callbacks.onChatMessage({
           botId: this.config.id,
           timestamp: Date.now(),
