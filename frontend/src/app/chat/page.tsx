@@ -22,6 +22,7 @@ import {
   Users,
   Bug,
   Gamepad2,
+  ArrowDown,
 } from 'lucide-react';
 import Link from 'next/link';
 import { MinecraftChatMessage } from '../../components/MinecraftChatMessage';
@@ -60,6 +61,8 @@ function ChatContent() {
   const [activeTab, setActiveTab] = useState<ChatTab>('chat');
   const [isEditingSettings, setIsEditingSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const playerLogsRef = useRef<HTMLDivElement | null>(null);
+  const [playerLogsAutoScroll, setPlayerLogsAutoScroll] = useState(true);
 
   useEffect(() => {
     if (botIdParam && configs.some((c) => c.id === botIdParam)) {
@@ -79,6 +82,12 @@ function ChatContent() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
+
+  useEffect(() => {
+    if (playerLogsAutoScroll && activeTab === 'logs' && playerLogsRef.current) {
+      playerLogsRef.current.scrollTop = playerLogsRef.current.scrollHeight;
+    }
+  }, [playerLogs, playerLogsAutoScroll, activeTab]);
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,6 +159,20 @@ function ChatContent() {
               ))}
             </select>
           </div>
+          {currentConfig && (
+            <div
+              title={`${isOnline ? 'Connected' : currentTelemetry?.status || 'Offline'} · ${currentConfig.name} · ${currentConfig.host}:${currentConfig.port}`}
+              className={`hidden lg:flex min-w-0 items-center gap-2 rounded-xl border px-3 py-1.5 ${isOnline ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}
+            >
+              <span className={`h-2 w-2 shrink-0 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,.12)]' : isConnecting ? 'animate-pulse bg-amber-500' : 'bg-slate-400'}`} />
+              <span className={`truncate text-[10px] font-bold ${isOnline ? 'text-emerald-800' : 'text-slate-600'}`}>
+                {isOnline ? 'Connected to' : isConnecting ? 'Connecting to' : 'Not connected'} {currentConfig.host.toLowerCase().includes('donut') ? 'DonutSMP' : currentConfig.host.toLowerCase().includes('freshsmp') ? 'FreshSMP' : currentConfig.host}
+              </span>
+              <span className="shrink-0 rounded-md border border-white/80 bg-white/80 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-500">
+                {currentConfig.edition === 'bedrock' || currentConfig.port === 19132 ? 'Bedrock' : 'Java'}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Live Bot Stats in Header */}
@@ -344,9 +367,9 @@ function ChatContent() {
 
           {activeTab === 'logs' && (
             <div className="flex-1 min-h-0 flex flex-col bg-[#f8fafc]">
-              <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3"><div><h1 className="text-sm font-black text-slate-900">Player Logs & Activity</h1><p className="text-[10px] text-slate-500">Live connection, survival, and command events</p></div><span className="text-[10px] font-mono text-slate-500">{playerLogs.length} events</span></div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                {playerLogs.length === 0 ? <EmptyWorkspace message={isOnline ? 'Waiting for player activity…' : 'Connect the bot to start collecting logs.'} /> : playerLogs.slice().reverse().map((log) => (
+              <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3"><div><h1 className="text-sm font-black text-slate-900">Player Logs & Activity</h1><p className="text-[10px] text-slate-500">Live connection, survival, and command events</p></div><div className="flex items-center gap-3"><span className="text-[10px] font-mono text-slate-500">{playerLogs.length} events</span><button type="button" onClick={() => setPlayerLogsAutoScroll((value) => !value)} aria-pressed={playerLogsAutoScroll} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold transition ${playerLogsAutoScroll ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-100'}`} title={playerLogsAutoScroll ? 'Pause automatic scrolling' : 'Resume automatic scrolling'}><ArrowDown className="h-3 w-3" /> Auto-scroll {playerLogsAutoScroll ? 'On' : 'Off'}</button></div></div>
+              <div ref={playerLogsRef} className="flex-1 overflow-y-auto p-4 space-y-2">
+                {playerLogs.length === 0 ? <EmptyWorkspace message={isOnline ? 'Waiting for player activity…' : 'Connect the bot to start collecting logs.'} /> : playerLogs.map((log) => (
                   <article key={log.id} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
                     <time className="shrink-0 pt-0.5 text-[10px] font-mono text-slate-400">{formatLogTime(log.timestamp)}</time>
                     <span className="shrink-0 rounded-md border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-slate-600">{log.type.replace('_', ' ')}</span>

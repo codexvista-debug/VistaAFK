@@ -14,7 +14,6 @@ import {
   Check,
   Shield,
   Zap,
-  Terminal,
   ChevronDown,
   ChevronUp,
   Swords,
@@ -438,16 +437,6 @@ export const BotCard: React.FC<BotCardProps> = ({
                 >
                   {isLogsExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                 </button>
-                <a
-                  href={`/logs?bot=${config.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-emerald-400 hover:text-emerald-300 transition flex items-center space-x-1 text-[10px] font-bold bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-700/80 px-2 py-0.5 rounded-md"
-                  title="Open Player Logs as dedicated page in a new tab"
-                >
-                  <span>Open Tab</span>
-                  <ExternalLink className="h-2.5 w-2.5" />
-                </a>
               </div>
             </div>
 
@@ -501,23 +490,7 @@ export const BotCard: React.FC<BotCardProps> = ({
         </div>
 
         {/* Player Logs, Control Panel, and Delete */}
-        <div className="grid grid-cols-3 sm:flex items-center gap-1.5 w-full sm:w-auto">
-          {/* 1. Player Live Logs Button */}
-          <a
-            href={`/logs?bot=${config.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="h-10 sm:h-8 px-2 sm:px-2.5 rounded-xl border shadow-xs transition flex items-center justify-center space-x-1 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border-slate-200 active:scale-95"
-            title="Open Dedicated Player Logs"
-          >
-            <Terminal className="h-4 w-4 text-emerald-700 shrink-0" />
-            {displayLogs.length > 0 && (
-              <span className="text-[10px] font-mono font-bold text-emerald-800 hidden md:inline">
-                {displayLogs.length}
-              </span>
-            )}
-          </a>
-
+        <div className="grid grid-cols-2 sm:flex items-center gap-1.5 w-full sm:w-auto">
           {/* Open the full workspace with settings, logs, chat, map, and inventory. */}
           <Link
             href={`/chat?bot=${encodeURIComponent(config.id)}`}

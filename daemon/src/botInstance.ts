@@ -542,10 +542,34 @@ export class BotInstance {
         });
       });
 
-      client.on('kick', (reason: any) => {
-        const cleanReason = typeof reason === 'string' ? reason : reason?.message || JSON.stringify(reason);
-        this.emitActivity('disconnect', `❌ Kicked from Bedrock server: ${cleanReason}`);
-        this.callbacks.onNotification('error', `[${this.config.name}] Kicked: ${cleanReason}`, this.config.id);
+      // Boar's transaction watchdog uses negative NetworkStackLatency timestamps
+      // as transaction IDs and expects the Bedrock client to echo them. The
+      // stock bedrock-protocol helper only echoes packets with needs_response,
+      // so answer these negative-ID probes explicitly without echoing ordinary
+      // latency replies (which would create a ping-pong loop).
+      client.on('network_stack_latency', (packet: any) => {
+        try {
+          const timestamp = BigInt(packet?.timestamp);
+          const isNegativeTransactionId = timestamp > (1n << 63n) - 1n;
+          if (isNegativeTransactionId && !packet?.needs_response) {
+            client.queue('network_stack_latency', {
+              timestamp: packet.timestamp,
+              needs_response: false,
+            });
+          }
+        } catch (error) {
+          // Ignore malformed latency packets; the library handles normal pings.
+        }
+      });
+
+      let bedrockDisconnectReason = '';
+      client.on('disconnect', (packet: any) => {
+        const rawReason = typeof packet === 'string' ? packet : packet?.message;
+        bedrockDisconnectReason = (typeof rawReason === 'string' ? rawReason : JSON.stringify(rawReason || packet || 'Unknown reason'))
+          .replace(/§[0-9a-fk-or]/gi, '')
+          .trim();
+        this.emitActivity('disconnect', `❌ Server disconnected this Bedrock session: ${bedrockDisconnectReason}`);
+        this.callbacks.onNotification('warn', `[${this.config.name}] Server disconnected the Bedrock session: ${bedrockDisconnectReason}`, this.config.id);
       });
 
       client.on('close', () => {
@@ -557,7 +581,9 @@ export class BotInstance {
             this.emitActivity('status', `⏳ Awaiting Microsoft authorization: Visit ${this.authCodeInfo.verificationUri} and enter ${this.authCodeInfo.userCode}`);
             return;
           }
-          this.emitActivity('disconnect', '🔴 Disconnected from Bedrock server');
+          if (!bedrockDisconnectReason) {
+            this.emitActivity('disconnect', '🔴 Disconnected from Bedrock server (no kick reason received; likely network close)');
+          }
           this.handleReconnect();
         } else {
           this.updateStatus('offline', 'Disconnected');
