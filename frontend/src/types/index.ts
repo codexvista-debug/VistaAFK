@@ -81,6 +81,15 @@ export interface InventoryItem {
   enchantments?: ItemEnchantment[];
 }
 
+export interface BotGuiWindow {
+  id: number;
+  title: string;
+  type: string;
+  slots: Array<InventoryItem | null>;
+  inventoryStart?: number;
+  inventoryEnd?: number;
+}
+
 export interface MinimapPlayer {
   username: string;
   x: number;
@@ -159,6 +168,7 @@ export interface BotTelemetry {
   offhandItem?: string;
   inventoryCount: number;
   inventory?: InventoryItem[];
+  openWindow?: BotGuiWindow | null;
   selectedSlot?: number;
   facing?: string;
   yaw?: number;

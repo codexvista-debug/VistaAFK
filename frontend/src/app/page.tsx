@@ -1,17 +1,13 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useVistaWebSocket } from '../hooks/useVistaWebSocket';
 import { Navbar } from '../components/Navbar';
 import { StatsOverview } from '../components/StatsOverview';
 import { BotCard } from '../components/BotCard';
-import { AddBotModal } from '../components/AddBotModal';
 import { DeployServerModal } from '../components/DeployServerModal';
-import { LiveChatTerminal } from '../components/LiveChatTerminal';
 import { NotificationToast } from '../components/NotificationToast';
-import { BotVisualControlModal } from '../components/BotVisualControlModal';
-import { BotInventoryModal } from '../components/BotInventoryModal';
-import { BotConfig, SavedAccount } from '../types';
+import { SavedAccount } from '../types';
 import { Plus, Server, AlertTriangle, RefreshCw, Layers, Users, Play } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '../context/VistaAuthContext';
@@ -34,44 +30,14 @@ export default function Dashboard() {
     serverPresets,
     deployAccountToServer,
     updateDaemonConfig,
-    connect,
-    addBot,
     updateBot,
     removeBot,
     startBot,
     stopBot,
-    sendChat,
-    moveBot,
-    togglePatrol,
-    lookAt,
-    attackBot,
     dismissNotification,
   } = useVistaWebSocket();
 
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
-  const [isAddBotModalOpen, setIsAddBotModalOpen] = useState(false);
-  const [editingBot, setEditingBot] = useState<BotConfig | null>(null);
-  const [chatBotId, setChatBotId] = useState<string | null>(null);
-  const [sightModalBot, setSightModalBot] = useState<BotConfig | null>(null);
-  const [inventoryModalBot, setInventoryModalBot] = useState<BotConfig | null>(null);
-
-  const activeChatConfig = configs.find((c) => c.id === chatBotId);
-  const activeChatTelemetry = chatBotId ? telemetry[chatBotId] : undefined;
-
-  const handleSaveBot = useCallback((config: BotConfig) => {
-    const isExisting = editingBot || configs.some((c) => c.id === config.id);
-    if (isExisting) {
-      updateBot(config);
-    } else {
-      addBot(config);
-    }
-  }, [editingBot, configs, updateBot, addBot]);
-
-  const handleEditBot = (config: BotConfig) => {
-    setEditingBot(config);
-    setIsAddBotModalOpen(true);
-  };
-
   const handleDismissNotification = (id: string) => {
     dismissNotification(id);
   };
@@ -268,10 +234,7 @@ export default function Dashboard() {
                   onStart={startBot}
                   onStop={stopBot}
                   onDelete={removeBot}
-                  onOpenChat={(id) => setChatBotId(id)}
-                  onOpenSightModal={(c) => setSightModalBot(c)}
-                  onOpenInventory={(c) => setInventoryModalBot(c)}
-                  onEdit={handleEditBot}
+                  onEdit={updateBot}
                   onUpdate={updateBot}
                 />
               ))}
@@ -289,54 +252,6 @@ export default function Dashboard() {
           onDeploy={deployAccountToServer}
         />
       )}
-
-      {/* Edit Bot Modal */}
-      {isAddBotModalOpen && (
-        <AddBotModal
-          onClose={() => {
-            setIsAddBotModalOpen(false);
-            setEditingBot(null);
-          }}
-          onSave={handleSaveBot}
-          initialConfig={editingBot}
-        />
-      )}
-
-      {/* Tactical Sight Radar & Movement Modal */}
-      {sightModalBot && (
-        <BotVisualControlModal
-          config={sightModalBot}
-          telemetry={telemetry[sightModalBot.id]}
-          daemonConnected={isConnected}
-          onClose={() => setSightModalBot(null)}
-          onMove={moveBot}
-          onTogglePatrol={togglePatrol}
-          onLook={lookAt}
-          onAttack={attackBot}
-        />
-      )}
-
-      {/* Live Inventory & Lore Modal */}
-      {inventoryModalBot && (
-        <BotInventoryModal
-          config={inventoryModalBot}
-          telemetry={telemetry[inventoryModalBot.id]}
-          onClose={() => setInventoryModalBot(null)}
-        />
-      )}
-
-      {/* Live Chat Terminal Modal */}
-      {chatBotId && activeChatConfig && (
-        <LiveChatTerminal
-          botConfig={activeChatConfig}
-          chatLogs={chatLogs[chatBotId] || []}
-          onClose={() => setChatBotId(null)}
-          onSendMessage={sendChat}
-          isOnline={activeChatTelemetry?.status === 'online'}
-        />
-      )}
-
-
 
       {/* Live Toast Notifications */}
       <NotificationToast

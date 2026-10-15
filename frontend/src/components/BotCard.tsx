@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   Play,
   Square,
-  MessageSquare,
   Trash2,
   Settings2,
   Heart,
@@ -13,16 +12,14 @@ import {
   MapPin,
   Copy,
   Check,
-  ExternalLink,
   Shield,
   Zap,
-  Compass,
   Terminal,
   ChevronDown,
   ChevronUp,
-  Package,
   Swords,
   Key,
+  ExternalLink,
 } from 'lucide-react';
 import { BotConfig, BotTelemetry, ChatMessage, ActivityLog } from '../types';
 
@@ -35,9 +32,6 @@ interface BotCardProps {
   onStart: (id: string) => void;
   onStop: (id: string) => void;
   onDelete: (id: string) => void;
-  onOpenChat: (id: string) => void;
-  onOpenSightModal?: (config: BotConfig) => void;
-  onOpenInventory?: (config: BotConfig) => void;
   onEdit: (config: BotConfig) => void;
   onUpdate?: (config: BotConfig) => void;
 }
@@ -51,9 +45,6 @@ export const BotCard: React.FC<BotCardProps> = ({
   onStart,
   onStop,
   onDelete,
-  onOpenChat,
-  onOpenSightModal,
-  onOpenInventory,
   onEdit,
   onUpdate,
 }) => {
@@ -509,8 +500,8 @@ export const BotCard: React.FC<BotCardProps> = ({
           )}
         </div>
 
-        {/* 6 Quick Action Tool Buttons */}
-        <div className="grid grid-cols-6 sm:flex items-center gap-1.5 w-full sm:w-auto">
+        {/* Player Logs, Control Panel, and Delete */}
+        <div className="grid grid-cols-3 sm:flex items-center gap-1.5 w-full sm:w-auto">
           {/* 1. Player Live Logs Button */}
           <a
             href={`/logs?bot=${config.id}`}
@@ -527,47 +518,17 @@ export const BotCard: React.FC<BotCardProps> = ({
             )}
           </a>
 
-          {/* 2. Tactical Sight & Movement Controls */}
-          {onOpenSightModal && (
-            <button
-              onClick={() => onOpenSightModal(config)}
-              className="h-10 sm:h-8 px-2 sm:px-2 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 rounded-xl border border-slate-200 shadow-xs transition flex items-center justify-center active:scale-95"
-              title="Tactical Radar & Movement Controls"
-            >
-              <Compass className="h-4 w-4 text-emerald-700 shrink-0" />
-            </button>
-          )}
-
-          {/* 3. Player Inventory & Lore Viewer */}
-          {onOpenInventory && (
-            <button
-              onClick={() => onOpenInventory(config)}
-              className="h-10 sm:h-8 px-2 sm:px-2 bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-700 rounded-xl border border-slate-200 shadow-xs transition flex items-center justify-center active:scale-95"
-              title="View Player Inventory & Items"
-            >
-              <Package className="h-4 w-4 text-amber-700 shrink-0" />
-            </button>
-          )}
-
-          {/* 4. Live Chat & Full Console */}
-          <button
-            onClick={() => onOpenChat(config.id)}
+          {/* Open the full workspace with settings, logs, chat, map, and inventory. */}
+          <Link
+            href={`/chat?bot=${encodeURIComponent(config.id)}`}
             className="h-10 sm:h-8 px-2 sm:px-2 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-xl border border-slate-200 shadow-xs transition flex items-center justify-center active:scale-95"
-            title="Open Console & Send Chat"
+            title="Open Control Panel"
+            aria-label={`Open control panel for ${config.name}`}
           >
-            <MessageSquare className="h-4 w-4 text-blue-600 shrink-0" />
-          </button>
+            <Settings2 className="h-4 w-4 text-blue-600 shrink-0" />
+          </Link>
 
-          {/* 5. Edit Settings */}
-          <button
-            onClick={() => onEdit(config)}
-            className="h-10 sm:h-8 px-2 sm:px-2 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-xl border border-slate-200 shadow-xs transition flex items-center justify-center active:scale-95"
-            title="Bot Settings"
-          >
-            <Settings2 className="h-4 w-4 text-slate-600 shrink-0" />
-          </button>
-
-          {/* 6. Delete Bot */}
+          {/* Delete Bot */}
           <button
             onClick={() => onDelete(config.id)}
             className="h-10 sm:h-8 px-2 sm:px-2 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-xl border border-slate-200 shadow-xs transition flex items-center justify-center active:scale-95"

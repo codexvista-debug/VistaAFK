@@ -1,6 +1,6 @@
 import mineflayer, { Bot } from 'mineflayer';
 import { SocksProxyAgent } from 'socks-proxy-agent';
-import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, InventoryItem, ItemEnchantment, MinimapPlayer, MinimapMob, TerrainGridData } from './types.js';
+import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, InventoryItem, ItemEnchantment, MinimapPlayer, MinimapMob, TerrainGridData, BotGuiWindow } from './types.js';
 import { sampleTerrainGrid } from './terrainMapper.js';
 import path from 'path';
 
@@ -96,6 +96,34 @@ function cleanMinecraftJsonText(raw: any): string {
     return out.replace(/§[0-9a-fk-or]/gi, '').trim();
   }
   return String(raw).replace(/§[0-9a-fk-or]/gi, '').trim();
+}
+
+function serializeGuiWindow(window: any): BotGuiWindow | null {
+  if (!window || !Array.isArray(window.slots)) return null;
+  const slots: Array<InventoryItem | null> = window.slots.map((item: any, slot: number) => {
+    if (!item) return null;
+    const lore = Array.isArray(item.customLore)
+      ? item.customLore.map((line: any) => cleanMinecraftJsonText(line)).filter(Boolean)
+      : [];
+    return {
+      slot,
+      name: String(item.name || 'unknown'),
+      displayName: cleanMinecraftJsonText(item.customName) || cleanMinecraftJsonText(item.displayName) || String(item.name || 'Unknown item'),
+      count: Number(item.count) || 1,
+      maxStackSize: Number(item.stackSize) || undefined,
+      customName: cleanMinecraftJsonText(item.customName) || undefined,
+      lore: lore.length ? lore : undefined,
+    };
+  });
+  const numericOrUndefined = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : undefined;
+  return {
+    id: numericOrUndefined(window.id) ?? 0,
+    title: cleanMinecraftJsonText(window.title) || 'Server Menu',
+    type: String(window.type || 'container'),
+    slots,
+    inventoryStart: numericOrUndefined(window.inventoryStart),
+    inventoryEnd: numericOrUndefined(window.inventoryEnd),
+  };
 }
 
 function parseMinecraftChat(raw: any): string {
@@ -600,6 +628,16 @@ export class BotInstance {
 
   private bindBotEvents() {
     if (!this.bot) return;
+
+    this.bot.on('windowOpen', (window: any) => {
+      // Mineflayer's window events carry the real server menu (including custom
+      // inventory GUIs); expose it so the web control panel can display it.
+      const updateTelemetry = () => this.emitTelemetry();
+      window?.on?.('updateSlot', updateTelemetry);
+      window?.on?.('update', updateTelemetry);
+      this.emitTelemetry();
+    });
+    this.bot.on('windowClose', () => this.emitTelemetry());
 
     this.bot.once('spawn', () => {
       if (this.bot?.username && this.bot.username !== this.config.name) {
@@ -1565,6 +1603,20 @@ export class BotInstance {
     }
   }
 
+  public async clickGuiWindowSlot(slot: number, mouseButton = 0) {
+    if (!this.bot || this.currentStatus !== 'online') return;
+    const window = this.bot.currentWindow;
+    if (!window || !Number.isInteger(slot) || slot < 0 || slot >= window.slots.length) return;
+    try {
+      await this.bot.clickWindow(slot, mouseButton, 0);
+      this.emitTelemetry();
+      setTimeout(() => this.emitTelemetry(), 120);
+    } catch (err: any) {
+      console.error(`[VistaAFK] Failed to click server GUI slot ${slot}:`, err?.message || err);
+      this.callbacks.onNotification('error', `Failed to click server menu: ${err?.message || 'Unknown error'}`, this.config.id);
+    }
+  }
+
   public getTelemetry(): BotTelemetry {
     if (this.bedrockClient) {
       const pos = this.bedrockPosition || { x: 0, y: 0, z: 0 };
@@ -1587,6 +1639,7 @@ export class BotInstance {
         gamemode: 'survival',
         uptimeSeconds: this.connectStartTime ? Math.floor((Date.now() - this.connectStartTime) / 1000) : 0,
         inventoryCount: 0,
+        openWindow: null,
         facing: 'North',
         yaw: 0,
         pitch: 0,
@@ -1620,6 +1673,7 @@ export class BotInstance {
         gamemode: 'survival',
         uptimeSeconds: 0,
         inventoryCount: 0,
+        openWindow: null,
         facing: 'North',
         yaw: 0,
         pitch: 0,
@@ -1922,6 +1976,7 @@ export class BotInstance {
       offhandItem: offhand?.name,
       inventoryCount: this.bot.inventory ? this.bot.inventory.items().length : 0,
       inventory: inventoryList,
+      openWindow: serializeGuiWindow(this.bot.currentWindow),
       selectedSlot: (this.bot as any).quickBarSlot ?? 0,
       facing,
       yaw: Math.round(yaw * 100) / 100,

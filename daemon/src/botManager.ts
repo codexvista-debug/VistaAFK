@@ -260,6 +260,13 @@ export class BotManager {
     }
   }
 
+  public clickGuiWindowSlot(botId: string, slot: number, mouseButton = 0) {
+    const instance = this.bots.get(botId);
+    if (instance) {
+      instance.clickGuiWindowSlot(slot, mouseButton);
+    }
+  }
+
   public getAllConfigs(): BotConfig[] {
     return Array.from(this.configs.values());
   }

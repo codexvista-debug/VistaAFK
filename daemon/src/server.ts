@@ -192,6 +192,9 @@ wss.on('connection', (ws) => {
         case 'SET_QUICK_BAR_SLOT':
           botManager.setQuickBarSlot(msg.payload.botId, msg.payload.slot);
           break;
+        case 'CLICK_GUI_WINDOW':
+          botManager.clickGuiWindowSlot(msg.payload.botId, msg.payload.slot, msg.payload.mouseButton ?? 0);
+          break;
         case 'DISCOVER_MICROSOFT_ACCOUNT': {
           const reqEmail = (msg as any).payload?.email;
           const reqEdition = (msg as any).payload?.editionFilter || 'both';

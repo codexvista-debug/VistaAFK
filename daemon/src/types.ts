@@ -58,6 +58,15 @@ export interface InventoryItem {
   enchantments?: ItemEnchantment[];
 }
 
+export interface BotGuiWindow {
+  id: number;
+  title: string;
+  type: string;
+  slots: Array<InventoryItem | null>;
+  inventoryStart?: number;
+  inventoryEnd?: number;
+}
+
 export interface MinimapPlayer {
   username: string;
   x: number;
@@ -136,6 +145,7 @@ export interface BotTelemetry {
   offhandItem?: string;
   inventoryCount: number;
   inventory?: InventoryItem[];
+  openWindow?: BotGuiWindow | null;
   selectedSlot?: number;
   facing?: string;
   yaw?: number;
@@ -185,6 +195,7 @@ export type ClientMessage =
   | { type: 'ATTACK_BOT'; payload: { botId: string } }
   | { type: 'MOVE_INVENTORY_ITEM'; payload: { botId: string; sourceSlot: number; targetSlot: number } }
   | { type: 'SET_QUICK_BAR_SLOT'; payload: { botId: string; slot: number } }
+  | { type: 'CLICK_GUI_WINDOW'; payload: { botId: string; slot: number; mouseButton?: number } }
   | { type: 'DISCOVER_MICROSOFT_ACCOUNT'; payload?: { email?: string; editionFilter?: string } }
   | { type: 'CANCEL_MICROSOFT_DISCOVERY' }
   | { type: 'LINK_ACCOUNT'; payload: { username: string; password: string; cloudUrl?: string } };

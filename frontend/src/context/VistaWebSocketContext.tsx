@@ -90,6 +90,7 @@ export interface VistaWebSocketContextType {
   attackBot: (botId: string) => void;
   moveInventoryItem: (botId: string, sourceSlot: number, targetSlot: number) => void;
   setQuickBarSlot: (botId: string, slot: number) => void;
+  clickGuiWindowSlot: (botId: string, slot: number, mouseButton?: number) => void;
   dismissNotification: (id: string) => void;
   clearNotifications: () => void;
   discoveryDeviceCode: { userCode: string; verificationUri: string; expiresIn: number } | null;
@@ -913,6 +914,8 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     send({ type: 'MOVE_INVENTORY_ITEM', payload: { botId, sourceSlot, targetSlot } });
   const setQuickBarSlot = (botId: string, slot: number) =>
     send({ type: 'SET_QUICK_BAR_SLOT', payload: { botId, slot } });
+  const clickGuiWindowSlot = (botId: string, slot: number, mouseButton = 0) =>
+    send({ type: 'CLICK_GUI_WINDOW', payload: { botId, slot, mouseButton } });
   const dismissNotification = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
@@ -1073,6 +1076,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         attackBot,
         moveInventoryItem,
         setQuickBarSlot,
+        clickGuiWindowSlot,
         dismissNotification,
         clearNotifications,
         discoveryDeviceCode,
