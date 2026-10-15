@@ -267,7 +267,7 @@ function parseBedrockChatPacket(packet: any, usernameForIdentity?: (xuid: string
   }
 
   // Preserve the actual chat text for regular Bedrock chat/whisper packets.
-  const isPlayerChat = translatedPlayerChat || type === 'chat' || type === 'whisper' || type === 'announcement' || Boolean(xuid);
+  let isPlayerChat = translatedPlayerChat || type === 'chat' || type === 'whisper' || type === 'announcement' || Boolean(xuid);
   if (!message && parameters.length) message = parameters.join(' ');
   if (!message) message = ' '; // Keep an otherwise valid empty chat event visible.
 
@@ -282,6 +282,11 @@ function parseBedrockChatPacket(packet: any, usernameForIdentity?: (xuid: string
   const cleanMessage = cleanBedrockFormatting(message);
   const knownRank = rankOnly.test(cleanSource) ? cleanSource : (rankOnly.test(cleanSender) ? cleanSender : null);
   const formattedRankMessage = cleanMessage.match(rankMessage);
+  const sourceLooksLikeUsername = /^[a-zA-Z0-9_]{3,16}$/.test(cleanSource)
+    && !rankOnly.test(cleanSource)
+    && !['SERVER', 'SYSTEM', 'FRESHSMP'].includes(cleanSource.toUpperCase())
+    && Boolean(formattedRankMessage);
+  isPlayerChat = isPlayerChat || sourceLooksLikeUsername;
   if (isPlayerChat && username && (knownRank || formattedRankMessage)) {
     const rank = knownRank || formattedRankMessage?.[1] || '';
     const body = knownRank ? cleanMessage.replace(/^\s*(?:▶|>|:)\s*/, '') : (formattedRankMessage?.[2] || '');
