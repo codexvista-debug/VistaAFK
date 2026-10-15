@@ -40,6 +40,11 @@ node ./scripts/patch-termux-raknet-native.cjs || {
   exit 0
 }
 
+node ./scripts/patch-termux-node-addon-api.cjs || {
+  echo "⚠️ Could not patch node-addon-api for Termux; the daemon will use the JSP RakNet fallback."
+  exit 0
+}
+
 if [ -f "node_modules/cmake-js/bin/cmake-js" ]; then
   CMAKE_JS_BIN="$PWD/node_modules/cmake-js/bin/cmake-js"
 elif [ -f "node_modules/raknet-native/node_modules/cmake-js/bin/cmake-js" ]; then

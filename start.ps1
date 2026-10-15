@@ -11,7 +11,7 @@ param(
 $ErrorActionPreference = "Continue"
 
 Write-Host "=============================================" -ForegroundColor Cyan
-Write-Host "      Starting VistaAFK Daemon v1.2.11 (Windows PC)  " -ForegroundColor Green
+Write-Host "      Starting VistaAFK Daemon v1.2.12 (Windows PC)  " -ForegroundColor Green
 Write-Host "=============================================" -ForegroundColor Cyan
 
 # 1. Terminate any previous instances on port 8080

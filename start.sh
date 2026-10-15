@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "============================================="
-echo "      🚀 Starting VistaAFK Daemon v1.2.11      "
+echo "      🚀 Starting VistaAFK Daemon v1.2.12      "
 echo "============================================="
 
 # 0. Automatically acquire Termux Wake Lock so Android OS never sleeps or throttles daemon
