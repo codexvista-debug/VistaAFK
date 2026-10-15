@@ -12,7 +12,7 @@ import {
   MapPin,
   MessageSquare,
   Settings2,
-  Compass,
+  Eye,
   Package,
   Activity,
   Server,
@@ -20,19 +20,17 @@ import {
   Play,
   Square,
   Users,
-  Bug,
   Gamepad2,
   ArrowDown,
 } from 'lucide-react';
 import Link from 'next/link';
 import { MinecraftChatMessage } from '../../components/MinecraftChatMessage';
-import { XaerosMinimap } from '../../components/XaerosMinimap';
 import { BotInventoryModal } from '../../components/BotInventoryModal';
 import { BotPlayerPov } from '../../components/BotPlayerPov';
 import { AddBotModal } from '../../components/AddBotModal';
 import { BotVisualControlModal } from '../../components/BotVisualControlModal';
 
-type ChatTab = 'settings' | 'logs' | 'chat' | 'map' | 'movement' | 'inventory';
+type ChatTab = 'settings' | 'logs' | 'chat' | 'pov' | 'movement' | 'inventory';
 
 function ChatContent() {
   const searchParams = useSearchParams();
@@ -53,6 +51,7 @@ function ChatContent() {
     lookAt,
     attackBot,
     clickGuiWindowSlot,
+    respondGuiForm,
   } = useVistaWebSocket();
 
   const [selectedBotId, setSelectedBotId] = useState<string>(botIdParam || '');
@@ -120,7 +119,7 @@ function ChatContent() {
     { id: 'settings', label: 'Connection Settings', icon: <Settings2 className="h-4 w-4" /> },
     { id: 'logs', label: 'Player Logs', icon: <Activity className="h-4 w-4" /> },
     { id: 'chat', label: 'Chat', icon: <MessageSquare className="h-4 w-4" /> },
-    { id: 'map', label: 'Map', icon: <Compass className="h-4 w-4" /> },
+    { id: 'pov', label: 'POV', icon: <Eye className="h-4 w-4" /> },
     { id: 'movement', label: 'Movement', icon: <Gamepad2 className="h-4 w-4" /> },
     { id: 'inventory', label: 'Inventory', icon: <Package className="h-4 w-4" /> },
   ];
@@ -380,23 +379,18 @@ function ChatContent() {
             </div>
           )}
 
-          {activeTab === 'map' && (
+          {activeTab === 'pov' && (
             <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 bg-slate-50">
               <div className="max-w-6xl mx-auto space-y-4">
-                <div className="flex items-center justify-between gap-3"><div><h1 className="text-sm font-black text-slate-900">World Map</h1><p className="text-[10px] text-slate-500">Terrain, nearby players, and mobs update with live telemetry.</p></div>{currentConfig && <button onClick={() => setActiveTab('movement')} className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold shadow-md shadow-emerald-900/15 hover:brightness-105"><Gamepad2 className="h-3.5 w-3.5" /> Movement controls</button>}</div>
-                {currentConfig ? <>
-                <BotPlayerPov telemetry={currentTelemetry} isOnline={isOnline} onClickGuiSlot={(slot, mouseButton) => clickGuiWindowSlot(currentConfig.id, slot, mouseButton)} />
-                <div className="grid lg:grid-cols-[minmax(400px,520px)_1fr] gap-5 items-start"><div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><XaerosMinimap telemetry={currentTelemetry} botName={currentConfig.name} large /></div><div className="space-y-4">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4"><h2 className="text-xs font-black uppercase text-slate-700 mb-3 flex items-center gap-2"><Users className="h-4 w-4 text-sky-600" /> Nearby players <span className="text-slate-400">({currentTelemetry?.nearbyPlayers?.length || 0})</span></h2><div className="space-y-2 max-h-64 overflow-y-auto">{(currentTelemetry?.nearbyPlayers || []).length ? currentTelemetry!.nearbyPlayers!.map((player) => <div key={player.username} className="flex justify-between gap-2 text-xs border-b border-slate-100 pb-2"><span className="font-semibold text-slate-800">{player.username}</span><span className="font-mono text-slate-500">{player.distance}m</span></div>) : <p className="text-xs text-slate-400">No nearby players.</p>}</div></div>
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4"><h2 className="text-xs font-black uppercase text-slate-700 mb-3 flex items-center gap-2"><Bug className="h-4 w-4 text-rose-600" /> Nearby mobs <span className="text-slate-400">({currentTelemetry?.nearbyMobs?.length || 0})</span></h2><div className="space-y-2 max-h-64 overflow-y-auto">{(currentTelemetry?.nearbyMobs || []).length ? currentTelemetry!.nearbyMobs!.map((mob) => <div key={mob.id} className="flex justify-between gap-2 text-xs border-b border-slate-100 pb-2"><span className={`font-semibold ${mob.isHostile ? 'text-rose-700' : 'text-emerald-700'}`}>{mob.name}{mob.isHostile ? ' · Hostile' : ''}</span><span className="font-mono text-slate-500">{mob.distance}m</span></div>) : <p className="text-xs text-slate-400">No nearby mobs.</p>}</div></div>
-                </div></div>
-                </> : <EmptyWorkspace message="Select an account to view its map." />}
+                {currentConfig
+                  ? <BotPlayerPov telemetry={currentTelemetry} isOnline={isOnline} onClickGuiSlot={(slot, mouseButton) => clickGuiWindowSlot(currentConfig.id, slot, mouseButton)} onRespondForm={(response) => respondGuiForm(currentConfig.id, response)} />
+                  : <EmptyWorkspace message="Select an account to view its POV." />}
               </div>
             </div>
           )}
 
           {activeTab === 'movement' && (currentConfig
-            ? <BotVisualControlModal embedded config={currentConfig} telemetry={currentTelemetry} daemonConnected={daemonConnected} onClose={() => setActiveTab('map')} onMove={moveBot} onTogglePatrol={togglePatrol} onLook={lookAt} onAttack={attackBot} />
+            ? <BotVisualControlModal embedded config={currentConfig} telemetry={currentTelemetry} daemonConnected={daemonConnected} onClose={() => setActiveTab('pov')} onMove={moveBot} onTogglePatrol={togglePatrol} onLook={lookAt} onAttack={attackBot} />
             : <div className="flex-1 min-h-0"><EmptyWorkspace message="Select an account to open its movement controls." /></div>)}
 
           {activeTab === 'inventory' && (currentConfig

@@ -8,13 +8,14 @@ interface BotPlayerPovProps {
   telemetry?: BotTelemetry;
   isOnline: boolean;
   onClickGuiSlot: (slot: number, mouseButton?: number) => void;
+  onRespondForm: (response: boolean | number | Array<unknown>) => void;
 }
 
 const textureName = (name: string) => name.replace(/^minecraft:/, '').toLowerCase();
 const blockTexture = (name: string) => `https://assets.mcasset.cloud/1.20.4/assets/minecraft/textures/block/${encodeURIComponent(textureName(name))}.png`;
 const itemTexture = (name: string) => `https://assets.mcasset.cloud/1.20.4/assets/minecraft/textures/item/${encodeURIComponent(textureName(name))}.png`;
 
-function GuiSlot({ item, slot, onClick }: { item: InventoryItem | null; slot: number; onClick: () => void }) {
+function GuiSlot({ item, slot, onClick, readOnly }: { item: InventoryItem | null; slot: number; onClick: () => void; readOnly?: boolean }) {
   const details = [item?.displayName, item?.count && item.count > 1 ? `Count: ${item.count}` : '', ...(item?.lore || [])]
     .filter(Boolean)
     .join('\n');
@@ -23,10 +24,10 @@ function GuiSlot({ item, slot, onClick }: { item: InventoryItem | null; slot: nu
     <button
       type="button"
       onClick={onClick}
-      disabled={!item}
+      disabled={!item || readOnly}
       title={details || `Empty slot ${slot + 1}`}
       aria-label={item ? `Click ${item.displayName}, slot ${slot + 1}${item.lore?.length ? `. ${item.lore.join('. ')}` : ''}` : `Empty slot ${slot + 1}`}
-      className={`relative aspect-square min-w-0 rounded-md border p-1 shadow-[inset_1px_1px_0_rgba(255,255,255,.9),inset_-1px_-1px_0_rgba(100,116,139,.28)] transition ${item ? 'border-slate-300 bg-[#d7d9d5] hover:border-emerald-400 hover:bg-white active:translate-y-px' : 'border-slate-200 bg-[#e7e9e5]'} disabled:cursor-default`}
+      className={`relative aspect-square min-w-0 rounded-md border p-1 shadow-[inset_1px_1px_0_rgba(255,255,255,.9),inset_-1px_-1px_0_rgba(100,116,139,.28)] transition ${item && !readOnly ? 'border-slate-300 bg-[#d7d9d5] hover:border-emerald-400 hover:bg-white active:translate-y-px' : 'border-slate-200 bg-[#e7e9e5]'} disabled:cursor-default`}
     >
       {item && <>
         <img
@@ -41,6 +42,55 @@ function GuiSlot({ item, slot, onClick }: { item: InventoryItem | null; slot: nu
         {item.lore?.length ? <span className="absolute left-1 top-1 h-1.5 w-1.5 rounded-full bg-sky-500" aria-hidden="true" /> : null}
       </>}
     </button>
+  );
+}
+
+function BedrockFormView({ window, onRespond }: { window: NonNullable<BotTelemetry['openWindow']>; onRespond: (response: boolean | number | Array<unknown>) => void }) {
+  const elements = window.formElements || [];
+  const [values, setValues] = React.useState<Array<unknown>>(() => elements.map((element) => {
+    if (element.type === 'toggle') return Boolean(element.default);
+    if (element.type === 'slider' || element.type === 'dropdown' || element.type === 'step_slider') return Number(element.default ?? element.min ?? 0);
+    return String(element.default ?? '');
+  }));
+  const setValue = (index: number, value: unknown) => setValues((current) => current.map((item, itemIndex) => itemIndex === index ? value : item));
+
+  return (
+    <div className="mx-auto max-w-2xl p-4 sm:p-8">
+      <div className="overflow-hidden rounded-2xl border border-slate-300 bg-[#e5e7eb] shadow-lg">
+        <div className="border-b border-slate-300 bg-white px-5 py-4">
+          <h3 className="text-base font-bold text-slate-800">{window.title}</h3>
+          {window.formContent && <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{window.formContent}</p>}
+        </div>
+        {window.formType === 'modal' ? (
+          <div className="grid gap-2 p-4 sm:grid-cols-2">
+            <button type="button" onClick={() => onRespond(true)} className="min-h-12 rounded-lg border-2 border-slate-500 bg-slate-200 px-4 py-3 text-sm font-bold text-rose-700 shadow-sm transition hover:bg-white">{window.formButton1 || 'Yes'}</button>
+            <button type="button" onClick={() => onRespond(false)} className="min-h-12 rounded-lg border-2 border-slate-500 bg-slate-200 px-4 py-3 text-sm font-bold text-emerald-700 shadow-sm transition hover:bg-white">{window.formButton2 || 'No'}</button>
+          </div>
+        ) : window.formType === 'simple' ? (
+          <div className="grid gap-2 p-4 sm:grid-cols-2">
+            {(window.formButtons || []).map((button, index) => <button key={`${index}-${button.text}`} type="button" onClick={() => onRespond(index)} className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-800 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50">{button.text}</button>)}
+            {!window.formButtons?.length && <p className="text-xs text-slate-500">This server form did not include any displayable choices.</p>}
+          </div>
+        ) : window.formType === 'custom' ? (
+          <form onSubmit={(event) => { event.preventDefault(); onRespond(values); }} className="space-y-4 p-4">
+            {elements.map((element, index) => (
+              <label key={`${element.type}-${index}`} className="block text-xs font-semibold text-slate-700">
+                {element.type !== 'toggle' && element.type !== 'label' && <span className="mb-1.5 block">{element.text}</span>}
+                {element.type === 'label' && <span className="block font-normal leading-relaxed text-slate-600">{element.text}</span>}
+                {element.type === 'input' && <input value={String(values[index] ?? '')} placeholder={element.placeholder} onChange={(event) => setValue(index, event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500" />}
+                {element.type === 'toggle' && <span className="flex items-center gap-2"><input type="checkbox" checked={Boolean(values[index])} onChange={(event) => setValue(index, event.target.checked)} className="h-4 w-4 accent-emerald-600" />{element.text}</span>}
+                {element.type === 'slider' && <span className="flex items-center gap-3"><input type="range" min={element.min ?? 0} max={element.max ?? 100} step={element.step ?? 1} value={Number(values[index] ?? 0)} onChange={(event) => setValue(index, Number(event.target.value))} className="w-full accent-emerald-600" /><span className="min-w-8 text-right font-mono">{String(values[index] ?? 0)}</span></span>}
+                {(element.type === 'dropdown' || element.type === 'step_slider') && <select value={Number(values[index] ?? 0)} onChange={(event) => setValue(index, Number(event.target.value))} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500">{(element.options || []).map((option, optionIndex) => <option key={`${optionIndex}-${option}`} value={optionIndex}>{option}</option>)}</select>}
+              </label>
+            ))}
+            <button type="submit" className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700">Submit</button>
+          </form>
+        ) : (
+          <div className="p-5 text-sm text-slate-500">This Bedrock form type is not supported yet.</div>
+        )}
+      </div>
+      <p className="mt-3 text-center text-[10px] text-slate-500">Choices are sent back to the server as a Bedrock form response.</p>
+    </div>
   );
 }
 
@@ -85,7 +135,7 @@ function TargetPreview({ telemetry, isOnline }: { telemetry?: BotTelemetry; isOn
   );
 }
 
-export function BotPlayerPov({ telemetry, isOnline, onClickGuiSlot }: BotPlayerPovProps) {
+export function BotPlayerPov({ telemetry, isOnline, onClickGuiSlot, onRespondForm }: BotPlayerPovProps) {
   const window = telemetry?.openWindow;
   const yaw = telemetry?.yaw;
   const pitch = telemetry?.pitch;
@@ -97,7 +147,7 @@ export function BotPlayerPov({ telemetry, isOnline, onClickGuiSlot }: BotPlayerP
           <Camera className="h-4 w-4 text-emerald-600" />
           <div>
             <h2 className="text-xs font-black uppercase tracking-wide text-slate-800">Player POV &amp; Server GUI</h2>
-            <p className="text-[10px] text-slate-500">Live target textures and interactive server menus</p>
+            <p className="text-[10px] text-slate-500">Live Bedrock forms and server inventory menus</p>
           </div>
         </div>
         <span className={`rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-wide ${isOnline ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500'}`}>
@@ -105,24 +155,26 @@ export function BotPlayerPov({ telemetry, isOnline, onClickGuiSlot }: BotPlayerP
         </span>
       </div>
 
-      {window ? (
+      {window?.kind === 'form' ? (
+        <BedrockFormView window={window} onRespond={onRespondForm} />
+      ) : window ? (
         <div className="p-4 sm:p-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2"><MousePointer2 className="h-4 w-4 shrink-0 text-emerald-600" /><h3 className="truncate text-sm font-bold text-slate-800">{window.title}</h3></div>
             <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-[9px] text-slate-500">{window.type}</span>
           </div>
-          <p className="mb-3 text-[10px] text-slate-500">Click a menu item to press it in game. Hover or focus an item to read its lore.</p>
+          <p className="mb-3 text-[10px] text-slate-500">{window.readOnly ? 'Bedrock server inventory menu captured from live packets. Item textures use the default Minecraft assets.' : 'Click a menu item to press it in game. Hover or focus an item to read its lore.'}</p>
           <div className="rounded-xl border border-slate-300 bg-[#c6c8c4] p-2 shadow-inner sm:p-3">
             <div className="grid grid-cols-9 gap-1 sm:gap-1.5">
               {window.slots.map((item, slot) => (
                 <React.Fragment key={`${window.id}-${slot}`}>
                   {slot === window.inventoryStart && slot > 0 && <div className="col-span-9 my-1 h-px bg-slate-400" aria-hidden="true" />}
-                  <GuiSlot item={item} slot={slot} onClick={() => onClickGuiSlot(slot)} />
+                  <GuiSlot item={item} slot={slot} readOnly={window.readOnly} onClick={() => onClickGuiSlot(slot)} />
                 </React.Fragment>
               ))}
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-2 text-[10px] text-emerald-700"><MousePointer2 className="h-3.5 w-3.5" /> Menu slots are live and clickable.</div>
+          {!window.readOnly && <div className="mt-3 flex items-center gap-2 text-[10px] text-emerald-700"><MousePointer2 className="h-3.5 w-3.5" /> Menu slots are live and clickable.</div>}
         </div>
       ) : (
         <div className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_220px] sm:p-5">

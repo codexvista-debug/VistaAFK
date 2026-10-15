@@ -85,6 +85,23 @@ export interface BotGuiWindow {
   id: number;
   title: string;
   type: string;
+  kind?: 'container' | 'form';
+  formType?: 'simple' | 'modal' | 'custom' | 'unknown';
+  formContent?: string;
+  formButtons?: Array<{ text: string; image?: string }>;
+  formButton1?: string;
+  formButton2?: string;
+  formElements?: Array<{
+    type: 'label' | 'input' | 'toggle' | 'slider' | 'step_slider' | 'dropdown';
+    text: string;
+    placeholder?: string;
+    default?: string | number | boolean;
+    min?: number;
+    max?: number;
+    step?: number;
+    options?: string[];
+  }>;
+  readOnly?: boolean;
   slots: Array<InventoryItem | null>;
   inventoryStart?: number;
   inventoryEnd?: number;

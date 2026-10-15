@@ -62,6 +62,23 @@ export interface BotGuiWindow {
   id: number;
   title: string;
   type: string;
+  kind?: 'container' | 'form';
+  formType?: 'simple' | 'modal' | 'custom' | 'unknown';
+  formContent?: string;
+  formButtons?: Array<{ text: string; image?: string }>;
+  formButton1?: string;
+  formButton2?: string;
+  formElements?: Array<{
+    type: 'label' | 'input' | 'toggle' | 'slider' | 'step_slider' | 'dropdown';
+    text: string;
+    placeholder?: string;
+    default?: string | number | boolean;
+    min?: number;
+    max?: number;
+    step?: number;
+    options?: string[];
+  }>;
+  readOnly?: boolean;
   slots: Array<InventoryItem | null>;
   inventoryStart?: number;
   inventoryEnd?: number;
@@ -196,6 +213,7 @@ export type ClientMessage =
   | { type: 'MOVE_INVENTORY_ITEM'; payload: { botId: string; sourceSlot: number; targetSlot: number } }
   | { type: 'SET_QUICK_BAR_SLOT'; payload: { botId: string; slot: number } }
   | { type: 'CLICK_GUI_WINDOW'; payload: { botId: string; slot: number; mouseButton?: number } }
+  | { type: 'RESPOND_GUI_FORM'; payload: { botId: string; response: boolean | number | Array<unknown> } }
   | { type: 'DISCOVER_MICROSOFT_ACCOUNT'; payload?: { email?: string; editionFilter?: string } }
   | { type: 'CANCEL_MICROSOFT_DISCOVERY' }
   | { type: 'LINK_ACCOUNT'; payload: { username: string; password: string; cloudUrl?: string } };

@@ -239,6 +239,12 @@ class BotManager {
             instance.clickGuiWindowSlot(slot, mouseButton);
         }
     }
+    respondGuiForm(botId, response) {
+        const instance = this.bots.get(botId);
+        if (instance) {
+            instance.respondGuiForm(response);
+        }
+    }
     getAllConfigs() {
         return Array.from(this.configs.values());
     }

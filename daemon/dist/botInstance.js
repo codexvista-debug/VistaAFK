@@ -124,6 +124,60 @@ function serializeGuiWindow(window) {
         inventoryEnd: numericOrUndefined(window.inventoryEnd),
     };
 }
+function parseBedrockForm(packet) {
+    const formId = Number(packet?.form_id);
+    if (!Number.isInteger(formId))
+        return null;
+    let form;
+    try {
+        form = typeof packet.data === 'string' ? JSON.parse(packet.data) : packet.data;
+    }
+    catch {
+        return null;
+    }
+    if (!form || typeof form !== 'object' || Array.isArray(form))
+        return null;
+    const formType = form.type === 'form' || form.type === 'simple_form'
+        ? 'simple'
+        : form.type === 'modal'
+            ? 'modal'
+            : form.type === 'custom_form'
+                ? 'custom'
+                : 'unknown';
+    const maxText = (value, fallback = '') => typeof value === 'string' ? value.slice(0, 2000) : fallback;
+    const formButtons = formType === 'simple' && Array.isArray(form.buttons)
+        ? form.buttons.slice(0, 64).map((button) => ({
+            text: maxText(button?.text, 'Select'),
+            image: typeof button?.image?.data === 'string' ? button.image.data.slice(0, 1000) : undefined,
+        }))
+        : undefined;
+    const supportedFields = new Set(['label', 'input', 'toggle', 'slider', 'step_slider', 'dropdown']);
+    const formElements = formType === 'custom' && Array.isArray(form.content)
+        ? form.content.slice(0, 64).filter((element) => supportedFields.has(element?.type)).map((element) => ({
+            type: element.type,
+            text: maxText(element?.text),
+            placeholder: maxText(element?.placeholder, ''),
+            default: typeof element?.default === 'string' || typeof element?.default === 'number' || typeof element?.default === 'boolean' ? element.default : undefined,
+            min: Number.isFinite(Number(element?.min)) ? Number(element.min) : undefined,
+            max: Number.isFinite(Number(element?.max)) ? Number(element.max) : undefined,
+            step: Number.isFinite(Number(element?.step)) ? Number(element.step) : undefined,
+            options: Array.isArray(element?.options) ? element.options.slice(0, 64).map((option) => maxText(option)) : Array.isArray(element?.steps) ? element.steps.slice(0, 64).map((option) => maxText(option)) : undefined,
+        }))
+        : undefined;
+    return {
+        id: formId,
+        title: maxText(form.title, 'Server Menu') || 'Server Menu',
+        type: 'bedrock_form',
+        kind: 'form',
+        formType,
+        formContent: maxText(form.content),
+        formButtons,
+        formButton1: maxText(form.button1, 'Yes'),
+        formButton2: maxText(form.button2, 'No'),
+        formElements,
+        slots: [],
+    };
+}
 function parseMinecraftChat(raw) {
     if (!raw)
         return 'Unknown reason';
@@ -213,6 +267,11 @@ class BotInstance {
     bedrockClient = null;
     bedrockPosition = { x: 0, y: 0, z: 0 };
     bedrockHealth = 20;
+    bedrockGuiWindow = null;
+    bedrockItemNames = new Map();
+    bedrockGuiRawSlots = [];
+    bedrockGuiContainer = { container_id: 'container' };
+    bedrockGuiRequestId = 0;
     tokenFolder;
     constructor(config, callbacks, tokenFolder) {
         this.config = config;
@@ -333,9 +392,10 @@ class BotInstance {
         this.updateStatus('connecting', 'Connecting to Bedrock server...');
         let host = (this.config.host || '').trim();
         let port = this.config.port || 19132;
-        // Auto-map DonutSMP Bedrock server address
-        if (host.toLowerCase().includes('donutsmp.net') && !host.toLowerCase().startsWith('bedrock.')) {
-            host = 'bedrock.donutsmp.net';
+        // DonutSMP's official Bedrock endpoint is donutsmp.net:19132. Normalize
+        // older saved configs that used bedrock.donutsmp.net as well.
+        if (host.toLowerCase().includes('donutsmp.net')) {
+            host = 'donutsmp.net';
             port = 19132;
         }
         else if (host.toLowerCase().includes('freshsmp') && port === 25565) {
@@ -383,6 +443,10 @@ class BotInstance {
                 catch (e) { }
                 this.bedrockClient = null;
             }
+            this.bedrockGuiWindow = null;
+            this.bedrockItemNames.clear();
+            this.bedrockGuiRawSlots = [];
+            this.bedrockGuiContainer = { container_id: 'container' };
             const clientOptions = {
                 host,
                 port,
@@ -469,6 +533,7 @@ class BotInstance {
                 this.emitTelemetry();
             });
             client.on('start_game', (packet) => {
+                this.registerBedrockItemNames(packet?.itemstates);
                 if (packet?.player_position) {
                     this.bedrockPosition = {
                         x: Math.round(packet.player_position.x * 10) / 10,
@@ -477,6 +542,74 @@ class BotInstance {
                     };
                     this.emitTelemetry();
                 }
+            });
+            client.on('item_registry', (packet) => {
+                this.registerBedrockItemNames(packet?.itemstates);
+            });
+            client.on('container_open', (packet) => {
+                const windowId = Number(packet?.window_id);
+                if (!Number.isInteger(windowId))
+                    return;
+                const type = String(packet?.window_type || 'container');
+                const title = type === 'container' ? 'Server Menu' : type.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+                this.bedrockGuiWindow = {
+                    id: windowId,
+                    title,
+                    type,
+                    kind: 'container',
+                    readOnly: false,
+                    slots: [],
+                };
+                this.emitTelemetry();
+            });
+            client.on('inventory_content', (packet) => {
+                const windowId = Number(packet?.window_id);
+                if (!this.bedrockGuiWindow || this.bedrockGuiWindow.kind !== 'container' || this.bedrockGuiWindow.id !== windowId)
+                    return;
+                const items = Array.isArray(packet?.input) ? packet.input : [];
+                this.bedrockGuiRawSlots = [...items];
+                const container = packet?.container;
+                if (container && typeof container.container_id === 'string') {
+                    const dynamicContainerId = container.dynamic_container_id;
+                    this.bedrockGuiContainer = {
+                        container_id: container.container_id,
+                        ...(dynamicContainerId !== undefined && dynamicContainerId !== null && Number.isInteger(Number(dynamicContainerId)) ? { dynamic_container_id: Number(dynamicContainerId) } : {}),
+                    };
+                }
+                this.bedrockGuiWindow = {
+                    ...this.bedrockGuiWindow,
+                    slots: items.map((item, slot) => this.serializeBedrockItem(item, slot)),
+                };
+                this.emitTelemetry();
+            });
+            client.on('inventory_slot', (packet) => {
+                const windowId = Number(packet?.window_id);
+                const slot = Number(packet?.slot);
+                if (!this.bedrockGuiWindow || this.bedrockGuiWindow.kind !== 'container' || this.bedrockGuiWindow.id !== windowId || !Number.isInteger(slot) || slot < 0)
+                    return;
+                const slots = [...this.bedrockGuiWindow.slots];
+                while (this.bedrockGuiRawSlots.length <= slot)
+                    this.bedrockGuiRawSlots.push(null);
+                this.bedrockGuiRawSlots[slot] = packet?.item || null;
+                while (slots.length <= slot)
+                    slots.push(null);
+                slots[slot] = this.serializeBedrockItem(packet?.item, slot);
+                this.bedrockGuiWindow = { ...this.bedrockGuiWindow, slots };
+                this.emitTelemetry();
+            });
+            client.on('container_close', (packet) => {
+                if (this.bedrockGuiWindow?.kind === 'container' && this.bedrockGuiWindow.id === Number(packet?.window_id)) {
+                    this.bedrockGuiWindow = null;
+                    this.bedrockGuiRawSlots = [];
+                    this.emitTelemetry();
+                }
+            });
+            client.on('modal_form_request', (packet) => {
+                const form = parseBedrockForm(packet);
+                if (!form)
+                    return;
+                this.bedrockGuiWindow = form;
+                this.emitTelemetry();
             });
             client.on('move_player', (packet) => {
                 const myId = client.entityId || client.startGameData?.runtime_entity_id;
@@ -538,6 +671,9 @@ class BotInstance {
             });
             client.on('close', () => {
                 this.bedrockClient = null;
+                this.bedrockGuiWindow = null;
+                this.bedrockGuiRawSlots = [];
+                this.emitTelemetry();
                 if (!this.isManuallyStopped) {
                     // Don't start another OAuth flow while the current device code is
                     // awaiting approval, even if an error event changed the status first.
@@ -1634,7 +1770,107 @@ class BotInstance {
             console.error(`[VistaAFK] Failed to set quick bar slot ${slot}:`, err.message);
         }
     }
+    registerBedrockItemNames(itemStates) {
+        if (!Array.isArray(itemStates))
+            return;
+        for (const item of itemStates) {
+            const runtimeId = Number(item?.runtime_id);
+            if (Number.isInteger(runtimeId) && typeof item?.name === 'string') {
+                this.bedrockItemNames.set(runtimeId, item.name.replace(/^minecraft:/, ''));
+            }
+        }
+    }
+    serializeBedrockItem(item, slot) {
+        const networkId = Number(item?.network_id);
+        if (!Number.isInteger(networkId) || networkId === 0 || Number(item?.count) <= 0)
+            return null;
+        const name = this.bedrockItemNames.get(networkId) || `unknown_item_${Math.abs(networkId)}`;
+        const displayName = name.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+        const extra = item?.extra?.value || item?.extra || {};
+        const customName = cleanMinecraftJsonText(extra?.display?.value?.Name?.value || extra?.display_name || '');
+        const rawLore = extra?.display?.value?.Lore?.value;
+        const lore = Array.isArray(rawLore) ? rawLore.map((line) => cleanMinecraftJsonText(line)).filter(Boolean) : [];
+        return {
+            slot,
+            name,
+            displayName: customName || displayName,
+            count: Number(item.count) || 1,
+            customName: customName || undefined,
+            lore: lore.length ? lore : undefined,
+        };
+    }
+    respondGuiForm(response) {
+        if (!this.bedrockClient || this.currentStatus !== 'online' || this.bedrockGuiWindow?.kind !== 'form')
+            return;
+        const window = this.bedrockGuiWindow;
+        if (window.formType === 'modal' && typeof response !== 'boolean')
+            return;
+        if (window.formType === 'simple' && (!Number.isInteger(response) || Number(response) < 0 || Number(response) >= (window.formButtons?.length || 0)))
+            return;
+        if (window.formType === 'custom' && (!Array.isArray(response) || response.length !== (window.formElements?.length || 0)))
+            return;
+        try {
+            this.bedrockClient.queue('modal_form_response', {
+                form_id: window.id,
+                has_response_data: true,
+                data: JSON.stringify(response),
+                has_cancel_reason: false,
+            });
+            this.bedrockGuiWindow = null;
+            this.emitActivity('command', `🖱️ Responded to Bedrock server form: ${window.title}`);
+            this.emitTelemetry();
+        }
+        catch (err) {
+            console.error(`[VistaAFK] Failed to respond to Bedrock server form ${window.id}:`, err?.message || err);
+            this.callbacks.onNotification('error', `Failed to respond to server form: ${err?.message || 'Unknown error'}`, this.config.id);
+        }
+    }
     async clickGuiWindowSlot(slot, mouseButton = 0) {
+        if (this.bedrockClient && this.currentStatus === 'online') {
+            const window = this.bedrockGuiWindow;
+            const item = this.bedrockGuiRawSlots[slot];
+            if (!window || window.kind !== 'container' || !Number.isInteger(slot) || slot < 0 || !item || Number(item.network_id) === 0)
+                return;
+            if (!this.bedrockClient.startGameData?.server_authoritative_inventory) {
+                this.callbacks.onNotification('warn', 'Bedrock menu clicks are not supported by this server inventory mode yet.', this.config.id);
+                return;
+            }
+            try {
+                const sourceContainer = {
+                    container_id: this.bedrockGuiContainer.container_id,
+                    ...(this.bedrockGuiContainer.dynamic_container_id !== undefined ? { dynamic_container_id: this.bedrockGuiContainer.dynamic_container_id } : {}),
+                };
+                this.bedrockGuiRequestId = this.bedrockGuiRequestId >= 0x7ffffffe ? 1 : this.bedrockGuiRequestId + 1;
+                this.bedrockClient.queue('item_stack_request', {
+                    requests: [{
+                            request_id: this.bedrockGuiRequestId,
+                            actions: [{
+                                    type_id: 'take',
+                                    legacy_type_id: 0,
+                                    count: mouseButton === 1 ? Math.max(1, Math.ceil(Number(item.count || 1) / 2)) : Math.max(1, Number(item.count) || 1),
+                                    source: {
+                                        slot_type: sourceContainer,
+                                        slot,
+                                        stack_id: Number(item.stack_id) || 0,
+                                    },
+                                    destination: {
+                                        slot_type: { container_id: 'cursor' },
+                                        slot: 0,
+                                        stack_id: 0,
+                                    },
+                                }],
+                            custom_names: [],
+                            cause: 'chat_public',
+                        }],
+                });
+                this.emitActivity('command', `🖱️ Clicked Bedrock server menu slot ${slot + 1}`);
+            }
+            catch (err) {
+                console.error(`[VistaAFK] Failed to click Bedrock server GUI slot ${slot}:`, err?.message || err);
+                this.callbacks.onNotification('error', `Failed to click Bedrock menu: ${err?.message || 'Unknown error'}`, this.config.id);
+            }
+            return;
+        }
         if (!this.bot || this.currentStatus !== 'online')
             return;
         const window = this.bot.currentWindow;
@@ -1672,7 +1908,7 @@ class BotInstance {
                 gamemode: 'survival',
                 uptimeSeconds: this.connectStartTime ? Math.floor((Date.now() - this.connectStartTime) / 1000) : 0,
                 inventoryCount: 0,
-                openWindow: null,
+                openWindow: this.bedrockGuiWindow,
                 facing: 'North',
                 yaw: 0,
                 pitch: 0,

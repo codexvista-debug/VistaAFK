@@ -267,6 +267,13 @@ export class BotManager {
     }
   }
 
+  public respondGuiForm(botId: string, response: boolean | number | Array<unknown>) {
+    const instance = this.bots.get(botId);
+    if (instance) {
+      instance.respondGuiForm(response);
+    }
+  }
+
   public getAllConfigs(): BotConfig[] {
     return Array.from(this.configs.values());
   }
