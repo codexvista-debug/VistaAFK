@@ -334,6 +334,8 @@ export class BotInstance {
   private bedrockFood: number = 20;
   private bedrockXuidToUsername = new Map<string, string>();
   private bedrockPlatformChatIdToUsername = new Map<string, string>();
+  private bedrockChatPacketStats = { raw: 0, text: 0, player: 0, system: 0 };
+  private bedrockChatStatsLastLoggedAt = 0;
   private bedrockInventoryDiagnosticsLogged = false;
   private bedrockSelectedSlot: number = 0;
   private bedrockInventorySlots: any[] = Array(46).fill(null);
@@ -547,6 +549,8 @@ export class BotInstance {
       this.bedrockMaxHealth = 20;
       this.bedrockXuidToUsername.clear();
       this.bedrockPlatformChatIdToUsername.clear();
+      this.bedrockChatPacketStats = { raw: 0, text: 0, player: 0, system: 0 };
+      this.bedrockChatStatsLastLoggedAt = Date.now();
       this.bedrockInventoryDiagnosticsLogged = false;
 
       const isMobileDaemon = process.env.VISTAAFK_DEVICE_TYPE === 'mobile';
@@ -868,11 +872,18 @@ export class BotInstance {
         }
       });
 
+      client.on('packet', (packet: any) => {
+        if (packet?.data?.name === 'text') this.bedrockChatPacketStats.raw++;
+      });
+
       client.on('text', (packet: any) => {
         const parsed = parseBedrockChatPacket(packet, (xuid, platformChatId) =>
           (xuid ? this.bedrockXuidToUsername.get(xuid.toLowerCase()) : undefined)
           || (platformChatId ? this.bedrockPlatformChatIdToUsername.get(platformChatId.toLowerCase()) : undefined)
         );
+        this.bedrockChatPacketStats.text++;
+        if (parsed.isSystem) this.bedrockChatPacketStats.system++;
+        else this.bedrockChatPacketStats.player++;
         this.callbacks.onChatMessage({
           botId: this.config.id,
           timestamp: Date.now(),
@@ -1582,7 +1593,19 @@ export class BotInstance {
     this.telemetryInterval = setInterval(() => {
       this.emitTelemetry();
       this.checkSurvivalActions();
+      this.logBedrockChatPacketStats();
     }, 2000);
+  }
+
+  private logBedrockChatPacketStats() {
+    if (!this.bedrockClient) return;
+    const now = Date.now();
+    if (now - this.bedrockChatStatsLastLoggedAt < 30000) return;
+    const elapsedSeconds = Math.max(1, Math.round((now - this.bedrockChatStatsLastLoggedAt) / 1000));
+    const { raw, text, player, system } = this.bedrockChatPacketStats;
+    console.log(`[VistaAFK Bedrock] Chat packets for ${this.config.name} (last ${elapsedSeconds}s): raw=${raw}, text-events=${text}, player=${player}, system=${system}`);
+    this.bedrockChatPacketStats = { raw: 0, text: 0, player: 0, system: 0 };
+    this.bedrockChatStatsLastLoggedAt = now;
   }
 
   private emitTelemetry() {
