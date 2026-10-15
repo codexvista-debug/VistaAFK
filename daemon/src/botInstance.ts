@@ -1051,7 +1051,7 @@ export class BotInstance {
     this.bot.on('error', (err: any) => {
       let friendlyMsg = err?.message || 'Connection failed';
       if (friendlyMsg.includes('Failed to obtain profile data') && process.env.VISTAAFK_DEVICE_TYPE === 'mobile') {
-        friendlyMsg = `Termux could not load a Java profile for ${this.config.name}. Sign in to this Microsoft account from Add Account while the Termux daemon is connected; PC Minecraft credentials are stored locally and are not copied to your phone.`;
+        friendlyMsg = `Java authentication failed for ${this.config.name}: Microsoft sign-in completed, but Minecraft did not return a usable Java profile token. Check that Termux is running the latest daemon, then retry the connection.`;
       } else if (friendlyMsg.includes('ECONNREFUSED')) {
         friendlyMsg = `Cannot connect to ${this.config.host}:${this.config.port} — no Minecraft server is running there.`;
       } else if (friendlyMsg.includes('ENOTFOUND')) {
