@@ -96,13 +96,13 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   // If text has § color codes
   if (rawText.includes('§')) {
     return (
-      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-slate-100/70 rounded transition">
+      <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-slate-100/70 rounded transition">
         {showTimestamp && (
           <span className="text-slate-400 text-[10px] shrink-0 select-none">
             [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
           </span>
         )}
-        <span className="break-words select-text">{parseLightMinecraftColorCodes(rawText)}</span>
+        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text">{parseLightMinecraftColorCodes(rawText)}</span>
       </div>
     );
   }
@@ -131,13 +131,13 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
     const parts = formattedDeath.split(/(<CYAN>.*?<\/CYAN>)/g);
 
     return (
-      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-rose-50/50 rounded transition text-rose-600 font-medium">
+      <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-rose-50/50 rounded transition text-rose-600 font-medium">
         {showTimestamp && (
           <span className="text-slate-400 text-[10px] shrink-0 select-none">
             [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
           </span>
         )}
-        <span className="break-words select-text">
+        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text">
           <span className="mr-1 text-rose-500 font-bold">☠</span>
           {parts.map((p, i) => {
             if (p.startsWith('<CYAN>')) {
@@ -160,13 +160,13 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   if (isEconomy) {
     const parts = rawText.split(/(\$[0-9,]+(?:\/each)?)/g);
     return (
-      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-emerald-50/50 rounded transition text-emerald-700 font-medium">
+      <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-emerald-50/50 rounded transition text-emerald-700 font-medium">
         {showTimestamp && (
           <span className="text-slate-400 text-[10px] shrink-0 select-none">
             [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
           </span>
         )}
-        <span className="break-words select-text">
+        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text">
           <span className="mr-1 text-amber-600 font-bold">$</span>
           {parts.map((p, i) => {
             if (p.startsWith('$')) {
@@ -187,13 +187,13 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   const isVault = /Successfully (?:opened|closed) vault|teleported|warp/i.test(rawText);
   if (isVault) {
     return (
-      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-amber-50/50 rounded transition text-amber-700 font-medium">
+      <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-amber-50/50 rounded transition text-amber-700 font-medium">
         {showTimestamp && (
           <span className="text-slate-400 text-[10px] shrink-0 select-none">
             [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
           </span>
         )}
-        <span className="break-words select-text">
+        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text">
           <span className="mr-1">📦</span>
           {rawText}
         </span>
@@ -204,13 +204,13 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   // 4. VistaAFK / System Bot Events (Emerald Green)
   if (message.sender === 'VistaAFK' || message.sender === 'AutoCommand') {
     return (
-      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-emerald-50/50 rounded transition text-emerald-700 font-medium">
+      <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-emerald-50/50 rounded transition text-emerald-700 font-medium">
         {showTimestamp && (
           <span className="text-slate-400 text-[10px] shrink-0 select-none">
             [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
           </span>
         )}
-        <span className="break-words select-text font-bold">{rawText}</span>
+        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text font-bold">{rawText}</span>
       </div>
     );
   }
@@ -225,13 +225,13 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
     const rankColor = LIGHT_RANK_COLORS[rank] || '#475569';
 
     return (
-      <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-slate-100/70 rounded transition">
+      <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-slate-100/70 rounded transition">
         {showTimestamp && (
           <span className="text-slate-400 text-[10px] shrink-0 select-none">
             [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
           </span>
         )}
-        <div className="break-words select-text text-slate-800">
+        <div className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text text-slate-800">
           <span
             className="font-black mr-1 px-1.5 py-0.5 rounded text-[11px]"
             style={{
@@ -257,13 +257,13 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   const senderColor = isServer ? '#d97706' : LIGHT_RANK_COLORS[message.sender.toUpperCase()] || '#0284c7';
 
   return (
-    <div className="font-mono text-xs leading-normal flex items-start space-x-1.5 py-1 px-1.5 hover:bg-slate-100/70 rounded transition text-slate-800">
+    <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-slate-100/70 rounded transition text-slate-800">
       {showTimestamp && (
         <span className="text-slate-400 text-[10px] shrink-0 select-none">
           [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
         </span>
       )}
-      <div className="break-words select-text">
+      <div className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text">
         {message.sender && (
           <span
             className="font-bold mr-1.5"

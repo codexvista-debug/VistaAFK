@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "============================================="
-echo "      🚀 Starting VistaAFK Daemon v1.2.9      "
+echo "      🚀 Starting VistaAFK Daemon v1.2.10      "
 echo "============================================="
 
 # 1. Kill any existing zombie processes
@@ -48,6 +48,7 @@ node ./scripts/patch-mobile-raknet.cjs || {
   echo "❌ Could not prepare the Termux Bedrock transport; daemon was not started."
   exit 1
 }
+bash ./scripts/prepare-mobile-raknet.sh
 
 # Rebuild every time so git-pulled daemon fixes are actually used.
 if [ ! -x "node_modules/.bin/tsc" ]; then

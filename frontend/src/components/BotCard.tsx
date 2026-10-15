@@ -452,11 +452,11 @@ export const BotCard: React.FC<BotCardProps> = ({
                   </div>
                 ) : (
                   recentActivities.map((act) => (
-                    <div key={act.id} className="flex items-start space-x-1.5 text-slate-300">
+                    <div key={act.id} className="flex min-w-0 items-start gap-1.5 text-slate-300">
                       <span className="text-slate-500 shrink-0 text-[10px]">
                         {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </span>
-                      <span className="break-all text-slate-200">{act.message}</span>
+                      <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] text-slate-200">{act.message}</span>
                     </div>
                   ))
                 )}

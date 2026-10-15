@@ -115,13 +115,13 @@ function ChatContent() {
   const displayHearts = rawHearts;
   const displayMaxHearts = Math.max(rawHearts, rawMaxHearts || 10);
 
-  const tabs: Array<{ id: ChatTab; label: string; icon: React.ReactNode }> = [
-    { id: 'settings', label: 'Connection Settings', icon: <Settings2 className="h-4 w-4" /> },
-    { id: 'logs', label: 'Player Logs', icon: <Activity className="h-4 w-4" /> },
-    { id: 'chat', label: 'Chat', icon: <MessageSquare className="h-4 w-4" /> },
-    { id: 'pov', label: 'POV', icon: <Eye className="h-4 w-4" /> },
-    { id: 'movement', label: 'Movement', icon: <Gamepad2 className="h-4 w-4" /> },
-    { id: 'inventory', label: 'Inventory', icon: <Package className="h-4 w-4" /> },
+  const tabs: Array<{ id: ChatTab; label: string; shortLabel: string; icon: React.ReactNode }> = [
+    { id: 'settings', label: 'Connection Settings', shortLabel: 'Settings', icon: <Settings2 className="h-4 w-4" /> },
+    { id: 'logs', label: 'Player Logs', shortLabel: 'Logs', icon: <Activity className="h-4 w-4" /> },
+    { id: 'chat', label: 'Chat', shortLabel: 'Chat', icon: <MessageSquare className="h-4 w-4" /> },
+    { id: 'pov', label: 'POV', shortLabel: 'POV', icon: <Eye className="h-4 w-4" /> },
+    { id: 'movement', label: 'Movement', shortLabel: 'Move', icon: <Gamepad2 className="h-4 w-4" /> },
+    { id: 'inventory', label: 'Inventory', shortLabel: 'Items', icon: <Package className="h-4 w-4" /> },
   ];
 
   const formatLogTime = (timestamp: number) => new Date(timestamp).toLocaleTimeString([], {
@@ -129,27 +129,27 @@ function ChatContent() {
   });
 
   return (
-    <div className="h-screen flex flex-col bg-transparent text-slate-800 font-sans">
+    <div className="h-[100dvh] min-h-[100svh] flex flex-col bg-transparent text-slate-800 font-sans">
       {/* Light-Themed Top Bar */}
-      <header className="h-16 px-6 border-b border-white/80 bg-white/85 backdrop-blur-xl flex items-center justify-between shadow-[0_8px_28px_-20px_rgba(15,23,42,0.45)]">
-        <div className="flex items-center space-x-4">
+      <header className="shrink-0 px-3 py-2 sm:h-16 sm:px-6 border-b border-white/80 bg-white/85 backdrop-blur-xl flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between shadow-[0_8px_28px_-20px_rgba(15,23,42,0.45)]">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
           <Link
             href="/"
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-300 transition"
+            className="shrink-0 flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-300 transition"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Dashboard</span>
           </Link>
 
-          <div className="h-5 w-px bg-slate-200" />
+          <div className="hidden sm:block h-5 w-px bg-slate-200" />
 
           {/* Account Selector */}
-          <div className="flex items-center space-x-2">
-            <span className="text-xs font-bold text-slate-600">Account:</span>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="hidden sm:inline text-xs font-bold text-slate-600">Account:</span>
             <select
               value={selectedBotId}
               onChange={(e) => setSelectedBotId(e.target.value)}
-              className="bg-white border-2 border-slate-300 text-slate-900 text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none focus:border-emerald-600 shadow-xs"
+              className="min-w-0 w-full sm:w-auto max-w-full bg-white border-2 border-slate-300 text-slate-900 text-xs font-bold rounded-xl px-2 sm:px-3 py-1.5 focus:outline-none focus:border-emerald-600 shadow-xs"
             >
               {configs.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -176,7 +176,7 @@ function ChatContent() {
 
         {/* Live Bot Stats in Header */}
         {currentConfig && (
-          <div className="flex items-center space-x-4 text-xs font-mono">
+          <div className="flex w-full items-center justify-between gap-2 text-[10px] font-mono sm:w-auto sm:justify-end sm:gap-4 sm:text-xs">
             <div className="flex items-center space-x-1.5 text-rose-600 font-bold">
               <Heart className="h-4 w-4 fill-current" />
               <span>{isOnline ? `${displayHearts} / ${displayMaxHearts} HP` : '--'}</span>
@@ -207,8 +207,8 @@ function ChatContent() {
       </header>
 
       {/* Workspace with persistent left navigation */}
-      <main className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden max-w-7xl w-full mx-auto p-3 sm:p-5 gap-4">
-        <nav aria-label="Bot workspace sections" className="shrink-0 md:w-60 flex md:flex-col gap-1.5 overflow-x-auto md:overflow-y-auto p-2 bg-white/75 backdrop-blur-xl border border-white/90 rounded-[1.5rem] shadow-[0_18px_48px_-26px_rgba(15,23,42,0.34)] ring-1 ring-slate-900/5">
+      <main className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden max-w-7xl w-full mx-auto p-2 sm:p-5 gap-2 sm:gap-4">
+        <nav aria-label="Bot workspace sections" className="mobile-scrollbar-hidden shrink-0 md:w-60 flex md:flex-col gap-1 overflow-x-auto md:overflow-y-auto p-1.5 sm:p-2 bg-white/75 backdrop-blur-xl border border-white/90 rounded-2xl md:rounded-[1.5rem] shadow-[0_18px_48px_-26px_rgba(15,23,42,0.34)] ring-1 ring-slate-900/5">
           <div className="hidden md:flex items-center gap-3 px-3 py-4 mb-1 border-b border-slate-200/70">
             <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-900/15"><Terminal className="h-4 w-4" /></div>
             <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-800">Bot Workspace</p><p className="truncate text-[10px] text-slate-500">{currentConfig?.name || 'Select an account'}</p></div>
@@ -219,9 +219,9 @@ function ChatContent() {
               type="button"
               onClick={() => setActiveTab(tab.id)}
               aria-current={activeTab === tab.id ? 'page' : undefined}
-              className={`group shrink-0 md:w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${activeTab === tab.id ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-900/15 ring-1 ring-emerald-500/50' : 'text-slate-600 hover:bg-slate-100/90 hover:text-slate-950 hover:translate-x-0.5'}`}
+              className={`group shrink-0 md:w-full flex items-center gap-1.5 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-bold transition-all ${activeTab === tab.id ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-900/15 ring-1 ring-emerald-500/50' : 'text-slate-600 hover:bg-slate-100/90 hover:text-slate-950 hover:translate-x-0.5'}`}
             >
-              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors ${activeTab === tab.id ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-emerald-700'}`}>{tab.icon}</span><span className="whitespace-nowrap">{tab.label}</span>
+              <span className={`grid h-7 w-7 sm:h-8 sm:w-8 shrink-0 place-items-center rounded-lg transition-colors ${activeTab === tab.id ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-emerald-700'}`}>{tab.icon}</span><span className="whitespace-nowrap"><span className="md:hidden">{tab.shortLabel}</span><span className="hidden md:inline">{tab.label}</span></span>
               {tab.id === 'logs' && playerLogs.length > 0 && <span className={`ml-auto rounded-full px-1.5 py-0.5 text-[9px] ${activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{playerLogs.length}</span>}
             </button>
           ))}
@@ -234,13 +234,13 @@ function ChatContent() {
         <section className="flex-1 min-w-0 min-h-0 flex flex-col bg-white/90 backdrop-blur-xl border border-white rounded-[1.5rem] overflow-hidden shadow-[0_20px_56px_-30px_rgba(15,23,42,0.34)] ring-1 ring-slate-900/5">
           {activeTab === 'chat' && <>
           {/* Sub Header */}
-          <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+          <div className="px-3 py-3 sm:px-5 border-b border-slate-200 bg-slate-50 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
               <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <Terminal className="h-4 w-4 stroke-[2.5]" />
               </div>
-              <div>
-                <span className="font-black text-slate-900 text-xs uppercase tracking-wide">
+              <div className="min-w-0">
+                <span className="block truncate font-black text-slate-900 text-xs uppercase tracking-wide">
                   {currentConfig?.name || 'No Bot Selected'} &bull; Live Game Console
                 </span>
                 <p className="text-[10px] text-slate-500 font-mono font-medium">
@@ -250,7 +250,7 @@ function ChatContent() {
             </div>
 
             {/* Filter buttons */}
-            <div className="bg-slate-200/80 p-0.5 rounded-lg border border-slate-300 text-xs flex font-bold">
+            <div className="bg-slate-200/80 p-0.5 rounded-lg border border-slate-300 text-xs flex font-bold self-start sm:self-auto">
               <button
                 onClick={() => setFilter('all')}
                 className={`px-3 py-1 rounded-md transition ${
@@ -279,7 +279,7 @@ function ChatContent() {
           </div>
 
           {/* Quick Commands */}
-          <div className="px-5 py-2.5 bg-slate-100/70 border-b border-slate-200 flex items-center space-x-2 overflow-x-auto text-xs">
+          <div className="mobile-scrollbar-hidden px-3 sm:px-5 py-2.5 bg-slate-100/70 border-b border-slate-200 flex items-center space-x-2 overflow-x-auto text-xs">
             <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Quick:</span>
             {['/afk', '/lifesteal', '/home', '/spawn', '/tpa accept', '/help', '/resourcepack', '/tpahereaccept', '/tpdeny'].map((cmd) => (
               <button
@@ -294,7 +294,7 @@ function ChatContent() {
           </div>
 
           {/* Light-Mode Chat Terminal Box */}
-          <div className="flex-1 p-5 overflow-y-auto bg-[#f8fafc] flex flex-col space-y-0.5">
+          <div className="flex-1 min-h-0 min-w-0 p-3 sm:p-5 overflow-y-auto bg-[#f8fafc] flex flex-col space-y-0.5">
             {filteredLogs.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2">
                 <MessageSquare className="h-10 w-10 stroke-[1.5]" />
@@ -310,23 +310,23 @@ function ChatContent() {
           </div>
 
           {/* Send Input Bar */}
-          <form onSubmit={handleSend} className="p-3.5 border-t border-slate-200 bg-slate-50 flex items-center space-x-2">
+          <form onSubmit={handleSend} className="p-2.5 sm:p-3.5 border-t border-slate-200 bg-slate-50 flex min-w-0 items-center gap-1.5 sm:gap-2">
             <span className="text-emerald-600 font-mono font-bold text-sm px-1">&gt;</span>
             <input
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               disabled={!isOnline}
-              placeholder={isOnline ? 'Type a chat message or server command (e.g. /spawn, /lifesteal)...' : 'Connect bot to chat'}
-              className="flex-1 bg-white border border-slate-300 focus:border-emerald-600 focus:outline-none rounded-xl px-4 py-2.5 text-xs text-slate-900 font-mono placeholder-slate-400 disabled:opacity-50 shadow-xs"
+              placeholder={isOnline ? 'Message or command…' : 'Connect bot to chat'}
+              className="min-w-0 flex-1 bg-white border border-slate-300 focus:border-emerald-600 focus:outline-none rounded-xl px-2.5 sm:px-4 py-2.5 text-xs text-slate-900 font-mono placeholder-slate-400 disabled:opacity-50 shadow-xs"
             />
             <button
               type="submit"
               disabled={!isOnline || !inputMessage.trim()}
-              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition flex items-center space-x-2 shadow-sm font-mono"
+              className="px-3 sm:px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition flex items-center gap-2 shadow-sm font-mono"
             >
               <Send className="h-4 w-4" />
-              <span>Send</span>
+              <span className="hidden sm:inline">Send</span>
             </button>
           </form>
           </>}
@@ -366,13 +366,13 @@ function ChatContent() {
 
           {activeTab === 'logs' && (
             <div className="flex-1 min-h-0 flex flex-col bg-[#f8fafc]">
-              <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3"><div><h1 className="text-sm font-black text-slate-900">Player Logs & Activity</h1><p className="text-[10px] text-slate-500">Live connection, survival, and command events</p></div><div className="flex items-center gap-3"><span className="text-[10px] font-mono text-slate-500">{playerLogs.length} events</span><button type="button" onClick={() => setPlayerLogsAutoScroll((value) => !value)} aria-pressed={playerLogsAutoScroll} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold transition ${playerLogsAutoScroll ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-100'}`} title={playerLogsAutoScroll ? 'Pause automatic scrolling' : 'Resume automatic scrolling'}><ArrowDown className="h-3 w-3" /> Auto-scroll {playerLogsAutoScroll ? 'On' : 'Off'}</button></div></div>
-              <div ref={playerLogsRef} className="flex-1 overflow-y-auto p-4 space-y-2">
+              <div className="px-3 py-3 sm:px-5 sm:py-4 border-b border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-2"><div className="min-w-0"><h1 className="text-sm font-black text-slate-900">Player Logs & Activity</h1><p className="text-[10px] text-slate-500">Live connection, survival, and command events</p></div><div className="flex items-center gap-2 sm:gap-3"><span className="text-[10px] font-mono text-slate-500">{playerLogs.length} events</span><button type="button" onClick={() => setPlayerLogsAutoScroll((value) => !value)} aria-pressed={playerLogsAutoScroll} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold transition ${playerLogsAutoScroll ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-100'}`} title={playerLogsAutoScroll ? 'Pause automatic scrolling' : 'Resume automatic scrolling'}><ArrowDown className="h-3 w-3" /> Auto-scroll {playerLogsAutoScroll ? 'On' : 'Off'}</button></div></div>
+              <div ref={playerLogsRef} className="flex-1 min-w-0 overflow-y-auto p-2.5 sm:p-4 space-y-2">
                 {playerLogs.length === 0 ? <EmptyWorkspace message={isOnline ? 'Waiting for player activity…' : 'Connect the bot to start collecting logs.'} /> : playerLogs.map((log) => (
-                  <article key={log.id} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                  <article key={log.id} className="flex flex-wrap sm:flex-nowrap items-start gap-2 sm:gap-3 rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
                     <time className="shrink-0 pt-0.5 text-[10px] font-mono text-slate-400">{formatLogTime(log.timestamp)}</time>
                     <span className="shrink-0 rounded-md border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-slate-600">{log.type.replace('_', ' ')}</span>
-                    <p className="min-w-0 break-words text-xs text-slate-700">{log.message}</p>
+                    <p className="min-w-0 flex-1 basis-full break-words [overflow-wrap:anywhere] text-xs text-slate-700 sm:basis-auto">{log.message}</p>
                   </article>
                 ))}
               </div>
@@ -380,8 +380,8 @@ function ChatContent() {
           )}
 
           {activeTab === 'pov' && (
-            <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 bg-slate-50">
-              <div className="max-w-6xl mx-auto space-y-4">
+            <div className="flex-1 min-h-0 min-w-0 overflow-y-auto p-2.5 sm:p-6 bg-slate-50">
+              <div className="w-full max-w-6xl mx-auto space-y-4">
                 {currentConfig
                   ? <BotPlayerPov telemetry={currentTelemetry} isOnline={isOnline} onClickGuiSlot={(slot, mouseButton) => clickGuiWindowSlot(currentConfig.id, slot, mouseButton)} onRespondForm={(response) => respondGuiForm(currentConfig.id, response)} />
                   : <EmptyWorkspace message="Select an account to view its POV." />}

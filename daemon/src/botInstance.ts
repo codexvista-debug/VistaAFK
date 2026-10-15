@@ -469,18 +469,33 @@ export class BotInstance {
       this.bedrockGuiContainer = { container_id: 'container' };
 
       const isMobileDaemon = process.env.VISTAAFK_DEVICE_TYPE === 'mobile';
+      let mobileRaknetBackend: 'raknet-native' | 'jsp-raknet' = 'jsp-raknet';
+      if (isMobileDaemon) {
+        try {
+          // Prefer the same native RakNet backend used on Windows when the
+          // Termux launcher has built its Android binding. Keep the patched JS
+          // transport as a fallback on devices where native compilation fails.
+          (eval('require'))('raknet-native');
+          mobileRaknetBackend = 'raknet-native';
+        } catch (error: any) {
+          console.warn(`[VistaAFK Mobile] Native RakNet is unavailable; using JSP RakNet fallback: ${error?.message || error}`);
+        }
+        console.log(`[VistaAFK Mobile] Bedrock RakNet backend: ${mobileRaknetBackend}`);
+      }
       const clientOptions: Record<string, unknown> = {
         host,
         port,
         username: this.config.name,
         offline: this.config.authType === 'offline',
         transport: 'raknet',
-        // Termux does not have a compatible raknet-native binary. Keep mobile
-        // on the bundled JS transport and skip its discovery ping, which
-        // bedrock-protocol hard-wires to raknet-native. The mobile launcher
-        // patches jsp-raknet to use the current RakNet protocol and register
-        // its handshake listeners before starting the handshake.
-        ...(isMobileDaemon ? { raknetBackend: 'jsp-raknet', useRaknetWorkers: false, skipPing: true } : {}),
+        // Termux prefers the native backend to match the desktop transport.
+        // When unavailable, use the launcher's protocol-fixed JSP fallback and
+        // skip discovery because bedrock-protocol hard-wires ping to native.
+        ...(isMobileDaemon ? {
+          raknetBackend: mobileRaknetBackend,
+          useRaknetWorkers: false,
+          ...(mobileRaknetBackend === 'jsp-raknet' ? { skipPing: true } : {}),
+        } : {}),
         profilesFolder: tokenFolder,
         connectTimeout: 45000,
         onMsaCode: (data: any) => {

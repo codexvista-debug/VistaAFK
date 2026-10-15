@@ -46,3 +46,12 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #10b981;
 }
+
+.mobile-scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.mobile-scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}

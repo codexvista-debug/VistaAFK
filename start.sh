@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "============================================="
-echo "      🚀 Starting VistaAFK Daemon v1.2.9      "
+echo "      🚀 Starting VistaAFK Daemon v1.2.10      "
 echo "============================================="
 
 # 0. Automatically acquire Termux Wake Lock so Android OS never sleeps or throttles daemon
@@ -72,6 +72,7 @@ node ./scripts/patch-mobile-raknet.cjs || {
   echo "❌ Could not prepare the Termux Bedrock transport; daemon was not started."
   exit 1
 }
+bash ./scripts/prepare-mobile-raknet.sh
 
 # Always compile after pulling updates. Running the old dist files leaves the
 # daemon's telemetry (including inventory enchantments) stale.

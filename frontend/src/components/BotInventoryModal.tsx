@@ -131,7 +131,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
         onDragOver={(e) => handleDragOver(e, slotNumber)}
         onDragLeave={() => setDragOverSlot(null)}
         onDrop={(e) => handleDrop(e, slotNumber)}
-        className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl border-2 flex items-center justify-center cursor-pointer transition-all select-none ${
+        className={`relative w-6 h-6 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl border-2 flex items-center justify-center cursor-pointer transition-all select-none ${
           isMovingThis
             ? 'bg-emerald-100 border-emerald-500 ring-4 ring-emerald-400/60 scale-105 z-20 animate-pulse'
             : isDragOver
@@ -168,7 +168,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
             <img
               src={getItemTextureUrl(item.name)}
               alt={item.displayName}
-              className="w-7 h-7 sm:w-8 sm:h-8 object-contain pixelated drop-shadow-xs"
+              className="w-4 h-4 sm:w-8 sm:h-8 object-contain pixelated drop-shadow-xs"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 if (!target.dataset.triedBlock) {
@@ -287,9 +287,9 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
         )}
 
         {/* Content Body: Split into Equipment/Grid + Item Lore Inspector */}
-        <div className={`${embedded ? 'flex-1 min-h-0 ' : ''}p-4 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-5 overflow-y-auto`}>
+        <div className={`${embedded ? 'flex-1 min-h-0 ' : ''}min-w-0 p-2.5 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-5 overflow-y-auto`}>
           {/* Left 2 Cols: Minecraft Grid Layout */}
-          <div className="md:col-span-2 space-y-4">
+          <div className="min-w-0 md:col-span-2 space-y-3 sm:space-y-4">
             {/* Equipment Row */}
             <div className="p-3.5 bg-slate-50 border-2 border-slate-200 rounded-2xl">
               <span className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-2">
@@ -320,21 +320,21 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
 
             {/* Main Storage (Slots 9 - 35, 3 Rows of 9) */}
             <div className="p-3.5 bg-slate-50 border-2 border-slate-200 rounded-2xl">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex flex-wrap items-center justify-between gap-1 mb-2">
                 <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">
                   Main Inventory (27 Slots)
                 </span>
-                <span className="text-[11px] text-slate-500 font-medium">Click an item to inspect, or drag it to move</span>
+                <span className="hidden sm:inline text-[11px] text-slate-500 font-medium">Click an item to inspect, or drag it to move</span>
               </div>
 
-              <div className="grid grid-cols-9 gap-1 sm:gap-1.5 justify-items-center">
+              <div className="grid grid-cols-9 gap-0.5 sm:gap-1.5 justify-items-center">
                 {Array.from({ length: 27 }, (_, i) => renderSlot(9 + i))}
               </div>
             </div>
 
             {/* Hotbar (Slots 36 - 44, 9 Slots) */}
             <div className="p-3.5 bg-slate-50 border-2 border-slate-200 rounded-2xl">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex flex-wrap items-center justify-between gap-1 mb-2">
                 <div className="flex items-center space-x-1.5">
                   <Swords className="h-3.5 w-3.5 text-emerald-600" />
                   <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
@@ -346,7 +346,7 @@ export const BotInventoryModal: React.FC<BotInventoryModalProps> = ({
                 </span>
               </div>
 
-              <div className="grid grid-cols-9 gap-1 sm:gap-1.5 justify-items-center">
+              <div className="grid grid-cols-9 gap-0.5 sm:gap-1.5 justify-items-center">
                 {Array.from({ length: 9 }, (_, i) => renderSlot(36 + i, undefined, i === selectedHotbarIndex))}
               </div>
             </div>

@@ -253,7 +253,7 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
 
   return (
     <div
-      className={embedded ? 'flex-1 min-h-0 overflow-y-auto' : 'fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto'}
+      className={embedded ? 'min-w-0 flex-1 min-h-0 overflow-y-auto' : 'fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto'}
       onClick={(e) => {
         if (!embedded && e.target === e.currentTarget) onClose();
       }}
@@ -290,9 +290,9 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
         </div>
 
         {/* Content Body: Left Minimap / Right Controls */}
-        <div className={`p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 ${embedded ? 'flex-1' : 'overflow-y-auto'}`}>
+        <div className={`min-w-0 p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 ${embedded ? 'flex-1' : 'overflow-y-auto'}`}>
           {/* LEFT: Xaero's Minimap & Target Block (5 cols) */}
-          <div className="lg:col-span-6 flex flex-col space-y-4">
+          <div className="min-w-0 lg:col-span-6 flex flex-col space-y-4">
             {/* Xaero's Minimap Component */}
             <XaerosMinimap telemetry={telemetry} botName={config.name} />
 
@@ -318,10 +318,10 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
           </div>
 
           {/* RIGHT: Movement and look controls (6 cols) */}
-          <div className="lg:col-span-6 flex flex-col space-y-4">
+          <div className="min-w-0 lg:col-span-6 flex flex-col space-y-4">
             {/* Manual Movement Controls (hold to move, click to step, or press WASD) */}
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
                   Manual Movement (Click, Hold or WASD)
                 </span>
