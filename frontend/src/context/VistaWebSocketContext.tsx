@@ -133,6 +133,8 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const [configs, setConfigs] = useState<BotConfig[]>([]);
   const [telemetry, setTelemetry] = useState<Record<string, BotTelemetry>>({});
   const [chatLogs, setChatLogs] = useState<Record<string, ChatMessage[]>>({});
+  const pendingChatMessagesRef = useRef<ChatMessage[]>([]);
+  const chatFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activityLogs, setActivityLogs] = useState<Record<string, ActivityLog[]>>({});
   const [notifications, setNotifications] = useState<VistaNotification[]>([]);
 
@@ -669,22 +671,36 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
 
             case 'CHAT_MESSAGE': {
               const chat: ChatMessage = msg.payload;
-              setChatLogs((prev) => {
-                const current = prev[chat.botId] || [];
-                const last = current[current.length - 1];
-                if (
-                  last &&
-                  last.message === chat.message &&
-                  last.sender === chat.sender &&
-                  Math.abs(last.timestamp - chat.timestamp) < 2000
-                ) {
-                  return prev;
-                }
-                return {
-                  ...prev,
-                  [chat.botId]: [...current.slice(-150), chat],
-                };
-              });
+              pendingChatMessagesRef.current.push(chat);
+              if (!chatFlushTimerRef.current) {
+                chatFlushTimerRef.current = setTimeout(() => {
+                  chatFlushTimerRef.current = null;
+                  const pending = pendingChatMessagesRef.current.splice(0);
+                  if (!pending.length) return;
+
+                  setChatLogs((prev) => {
+                    let next = prev;
+                    for (const item of pending) {
+                      const current = next[item.botId] || [];
+                      const last = current[current.length - 1];
+                      if (
+                        last &&
+                        last.message === item.message &&
+                        last.sender === item.sender &&
+                        Math.abs(last.timestamp - item.timestamp) < 2000
+                      ) {
+                        continue;
+                      }
+                      if (next === prev) next = { ...prev };
+                      next = {
+                        ...next,
+                        [item.botId]: [...current.slice(-150), item],
+                      };
+                    }
+                    return next;
+                  });
+                }, 50);
+              }
               break;
             }
 

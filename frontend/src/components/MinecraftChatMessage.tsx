@@ -88,6 +88,10 @@ function parseLightMinecraftColorCodes(text: string): React.ReactNode {
   });
 }
 
+function stripMinecraftFormatting(text: string): string {
+  return text.replace(/§[0-9a-fk-orx]/gi, '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+}
+
 export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   message,
   showTimestamp = true,
@@ -96,6 +100,38 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
 
   // Clean out Unicode replacement diamonds frequently sent by custom server resource packs
   rawText = rawText.replace(/[\uFFFD\u25C6\u25C7]/g, '').trim();
+  const cleanText = stripMinecraftFormatting(rawText);
+  const cleanSender = stripMinecraftFormatting(message.sender || '');
+  const rankPrefixMatch = cleanText.match(/^(?:\[?(TITAN|KING|CHAMPION|KNIGHT|EMPEROR|OVERLORD\+{0,2}|LORD|JESTER|MEMBER|VIP\+?|MVP\+?|ADMIN|OWNER|MOD)\]?)\s*(?:▶|>|:)\s*(.*)$/i);
+  const senderIsRank = /^(?:TITAN|KING|CHAMPION|KNIGHT|EMPEROR|OVERLORD\+{0,2}|LORD|JESTER|MEMBER|VIP\+?|MVP\+?|ADMIN|OWNER|MOD)$/i.test(cleanSender);
+  const senderAlreadyShown = cleanText.split(/[\s▶>:]+/).some((token) => token.toLowerCase() === cleanSender.toLowerCase());
+  const showPlayerSender = Boolean(
+    !message.isSystem
+    && cleanSender
+    && !senderIsRank
+    && !['server', 'vistaafk', 'autocommand', 'you'].includes(cleanSender.toLowerCase())
+    && !senderAlreadyShown
+  );
+
+  if (rankPrefixMatch && showPlayerSender) {
+    const rank = rankPrefixMatch[1].toUpperCase();
+    const rankColor = LIGHT_RANK_COLORS[rank] || '#475569';
+    return (
+      <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-slate-100/70 rounded transition">
+        {showTimestamp && (
+          <span className="text-slate-400 text-[10px] shrink-0 select-none">
+            [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
+          </span>
+        )}
+        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text">
+          <span className="font-black mr-1 px-1.5 py-0.5 rounded text-[11px]" style={{ color: rankColor, backgroundColor: rankColor + '15', borderColor: rankColor, borderWidth: 1, borderStyle: 'solid' }}>{rank}</span>
+          <span className="mr-1 font-bold text-slate-900">{cleanSender}</span>
+          <span className="text-slate-400 mr-1.5 font-bold">▶</span>
+          {parseLightMinecraftColorCodes(rankPrefixMatch[2])}
+        </span>
+      </div>
+    );
+  }
 
   // If text has § color codes
   if (rawText.includes('§')) {
@@ -106,7 +142,10 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
             [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
           </span>
         )}
-        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text">{parseLightMinecraftColorCodes(rawText)}</span>
+        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text">
+          {showPlayerSender && <span className="mr-1 font-bold text-sky-700">&lt;{cleanSender}&gt;</span>}
+          {parseLightMinecraftColorCodes(rawText)}
+        </span>
       </div>
     );
   }
@@ -221,7 +260,7 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
 
   // 5. Player Chat with Rank Badges
   // Matches: "TITAN ANK_PATRICK ▶ Check Ank2 orders" or "EMPEROR PluhWalkk ▶ Selling..."
-  const rankMatch = rawText.match(/^(?:\[?(TITAN|KING|CHAMPION|KNIGHT|EMPEROR|OVERLORD\+{0,2}|LORD|JESTER|MEMBER|VIP\+?|MVP\+?|ADMIN|OWNER|MOD)\]?)\s+([a-zA-Z0-9_]{3,16})\s*(?:▶|>|:)\s*(.*)$/i);
+  const rankMatch = rawText.match(/^(?:\[?(TITAN|KING|CHAMPION|KNIGHT|EMPEROR|OVERLORD\+{0,2}|LORD|JESTER|MEMBER|VIP\+?|MVP\+?|ADMIN|OWNER|MOD)\]?)\s+([a-zA-Z0-9_]{3,16})(?:\s+\[[^\]]{1,12}\])?\s*(?:▶|>|:)\s*(.*)$/i);
   if (rankMatch) {
     const rank = rankMatch[1].toUpperCase();
     const username = rankMatch[2];
