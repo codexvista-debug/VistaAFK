@@ -11,7 +11,7 @@ const os_1 = __importDefault(require("os"));
 const ws_1 = require("ws");
 const botManager_js_1 = require("./botManager.js");
 const accountDiscovery_js_1 = require("./accountDiscovery.js");
-exports.DAEMON_VERSION = 'v1.2.7';
+exports.DAEMON_VERSION = 'v1.2.24';
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const SECRET = process.env.VISTAAFK_SECRET || '';
 const HOST = process.env.HOST || '0.0.0.0';
@@ -189,6 +189,9 @@ wss.on('connection', (ws) => {
                     break;
                 case 'CLICK_GUI_WINDOW':
                     botManager.clickGuiWindowSlot(msg.payload.botId, msg.payload.slot, msg.payload.mouseButton ?? 0);
+                    break;
+                case 'CLOSE_GUI_WINDOW':
+                    botManager.closeGuiWindow(msg.payload.botId);
                     break;
                 case 'RESPOND_GUI_FORM':
                     botManager.respondGuiForm(msg.payload.botId, msg.payload.response);

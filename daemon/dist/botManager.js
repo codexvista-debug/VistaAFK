@@ -239,6 +239,12 @@ class BotManager {
             instance.clickGuiWindowSlot(slot, mouseButton);
         }
     }
+    closeGuiWindow(botId) {
+        const instance = this.bots.get(botId);
+        if (instance) {
+            instance.closeGuiWindow();
+        }
+    }
     respondGuiForm(botId, response) {
         const instance = this.bots.get(botId);
         if (instance) {

@@ -11,12 +11,12 @@ const prismarine_auth_1 = require("prismarine-auth");
 function getPrismarineHash(input) {
     return crypto_1.default.createHash('sha1').update(input ?? '', 'binary').digest('hex').substring(0, 6);
 }
-function syncMicrosoftTokens(tokenFolder, sourceId, targetNames) {
+function syncMicrosoftTokens(tokenFolder, sourceId, targetNames, cacheIds = ['msal', 'live']) {
     const sourceHash = getPrismarineHash(sourceId);
-    // Share only the Microsoft sign-in token. Xbox proof keys and edition-specific
-    // Minecraft tokens are bound to a particular Authflow/client and must be issued
-    // again by the Java or Bedrock client that will actually connect.
-    const cacheIds = ['msal', 'live'];
+    // Share Microsoft sign-in credentials by default. Xbox proof keys and Bedrock
+    // credentials are bound to a particular Authflow/client and must be issued
+    // again by the client that will actually connect. A discovered Java profile
+    // token is copied separately to the exact Java account alias below.
     // Expand targetNames with lowercase, uppercase, and trimmed variants
     const expandedTargets = new Set();
     for (const name of targetNames) {
@@ -220,6 +220,18 @@ async function discoverMicrosoftProfiles(tokenFolder, onDeviceCode, email, editi
     if (targetNames.length > 0) {
         syncMicrosoftTokens(tokenFolder, accountId, targetNames);
         syncMicrosoftTokens(tokenFolder, `${accountId}_java`, targetNames);
+    }
+    // Discovery already authenticated this exact Java profile and fetched its
+    // Minecraft Services token. Make that token available under the username
+    // mineflayer uses. This avoids repeating a profile lookup with a newly
+    // constructed Authflow that may not be able to complete on mobile, even
+    // though discovery just proved the account and profile are valid. The token
+    // manager validates its expiry before using it; Xbox and Bedrock caches are
+    // intentionally not shared.
+    if (result.java) {
+        const javaAliases = [result.java.name, result.java.uuid];
+        syncMicrosoftTokens(tokenFolder, accountId, javaAliases, ['mca']);
+        syncMicrosoftTokens(tokenFolder, `${accountId}_java`, javaAliases, ['mca']);
     }
     if (!result.java && !result.bedrock && lookupErrors.length > 0) {
         throw new Error(`Profile lookup failed. ${lookupErrors.join(' | ')}`);

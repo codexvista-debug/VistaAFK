@@ -9,6 +9,7 @@ const node_crypto_1 = require("node:crypto");
 const socks_proxy_agent_1 = require("socks-proxy-agent");
 const terrainMapper_js_1 = require("./terrainMapper.js");
 const path_1 = __importDefault(require("path"));
+const BEDROCK_PLAYER_CONTAINERS = new Set(['armor', 'hotbar_and_inventory', 'hotbar', 'inventory', 'offhand']);
 function romanNumeral(num) {
     const romanMap = [
         [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']
@@ -230,6 +231,51 @@ function parseMinecraftChat(raw) {
     }
     return typeof raw === 'object' ? JSON.stringify(raw) : String(raw);
 }
+function parseBedrockChatPacket(packet) {
+    const type = String(packet?.type || 'system');
+    const source = typeof packet?.source_name === 'string' ? packet.source_name.trim() : '';
+    const rawMessage = typeof packet?.message === 'string' ? packet.message : '';
+    const parameters = Array.isArray(packet?.parameters)
+        ? packet.parameters.map((value) => String(value ?? ''))
+        : [];
+    // Bedrock servers commonly encode player chat as a translation packet rather
+    // than a `chat` packet. Decode those known keys so it appears as player chat
+    // instead of a server/system line containing the untranslated key.
+    let sender = source || 'Server';
+    let message = rawMessage;
+    let translatedPlayerChat = false;
+    if (type === 'translation' && parameters.length >= 2) {
+        if (rawMessage === 'chat.type.text' || rawMessage === 'chat.type.emote') {
+            sender = parameters[0] || sender;
+            message = parameters.slice(1).join(' ');
+            translatedPlayerChat = true;
+        }
+        else if (rawMessage === 'commands.message.display.incoming') {
+            sender = parameters[0] || sender;
+            message = `whispers to you: ${parameters.slice(1).join(' ')}`;
+            translatedPlayerChat = true;
+        }
+        else if (rawMessage === 'commands.message.display.outgoing') {
+            sender = 'You';
+            message = `whisper to ${parameters[0]}: ${parameters.slice(1).join(' ')}`;
+            translatedPlayerChat = true;
+        }
+        else if (parameters.length) {
+            message = `${rawMessage}: ${parameters.join(' ')}`.trim();
+        }
+    }
+    // Preserve the actual chat text for regular Bedrock chat/whisper packets.
+    const isPlayerChat = translatedPlayerChat || type === 'chat' || type === 'whisper';
+    if (!message && parameters.length)
+        message = parameters.join(' ');
+    if (!message)
+        message = ' '; // Keep an otherwise valid empty chat event visible.
+    return {
+        sender: sender || 'Server',
+        message,
+        isSystem: !isPlayerChat,
+    };
+}
 class BotInstance {
     config;
     bot = null;
@@ -259,6 +305,7 @@ class BotInstance {
     lastChatTimestamp = 0;
     lastAntiAfkLogTime = 0;
     isEatingFood = false;
+    lastJavaGuiWindowId = null;
     customMaxHealth = 0;
     terrainGridCache = null;
     terrainGridSampledAt = 0;
@@ -267,6 +314,13 @@ class BotInstance {
     bedrockClient = null;
     bedrockPosition = { x: 0, y: 0, z: 0 };
     bedrockHealth = 20;
+    bedrockMaxHealth = 20;
+    bedrockFood = 20;
+    bedrockInventoryDiagnosticsLogged = false;
+    bedrockSelectedSlot = 0;
+    bedrockInventorySlots = Array(46).fill(null);
+    bedrockLastEatAt = 0;
+    bedrockHandshakeTimeout = null;
     bedrockGuiWindow = null;
     bedrockItemNames = new Map();
     bedrockGuiRawSlots = [];
@@ -370,6 +424,7 @@ class BotInstance {
             }
         }
         try {
+            this.lastJavaGuiWindowId = null;
             this.bot = mineflayer_1.default.createBot(options);
             this.bindBotEvents();
         }
@@ -447,16 +502,41 @@ class BotInstance {
             this.bedrockItemNames.clear();
             this.bedrockGuiRawSlots = [];
             this.bedrockGuiContainer = { container_id: 'container' };
+            this.bedrockInventorySlots = Array(46).fill(null);
+            this.bedrockSelectedSlot = 0;
+            this.bedrockFood = 20;
+            this.bedrockHealth = 20;
+            this.bedrockMaxHealth = 20;
+            this.bedrockInventoryDiagnosticsLogged = false;
             const isMobileDaemon = process.env.VISTAAFK_DEVICE_TYPE === 'mobile';
+            let mobileRaknetBackend = 'jsp-raknet';
+            if (isMobileDaemon) {
+                try {
+                    // Prefer the same native RakNet backend used on Windows when the
+                    // Termux launcher has built its Android binding. Keep the patched JS
+                    // transport as a fallback on devices where native compilation fails.
+                    (eval('require'))('raknet-native');
+                    mobileRaknetBackend = 'raknet-native';
+                }
+                catch (error) {
+                    console.warn(`[VistaAFK Mobile] Native RakNet is unavailable; using JSP RakNet fallback: ${error?.message || error}`);
+                }
+                console.log(`[VistaAFK Mobile] Bedrock RakNet backend: ${mobileRaknetBackend}`);
+            }
             const clientOptions = {
                 host,
                 port,
                 username: this.config.name,
                 offline: this.config.authType === 'offline',
                 transport: 'raknet',
-                // Termux does not have a compatible raknet-native binary. Keep mobile
-                // on the bundled JS transport; desktop platforms use native RakNet.
-                ...(isMobileDaemon ? { raknetBackend: 'jsp-raknet', useRaknetWorkers: false } : {}),
+                // Termux prefers the native backend to match the desktop transport.
+                // When unavailable, use the launcher's protocol-fixed JSP fallback and
+                // skip discovery because bedrock-protocol hard-wires ping to native.
+                ...(isMobileDaemon ? {
+                    raknetBackend: mobileRaknetBackend,
+                    useRaknetWorkers: false,
+                    ...(mobileRaknetBackend === 'jsp-raknet' ? { skipPing: true } : {}),
+                } : {}),
                 profilesFolder: tokenFolder,
                 connectTimeout: 45000,
                 onMsaCode: (data) => {
@@ -503,6 +583,16 @@ class BotInstance {
             // the device code here prevents a later server/network error from being
             // mistaken for an OAuth flow that is still waiting for approval.
             client.once('session', () => {
+                if (this.bedrockHandshakeTimeout)
+                    clearTimeout(this.bedrockHandshakeTimeout);
+                this.bedrockHandshakeTimeout = setTimeout(() => {
+                    if (this.bedrockClient !== client || this.currentStatus === 'online')
+                        return;
+                    const reason = 'Bedrock server handshake timed out after Microsoft sign-in';
+                    this.emitActivity('status', `⏱️ ${reason}; reconnecting...`);
+                    this.updateStatus('error', reason);
+                    client.close();
+                }, 90000);
                 if (this.authCodeInfo) {
                     this.authCodeInfo = undefined;
                     this.updateStatus('connecting', 'Microsoft sign-in complete; joining Bedrock server...');
@@ -510,6 +600,9 @@ class BotInstance {
                 }
             });
             client.on('join', () => {
+                if (this.bedrockHandshakeTimeout)
+                    clearTimeout(this.bedrockHandshakeTimeout);
+                this.bedrockHandshakeTimeout = null;
                 if (client.username && client.username !== this.config.name) {
                     console.log(`[VistaAFK Bedrock] In-game gamertag updated: ${this.config.name} -> ${client.username}`);
                     this.config.name = client.username;
@@ -523,6 +616,9 @@ class BotInstance {
                 this.emitTelemetry();
             });
             client.on('spawn', () => {
+                if (this.bedrockHandshakeTimeout)
+                    clearTimeout(this.bedrockHandshakeTimeout);
+                this.bedrockHandshakeTimeout = null;
                 if (client.username && client.username !== this.config.name) {
                     this.config.name = client.username;
                     this.callbacks.onConfigUpdated?.(this.config);
@@ -551,6 +647,54 @@ class BotInstance {
             client.on('item_registry', (packet) => {
                 this.registerBedrockItemNames(packet?.itemstates);
             });
+            client.on('player_hotbar', (packet) => {
+                const selectedSlot = Number(packet?.selected_slot);
+                if (packet?.select_slot !== false && Number.isInteger(selectedSlot) && selectedSlot >= 0 && selectedSlot <= 8) {
+                    this.bedrockSelectedSlot = selectedSlot;
+                    this.emitTelemetry();
+                }
+            });
+            client.on('update_attributes', (packet) => {
+                if (!Array.isArray(packet?.attributes))
+                    return;
+                const playerRuntimeId = client.entityId ?? client.startGameData?.runtime_entity_id;
+                const packetRuntimeId = packet?.runtime_entity_id;
+                if (playerRuntimeId != null && packetRuntimeId != null && String(playerRuntimeId) !== String(packetRuntimeId))
+                    return;
+                const normalizedName = (attribute) => String(attribute?.name || '')
+                    .toLowerCase()
+                    .replace(/^minecraft:/, '')
+                    .replace(/^player\./, '');
+                const health = packet.attributes.find((attribute) => normalizedName(attribute) === 'health');
+                const healthValue = Number(health?.current);
+                const maxHealth = Number(health?.max);
+                let changed = false;
+                if (Number.isFinite(maxHealth) && maxHealth > 0 && maxHealth <= 2048 && maxHealth !== this.bedrockMaxHealth) {
+                    this.bedrockMaxHealth = maxHealth;
+                    this.bedrockHealth = Math.min(this.bedrockHealth, maxHealth);
+                    changed = true;
+                }
+                if (Number.isFinite(healthValue)) {
+                    const nextHealth = Math.round(Math.max(0, Math.min(this.bedrockMaxHealth, healthValue)) * 10) / 10;
+                    if (nextHealth !== this.bedrockHealth) {
+                        this.bedrockHealth = nextHealth;
+                        changed = true;
+                    }
+                }
+                const hunger = packet.attributes.find((attribute) => normalizedName(attribute) === 'hunger');
+                const foodValue = Number(hunger?.current);
+                if (Number.isFinite(foodValue)) {
+                    const nextFood = Math.max(0, Math.min(20, foodValue));
+                    if (nextFood !== this.bedrockFood) {
+                        this.bedrockFood = nextFood;
+                        changed = true;
+                    }
+                }
+                if (changed) {
+                    this.emitTelemetry();
+                    this.checkSurvivalActions();
+                }
+            });
             client.on('container_open', (packet) => {
                 const windowId = Number(packet?.window_id);
                 if (!Number.isInteger(windowId))
@@ -569,9 +713,19 @@ class BotInstance {
             });
             client.on('inventory_content', (packet) => {
                 const windowId = Number(packet?.window_id);
-                if (!this.bedrockGuiWindow || this.bedrockGuiWindow.kind !== 'container' || this.bedrockGuiWindow.id !== windowId)
-                    return;
+                const containerId = packet?.container?.container_id;
                 const items = Array.isArray(packet?.input) ? packet.input : [];
+                const playerInventoryUpdated = this.updateBedrockPlayerInventory(containerId, items, windowId);
+                if (playerInventoryUpdated && !this.bedrockInventoryDiagnosticsLogged) {
+                    this.bedrockInventoryDiagnosticsLogged = true;
+                    const nonEmpty = items.filter((item) => Number(item?.network_id) !== 0 && Number(item?.count) > 0).length;
+                    console.log(`[VistaAFK Bedrock] Inventory snapshot for ${this.config.name}: container=${String(containerId ?? 'unknown')}, window=${String(packet?.window_id ?? 'unknown')}, slots=${items.length}, non-empty=${nonEmpty}`);
+                }
+                if (this.bedrockGuiWindow?.kind !== 'container' || this.bedrockGuiWindow.id !== windowId) {
+                    if (playerInventoryUpdated)
+                        this.emitTelemetry();
+                    return;
+                }
                 this.bedrockGuiRawSlots = [...items];
                 const container = packet?.container;
                 if (container && typeof container.container_id === 'string') {
@@ -590,8 +744,17 @@ class BotInstance {
             client.on('inventory_slot', (packet) => {
                 const windowId = Number(packet?.window_id);
                 const slot = Number(packet?.slot);
-                if (!this.bedrockGuiWindow || this.bedrockGuiWindow.kind !== 'container' || this.bedrockGuiWindow.id !== windowId || !Number.isInteger(slot) || slot < 0)
+                const containerId = packet?.container?.container_id;
+                const playerInventoryUpdated = this.updateBedrockPlayerInventorySlot(containerId, slot, packet?.item, windowId);
+                if (playerInventoryUpdated && !this.bedrockInventoryDiagnosticsLogged) {
+                    this.bedrockInventoryDiagnosticsLogged = true;
+                    console.log(`[VistaAFK Bedrock] Inventory slot update for ${this.config.name}: container=${String(containerId ?? 'unknown')}, window=${String(packet?.window_id ?? 'unknown')}, slot=${String(packet?.slot ?? 'unknown')}, item=${String(packet?.item?.network_id ?? 'unknown')}x${String(packet?.item?.count ?? 0)}`);
+                }
+                if (this.bedrockGuiWindow?.kind !== 'container' || this.bedrockGuiWindow.id !== windowId || !Number.isInteger(slot) || slot < 0) {
+                    if (playerInventoryUpdated)
+                        this.emitTelemetry();
                     return;
+                }
                 const slots = [...this.bedrockGuiWindow.slots];
                 while (this.bedrockGuiRawSlots.length <= slot)
                     this.bedrockGuiRawSlots.push(null);
@@ -630,19 +793,19 @@ class BotInstance {
                 }
             });
             client.on('set_health', (packet) => {
-                if (typeof packet?.health === 'number') {
-                    this.bedrockHealth = Math.round(packet.health * 10) / 10;
+                const health = Number(packet?.health);
+                if (Number.isFinite(health)) {
+                    this.bedrockHealth = Math.round(Math.max(0, Math.min(this.bedrockMaxHealth, health)) * 10) / 10;
                     this.emitTelemetry();
+                    this.checkSurvivalActions();
                 }
             });
             client.on('text', (packet) => {
-                const msg = packet.message || packet.source_name ? `${packet.source_name}: ${packet.message}` : String(packet);
+                const parsed = parseBedrockChatPacket(packet);
                 this.callbacks.onChatMessage({
                     botId: this.config.id,
                     timestamp: Date.now(),
-                    sender: packet.source_name || 'Server',
-                    message: packet.message || msg,
-                    isSystem: packet.type === 'system' || !packet.source_name,
+                    ...parsed,
                 });
             });
             // Boar's transaction watchdog uses negative NetworkStackLatency timestamps
@@ -675,6 +838,9 @@ class BotInstance {
                 this.callbacks.onNotification('warn', `[${this.config.name}] Server disconnected the Bedrock session: ${bedrockDisconnectReason}`, this.config.id);
             });
             client.on('close', () => {
+                if (this.bedrockHandshakeTimeout)
+                    clearTimeout(this.bedrockHandshakeTimeout);
+                this.bedrockHandshakeTimeout = null;
                 this.bedrockClient = null;
                 this.bedrockGuiWindow = null;
                 this.bedrockGuiRawSlots = [];
@@ -696,6 +862,9 @@ class BotInstance {
                 }
             });
             client.on('error', (err) => {
+                if (this.bedrockHandshakeTimeout)
+                    clearTimeout(this.bedrockHandshakeTimeout);
+                this.bedrockHandshakeTimeout = null;
                 const errorMsg = err?.message || 'Bedrock connection error';
                 console.error(`[VistaAFK Bedrock] Connection error for ${this.config.name} (${host}:${port}):`, err);
                 this.updateStatus('error', errorMsg);
@@ -734,6 +903,7 @@ class BotInstance {
             }
             this.bot = null;
         }
+        this.lastJavaGuiWindowId = null;
         this.updateStatus('offline', 'Disconnected');
         if (this.connectStartTime) {
             this.emitActivity('disconnect', `⏹️ Disconnected by user (Session Uptime: ${uptime})`);
@@ -819,6 +989,7 @@ class BotInstance {
         this.bot.on('windowOpen', (window) => {
             // Mineflayer's window events carry the real server menu (including custom
             // inventory GUIs); expose it so the web control panel can display it.
+            this.lastJavaGuiWindowId = Number.isInteger(window?.id) ? window.id : null;
             const updateTelemetry = () => this.emitTelemetry();
             window?.on?.('updateSlot', updateTelemetry);
             window?.on?.('update', updateTelemetry);
@@ -1002,7 +1173,10 @@ class BotInstance {
         });
         this.bot.on('error', (err) => {
             let friendlyMsg = err?.message || 'Connection failed';
-            if (friendlyMsg.includes('ECONNREFUSED')) {
+            if (friendlyMsg.includes('Failed to obtain profile data') && process.env.VISTAAFK_DEVICE_TYPE === 'mobile') {
+                friendlyMsg = `Java authentication failed for ${this.config.name}: Microsoft sign-in completed, but Minecraft did not return a usable Java profile token. Check that Termux is running the latest daemon, then retry the connection.`;
+            }
+            else if (friendlyMsg.includes('ECONNREFUSED')) {
                 friendlyMsg = `Cannot connect to ${this.config.host}:${this.config.port} — no Minecraft server is running there.`;
             }
             else if (friendlyMsg.includes('ENOTFOUND')) {
@@ -1019,6 +1193,7 @@ class BotInstance {
             const uptime = this.getSessionUptime();
             this.clearTimers();
             this.bot = null;
+            this.lastJavaGuiWindowId = null;
             if (!this.isManuallyStopped) {
                 if (this.connectStartTime) {
                     this.emitActivity('disconnect', `🔴 Disconnected from server (Session Uptime: ${uptime})`);
@@ -1196,6 +1371,10 @@ class BotInstance {
         return 20;
     }
     checkSurvivalActions() {
+        if (this.bedrockClient) {
+            this.checkBedrockAutoEat();
+            return;
+        }
         if (!this.bot)
             return;
         // 1. Auto Totem
@@ -1261,6 +1440,9 @@ class BotInstance {
                         }
                     }
                     if (selectedFood) {
+                        const previousHotbarSlot = Number.isInteger(this.bot.quickBarSlot)
+                            ? this.bot.quickBarSlot
+                            : 0;
                         this.isEatingFood = true;
                         const foodToEat = selectedFood;
                         const foodName = foodToEat.displayName || foodToEat.name;
@@ -1275,12 +1457,15 @@ class BotInstance {
                                 // Eating interrupted or failed
                             }
                             finally {
+                                await this.restoreJavaMainHandAfterEating(previousHotbarSlot);
                                 this.isEatingFood = false;
                                 this.emitTelemetry();
                             }
                         })
                             .catch(() => {
+                            void this.restoreJavaMainHandAfterEating(previousHotbarSlot);
                             this.isEatingFood = false;
+                            this.emitTelemetry();
                         });
                     }
                 }
@@ -1288,6 +1473,33 @@ class BotInstance {
             catch (e) {
                 this.isEatingFood = false;
             }
+        }
+    }
+    async restoreJavaMainHandAfterEating(previousHotbarSlot) {
+        const bot = this.bot;
+        if (!bot || this.currentStatus !== 'online' || !bot.inventory)
+            return;
+        try {
+            if (this.config.farming?.enabled && this.config.farming.autoEquipSword) {
+                const isWeapon = (item) => Boolean(item && (item.name?.includes('sword') || item.name?.includes('axe')));
+                if (isWeapon(bot.heldItem))
+                    return;
+                const hotbarWeapon = Array.from({ length: 9 }, (_, slot) => bot.inventory.slots[36 + slot])
+                    .find(isWeapon);
+                if (hotbarWeapon) {
+                    bot.setQuickBarSlot(hotbarWeapon.slot - 36);
+                    return;
+                }
+                const inventoryWeapon = bot.inventory.items().find(isWeapon);
+                if (inventoryWeapon) {
+                    await bot.equip(inventoryWeapon, 'hand');
+                    return;
+                }
+            }
+            bot.setQuickBarSlot(Math.max(0, Math.min(8, previousHotbarSlot)));
+        }
+        catch (err) {
+            console.warn(`[VistaAFK] Could not restore the preferred main-hand item after eating: ${err?.message || err}`);
         }
     }
     handleReconnect() {
@@ -1740,6 +1952,40 @@ class BotInstance {
         }
     }
     async moveSlotItem(sourceSlot, targetSlot) {
+        if (this.bedrockClient && this.currentStatus === 'online') {
+            const source = this.getBedrockInventoryAddress(sourceSlot);
+            const destination = this.getBedrockInventoryAddress(targetSlot);
+            if (!source || !destination || sourceSlot === targetSlot)
+                return;
+            if (!this.bedrockClient.startGameData?.server_authoritative_inventory) {
+                this.callbacks.onNotification('warn', 'Bedrock inventory moves are not supported by this server inventory mode yet.', this.config.id);
+                return;
+            }
+            try {
+                const sourceItem = this.bedrockInventorySlots[sourceSlot];
+                const destinationItem = this.bedrockInventorySlots[targetSlot];
+                this.bedrockGuiRequestId = this.bedrockGuiRequestId >= 0x7ffffffe ? 1 : this.bedrockGuiRequestId + 1;
+                this.bedrockClient.queue('item_stack_request', {
+                    requests: [{
+                            request_id: this.bedrockGuiRequestId,
+                            actions: [{
+                                    type_id: 'swap',
+                                    legacy_type_id: 0,
+                                    source: { slot_type: { container_id: source.containerId }, slot: source.slot, stack_id: Number(sourceItem?.stack_id) || 0 },
+                                    destination: { slot_type: { container_id: destination.containerId }, slot: destination.slot, stack_id: Number(destinationItem?.stack_id) || 0 },
+                                }],
+                            custom_names: [],
+                            cause: 'chat_public',
+                        }],
+                });
+                this.emitActivity('survival', `📦 Requested Bedrock inventory move from slot #${sourceSlot} to #${targetSlot}`);
+            }
+            catch (err) {
+                console.error(`[VistaAFK] Failed to move Bedrock inventory item:`, err?.message || err);
+                this.callbacks.onNotification('error', `Failed to move inventory item: ${err?.message || 'Unknown error'}`, this.config.id);
+            }
+            return;
+        }
         if (!this.bot || this.currentStatus !== 'online') {
             this.callbacks.onNotification('warn', 'Bot is offline, cannot move items', this.config.id);
             return;
@@ -1765,6 +2011,10 @@ class BotInstance {
         }
     }
     async setQuickBarSlot(slot) {
+        if (this.bedrockClient && this.currentStatus === 'online') {
+            this.selectBedrockHotbarSlot(slot);
+            return;
+        }
         if (!this.bot || this.currentStatus !== 'online')
             return;
         try {
@@ -1783,6 +2033,260 @@ class BotInstance {
             if (Number.isInteger(runtimeId) && typeof item?.name === 'string') {
                 this.bedrockItemNames.set(runtimeId, item.name.replace(/^minecraft:/, ''));
             }
+        }
+    }
+    normalizeBedrockContainerId(containerId, windowId) {
+        if (typeof containerId === 'string') {
+            const normalized = containerId.trim().toLowerCase();
+            if (!/^\d+$/.test(normalized))
+                return BEDROCK_PLAYER_CONTAINERS.has(normalized) ? normalized : null;
+            const mapped = { 6: 'armor', 12: 'hotbar_and_inventory', 28: 'hotbar', 29: 'inventory', 34: 'offhand' };
+            return mapped[Number(normalized)] || null;
+        }
+        if (typeof containerId === 'number') {
+            const mapped = { 6: 'armor', 12: 'hotbar_and_inventory', 28: 'hotbar', 29: 'inventory', 34: 'offhand' };
+            return mapped[containerId] || null;
+        }
+        if (windowId === 0 || windowId === 'inventory')
+            return 'hotbar_and_inventory';
+        return null;
+    }
+    bedrockLogicalSlot(containerId, slot) {
+        if (!Number.isInteger(slot) || slot < 0)
+            return null;
+        if (containerId === 'hotbar_and_inventory') {
+            if (slot <= 8)
+                return 36 + slot;
+            if (slot <= 35)
+                return slot;
+            return null;
+        }
+        if (containerId === 'hotbar')
+            return slot <= 8 ? 36 + slot : null;
+        if (containerId === 'inventory')
+            return slot <= 26 ? 9 + slot : null;
+        if (containerId === 'armor')
+            return slot <= 3 ? 5 + slot : null;
+        if (containerId === 'offhand')
+            return slot === 0 ? 45 : null;
+        return null;
+    }
+    updateBedrockPlayerInventory(containerId, items, windowId) {
+        const normalized = this.normalizeBedrockContainerId(containerId, windowId);
+        if (!normalized || !Array.isArray(items))
+            return false;
+        for (let index = 0; index < items.length; index++) {
+            const logicalSlot = this.bedrockLogicalSlot(normalized, index);
+            if (logicalSlot !== null)
+                this.bedrockInventorySlots[logicalSlot] = items[index] || null;
+        }
+        return true;
+    }
+    updateBedrockPlayerInventorySlot(containerId, slot, item, windowId) {
+        const normalized = this.normalizeBedrockContainerId(containerId, windowId);
+        if (!normalized)
+            return false;
+        const logicalSlot = this.bedrockLogicalSlot(normalized, slot);
+        if (logicalSlot === null)
+            return false;
+        this.bedrockInventorySlots[logicalSlot] = item || null;
+        return true;
+    }
+    getBedrockInventoryAddress(logicalSlot) {
+        if (!Number.isInteger(logicalSlot))
+            return null;
+        if (logicalSlot >= 9 && logicalSlot <= 35)
+            return { containerId: 'hotbar_and_inventory', slot: logicalSlot };
+        if (logicalSlot >= 36 && logicalSlot <= 44)
+            return { containerId: 'hotbar_and_inventory', slot: logicalSlot - 36 };
+        if (logicalSlot >= 5 && logicalSlot <= 8)
+            return { containerId: 'armor', slot: logicalSlot - 5 };
+        if (logicalSlot === 45)
+            return { containerId: 'offhand', slot: 0 };
+        return null;
+    }
+    selectBedrockHotbarSlot(slot) {
+        if (!this.bedrockClient || !Number.isInteger(slot) || slot < 0 || slot > 8)
+            return;
+        const rawItem = this.bedrockInventorySlots[36 + slot] || { network_id: 0, count: 0, metadata: 0, has_stack_id: false, block_runtime_id: 0, extra: { value: {} } };
+        const runtimeId = Number(this.bedrockClient.entityId || this.bedrockClient.startGameData?.runtime_entity_id);
+        if (!Number.isFinite(runtimeId))
+            return;
+        try {
+            this.bedrockClient.queue('mob_equipment', {
+                runtime_entity_id: runtimeId,
+                item: rawItem,
+                slot,
+                selected_slot: slot,
+                window_id: 'inventory',
+            });
+            this.bedrockSelectedSlot = slot;
+            this.emitTelemetry();
+        }
+        catch (err) {
+            console.warn(`[VistaAFK] Could not select Bedrock hotbar slot ${slot}:`, err?.message || err);
+        }
+    }
+    checkBedrockAutoEat() {
+        if (!this.config.survival.autoEat || this.isEatingFood || !this.bedrockClient || this.currentStatus !== 'online')
+            return;
+        if (Date.now() - this.bedrockLastEatAt < 5000)
+            return;
+        const foodPriority = [
+            'golden_carrot', 'cooked_beef', 'steak', 'cooked_porkchop', 'cooked_mutton', 'cooked_salmon', 'cooked_chicken',
+            'baked_potato', 'bread', 'cooked_cod', 'cooked_rabbit', 'apple', 'carrot', 'sweet_berries', 'glow_berries',
+            'melon_slice', 'pumpkin_pie', 'honey_bottle', 'cookie', 'dried_kelp', 'beetroot', 'mushroom_stew',
+            'rabbit_stew', 'beetroot_soup', 'potato', 'beef', 'porkchop', 'mutton', 'chicken', 'salmon', 'cod', 'rabbit',
+        ];
+        const injured = this.bedrockHealth < this.bedrockMaxHealth;
+        const hungry = this.bedrockFood < 20;
+        if (!hungry && !injured)
+            return;
+        const canSwapInventory = Boolean(this.bedrockClient.startGameData?.server_authoritative_inventory);
+        const foodSlots = Array.from({ length: canSwapInventory ? 36 : 9 }, (_, offset) => offset + (canSwapInventory ? 9 : 36));
+        let selectedIndex = -1;
+        if (injured) {
+            selectedIndex = foodSlots.find((index) => {
+                const name = this.serializeBedrockItem(this.bedrockInventorySlots[index], index)?.name;
+                return name === 'golden_apple' || name === 'enchanted_golden_apple';
+            }) ?? -1;
+        }
+        if (selectedIndex < 0 && hungry) {
+            for (const foodName of foodPriority) {
+                selectedIndex = foodSlots.find((index) => this.serializeBedrockItem(this.bedrockInventorySlots[index], index)?.name === foodName) ?? -1;
+                if (selectedIndex >= 0)
+                    break;
+            }
+        }
+        if (selectedIndex < 0)
+            return;
+        const sourceSlot = selectedIndex < 36 ? selectedIndex : null;
+        const selectedItem = this.serializeBedrockItem(this.bedrockInventorySlots[selectedIndex], selectedIndex);
+        if (!selectedItem)
+            return;
+        const previousSlot = this.bedrockSelectedSlot;
+        this.isEatingFood = true;
+        this.bedrockLastEatAt = Date.now();
+        if (sourceSlot !== null) {
+            if (!this.requestBedrockInventorySwap(sourceSlot, 36 + previousSlot)) {
+                this.isEatingFood = false;
+                return;
+            }
+            setTimeout(() => this.beginBedrockEating(36 + previousSlot, previousSlot, previousSlot, sourceSlot, selectedItem.name), 450);
+            return;
+        }
+        const hotbarSlot = selectedIndex - 36;
+        this.selectBedrockHotbarSlot(hotbarSlot);
+        this.beginBedrockEating(selectedIndex, hotbarSlot, previousSlot, null, selectedItem.name);
+    }
+    requestBedrockInventorySwap(sourceSlot, targetSlot) {
+        if (!this.bedrockClient || !this.bedrockClient.startGameData?.server_authoritative_inventory)
+            return false;
+        const source = this.getBedrockInventoryAddress(sourceSlot);
+        const destination = this.getBedrockInventoryAddress(targetSlot);
+        if (!source || !destination || sourceSlot === targetSlot)
+            return false;
+        const sourceItem = this.bedrockInventorySlots[sourceSlot];
+        const destinationItem = this.bedrockInventorySlots[targetSlot];
+        this.bedrockGuiRequestId = this.bedrockGuiRequestId >= 0x7ffffffe ? 1 : this.bedrockGuiRequestId + 1;
+        try {
+            this.bedrockClient.queue('item_stack_request', {
+                requests: [{
+                        request_id: this.bedrockGuiRequestId,
+                        actions: [{
+                                type_id: 'swap',
+                                legacy_type_id: 0,
+                                source: { slot_type: { container_id: source.containerId }, slot: source.slot, stack_id: Number(sourceItem?.stack_id) || 0 },
+                                destination: { slot_type: { container_id: destination.containerId }, slot: destination.slot, stack_id: Number(destinationItem?.stack_id) || 0 },
+                            }],
+                        custom_names: [],
+                        cause: 'chat_public',
+                    }],
+            });
+            return true;
+        }
+        catch (err) {
+            console.warn('[VistaAFK] Bedrock inventory swap failed:', err?.message || err);
+            return false;
+        }
+    }
+    beginBedrockEating(inventorySlot, hotbarSlot, previousSlot, swapBackToSlot, expectedName, retry = 0) {
+        if (!this.bedrockClient || this.currentStatus !== 'online') {
+            this.isEatingFood = false;
+            return;
+        }
+        const rawItem = this.bedrockInventorySlots[inventorySlot];
+        const item = this.serializeBedrockItem(rawItem, inventorySlot);
+        if (!item || !rawItem || item.name !== expectedName) {
+            if (retry < 5 && this.bedrockClient && this.currentStatus === 'online') {
+                setTimeout(() => this.beginBedrockEating(inventorySlot, hotbarSlot, previousSlot, swapBackToSlot, expectedName, retry + 1), 200);
+                return;
+            }
+            if (swapBackToSlot !== null && item?.name === expectedName)
+                this.requestBedrockInventorySwap(36 + hotbarSlot, swapBackToSlot);
+            this.isEatingFood = false;
+            return;
+        }
+        const position = this.bedrockPosition;
+        try {
+            this.bedrockClient.queue('inventory_transaction', {
+                transaction: {
+                    legacy: { legacy_request_id: 0, legacy_transactions: null },
+                    transaction_type: 'item_use',
+                    actions: [],
+                    transaction_data: {
+                        action_type: 'click_air',
+                        trigger_type: 'player_input',
+                        block_position: { x: 0, y: 0, z: 0 },
+                        face: 0xff,
+                        hotbar_slot: hotbarSlot,
+                        hand: 'main_hand',
+                        held_item: rawItem,
+                        player_pos: position,
+                        click_pos: { x: 0, y: 0, z: 0 },
+                        block_runtime_id: 0,
+                        client_prediction: 'success',
+                        client_cooldown_state: 'off',
+                    },
+                },
+            });
+            this.emitActivity('survival', `🍖 Auto-eat: Using ${item.displayName} (HP: ${this.bedrockHealth}/${this.bedrockMaxHealth}, Hunger: ${this.bedrockFood}/20)`);
+            setTimeout(() => {
+                if (!this.bedrockClient || this.currentStatus !== 'online') {
+                    this.isEatingFood = false;
+                    return;
+                }
+                try {
+                    this.bedrockClient.queue('inventory_transaction', {
+                        transaction: {
+                            legacy: { legacy_request_id: 0, legacy_transactions: null },
+                            transaction_type: 'item_release',
+                            actions: [],
+                            transaction_data: {
+                                action_type: 'consume',
+                                hotbar_slot: hotbarSlot,
+                                held_item: rawItem,
+                                head_pos: { x: position.x, y: position.y + 1.62, z: position.z },
+                            },
+                        },
+                    });
+                }
+                catch (err) {
+                    console.warn('[VistaAFK] Bedrock auto-eat release failed:', err?.message || err);
+                }
+                if (swapBackToSlot !== null)
+                    this.requestBedrockInventorySwap(36 + hotbarSlot, swapBackToSlot);
+                if (previousSlot !== hotbarSlot)
+                    this.selectBedrockHotbarSlot(previousSlot);
+                setTimeout(() => {
+                    this.isEatingFood = false;
+                    this.emitTelemetry();
+                }, 500);
+            }, 1700);
+        }
+        catch (err) {
+            this.isEatingFood = false;
+            console.warn('[VistaAFK] Bedrock auto-eat failed:', err?.message || err);
         }
     }
     serializeBedrockItem(item, slot) {
@@ -1828,6 +2332,75 @@ class BotInstance {
         catch (err) {
             console.error(`[VistaAFK] Failed to respond to Bedrock server form ${window.id}:`, err?.message || err);
             this.callbacks.onNotification('error', `Failed to respond to server form: ${err?.message || 'Unknown error'}`, this.config.id);
+        }
+    }
+    async closeGuiWindow() {
+        if (this.bedrockClient && this.currentStatus === 'online') {
+            const window = this.bedrockGuiWindow;
+            if (!window)
+                return;
+            try {
+                if (window.kind === 'form') {
+                    this.bedrockClient.queue('modal_form_response', {
+                        form_id: window.id,
+                        has_response_data: false,
+                        has_cancel_reason: true,
+                        cancel_reason: 0,
+                    });
+                }
+                else {
+                    this.bedrockClient.queue('container_close', {
+                        window_id: window.id,
+                        window_type: window.type || 'container',
+                        server: false,
+                    });
+                }
+                this.bedrockGuiWindow = null;
+                this.bedrockGuiRawSlots = [];
+                this.emitTelemetry();
+            }
+            catch (err) {
+                console.error(`[VistaAFK] Failed to close Bedrock GUI for ${this.config.name}:`, err?.message || err);
+                this.callbacks.onNotification('error', `Failed to close Bedrock menu: ${err?.message || 'Unknown error'}`, this.config.id);
+            }
+            return;
+        }
+        const bot = this.bot;
+        if (!bot || this.currentStatus !== 'online')
+            return;
+        const window = bot.currentWindow;
+        const windowId = window?.id ?? this.lastJavaGuiWindowId;
+        if (typeof windowId !== 'number' || !Number.isInteger(windowId)) {
+            this.emitTelemetry();
+            return;
+        }
+        try {
+            if (window && typeof bot.closeWindow === 'function') {
+                await bot.closeWindow(window);
+            }
+            else {
+                // The dashboard may still show an open-menu snapshot after Mineflayer
+                // has cleared its local window. Send the protocol close using the last
+                // server window id so the menu is closed in-game as well.
+                bot._client.write('close_window', { windowId });
+            }
+            this.lastJavaGuiWindowId = null;
+            this.emitTelemetry();
+            this.emitActivity('status', 'Closed the open server menu');
+        }
+        catch (err) {
+            try {
+                bot._client.write('close_window', { windowId });
+                if (window && bot.currentWindow === window) {
+                    bot.currentWindow = null;
+                    bot.emit('windowClose', window);
+                }
+                this.lastJavaGuiWindowId = null;
+                this.emitTelemetry();
+            }
+            catch { }
+            console.error(`[VistaAFK] Failed to close Java GUI for ${this.config.name}:`, err?.message || err);
+            this.callbacks.onNotification('error', `Failed to close menu: ${err?.message || 'Unknown error'}`, this.config.id);
         }
     }
     async clickGuiWindowSlot(slot, mouseButton = 0) {
@@ -1894,7 +2467,8 @@ class BotInstance {
     getTelemetry() {
         if (this.bedrockClient) {
             const pos = this.bedrockPosition || { x: 0, y: 0, z: 0 };
-            const hp = this.bedrockHealth ?? 20;
+            const hp = this.bedrockHealth ?? this.bedrockMaxHealth;
+            const maxHp = this.bedrockMaxHealth ?? 20;
             const hearts = Math.round((hp / 2) * 10) / 10;
             return {
                 id: this.config.id,
@@ -1903,16 +2477,23 @@ class BotInstance {
                 statusMessage: this.statusMessage,
                 authCodeInfo: this.authCodeInfo,
                 health: hp,
-                maxHealth: 20,
+                maxHealth: maxHp,
                 hearts,
-                maxHearts: 10,
-                food: 20,
+                maxHearts: Math.round((maxHp / 2) * 10) / 10,
+                food: this.bedrockFood,
                 coordinates: pos,
                 dimension: 'overworld',
                 ping: 0,
                 gamemode: 'survival',
                 uptimeSeconds: this.connectStartTime ? Math.floor((Date.now() - this.connectStartTime) / 1000) : 0,
-                inventoryCount: 0,
+                heldItem: this.serializeBedrockItem(this.bedrockInventorySlots[36 + this.bedrockSelectedSlot], 36 + this.bedrockSelectedSlot)?.name,
+                offhandItem: this.serializeBedrockItem(this.bedrockInventorySlots[45], 45)?.name,
+                inventoryCount: this.bedrockInventorySlots.reduce((count, item, slot) => count + (this.serializeBedrockItem(item, slot) ? 1 : 0), 0),
+                inventory: this.bedrockInventorySlots.flatMap((item, slot) => {
+                    const serialized = this.serializeBedrockItem(item, slot);
+                    return serialized ? [serialized] : [];
+                }),
+                selectedSlot: this.bedrockSelectedSlot,
                 openWindow: this.bedrockGuiWindow,
                 facing: 'North',
                 yaw: 0,
@@ -1966,7 +2547,7 @@ class BotInstance {
         const yaw = this.bot.entity.yaw || 0;
         const pitch = this.bot.entity.pitch || 0;
         // Calculate Cardinal direction
-        const deg = (((-yaw * 180 / Math.PI) % 360) + 360) % 360;
+        const deg = (((180 - yaw * 180 / Math.PI) % 360) + 360) % 360;
         let facing = 'South';
         if (deg >= 315 || deg < 45)
             facing = 'South';
@@ -2021,7 +2602,7 @@ class BotInstance {
                     }
                     if (username && username.toLowerCase() !== myUsername) {
                         const entYaw = ent.yaw || 0;
-                        const entDeg = (((-entYaw * 180 / Math.PI) % 360) + 360) % 360;
+                        const entDeg = (((180 - entYaw * 180 / Math.PI) % 360) + 360) % 360;
                         let entFacing = 'South';
                         if (entDeg >= 315 || entDeg < 45)
                             entFacing = 'South';
@@ -2273,6 +2854,8 @@ class BotInstance {
     clearTimers() {
         if (this.reconnectTimeout)
             clearTimeout(this.reconnectTimeout);
+        if (this.bedrockHandshakeTimeout)
+            clearTimeout(this.bedrockHandshakeTimeout);
         if (this.antiAfkInterval)
             clearInterval(this.antiAfkInterval);
         if (this.telemetryInterval)
@@ -2293,6 +2876,7 @@ class BotInstance {
         this.movementTelemetryIntervals.clear();
         this.manualMovementControls.clear();
         this.reconnectTimeout = null;
+        this.bedrockHandshakeTimeout = null;
         this.antiAfkInterval = null;
         this.telemetryInterval = null;
         this.patrolInterval = null;
