@@ -408,6 +408,18 @@ export class BotInstance {
 
       this.bedrockClient = client;
 
+      // bedrock-protocol emits `session` once Microsoft/Xbox authentication has
+      // completed and it is ready to negotiate with the game server. Clearing
+      // the device code here prevents a later server/network error from being
+      // mistaken for an OAuth flow that is still waiting for approval.
+      client.once('session', () => {
+        if (this.authCodeInfo) {
+          this.authCodeInfo = undefined;
+          this.updateStatus('connecting', 'Microsoft sign-in complete; joining Bedrock server...');
+          this.emitActivity('status', '✅ Microsoft sign-in complete; joining the Bedrock server...');
+        }
+      });
+
       client.on('join', () => {
         if ((client as any).username && (client as any).username !== this.config.name) {
           console.log(`[VistaAFK Bedrock] In-game gamertag updated: ${this.config.name} -> ${(client as any).username}`);
@@ -489,8 +501,9 @@ export class BotInstance {
       client.on('close', () => {
         this.bedrockClient = null;
         if (!this.isManuallyStopped) {
-          // If the bot is currently authenticating (waiting for the user to approve the device code on microsoft.com/link), do not aggressively auto-reconnect
-          if (this.currentStatus === 'authenticating' && this.authCodeInfo) {
+          // Don't start another OAuth flow while the current device code is
+          // awaiting approval, even if an error event changed the status first.
+          if (this.authCodeInfo) {
             this.emitActivity('status', `⏳ Awaiting Microsoft authorization: Visit ${this.authCodeInfo.verificationUri} and enter ${this.authCodeInfo.userCode}`);
             return;
           }
@@ -503,6 +516,7 @@ export class BotInstance {
 
       client.on('error', (err: any) => {
         const errorMsg = err?.message || 'Bedrock connection error';
+        console.error(`[VistaAFK Bedrock] Connection error for ${this.config.name} (${host}:${port}):`, err);
         this.updateStatus('error', errorMsg);
         this.emitActivity('status', `⚠️ Bedrock Error: ${errorMsg}`);
       });

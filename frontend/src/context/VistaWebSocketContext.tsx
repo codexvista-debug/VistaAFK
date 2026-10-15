@@ -939,9 +939,9 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     setDiscoveryProfiles(null);
     setDiscoveryError(null);
 
-    // If connected to the AFK daemon, route discovery through the daemon so credentials & MSAL tokens
-    // are stored directly in the daemon's local token folder (Mineflayer cache). This eliminates the
-    // second authentication prompt when connecting to a server!
+    // Microsoft tokens must be cached beside the daemon that will run the bot.
+    // A cloud-only device-code flow can discover profile names, but cannot seed
+    // the local Bedrock token cache and would prompt again when the bot starts.
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       try {
         wsRef.current.send(JSON.stringify({
@@ -953,96 +953,13 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         }));
         return;
       } catch (err: any) {
-        console.warn('[VistaAFK] Daemon discovery trigger failed, falling back to cloud:', err);
+        console.warn('[VistaAFK] Daemon discovery trigger failed:', err);
       }
     }
 
-    try {
-      const res = await fetch('/api/accounts/device-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email ? email.trim() : undefined }),
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to initiate Microsoft device code flow');
-      }
-
-      const data = await res.json();
-      if (!data.success || !data.userCode || !data.deviceCode) {
-        throw new Error(data.error || 'Failed to obtain Microsoft device code');
-      }
-
-      const devCode = {
-        userCode: data.userCode,
-        verificationUri: data.verificationUri,
-        expiresIn: data.expiresIn,
-      };
-      setDiscoveryDeviceCode(devCode);
-      setDiscoveryStatus('waiting_approval');
-
-      const pollStartTime = Date.now();
-      const maxPollTime = (data.expiresIn || 900) * 1000;
-
-      // Poll every 2 seconds for instant account discovery as soon as user approves code
-      pollTimerRef.current = setInterval(async () => {
-        if (Date.now() - pollStartTime > maxPollTime) {
-          if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-          setDiscoveryError('Authentication session timed out. Please try again.');
-          setDiscoveryStatus('error');
-          return;
-        }
-
-        try {
-          const pollRes = await fetch('/api/accounts/poll-token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              deviceCode: data.deviceCode,
-              editionFilter,
-            }),
-          });
-
-          if (!pollRes.ok) return;
-
-          const pollData = await pollRes.json();
-          if (pollData.status === 'pending') {
-            return;
-          }
-
-          if (pollData.status === 'error') {
-            if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-            setDiscoveryError(pollData.error || 'Microsoft authentication failed');
-            setDiscoveryStatus('error');
-            return;
-          }
-
-          if (pollData.status === 'success' && pollData.profiles) {
-            if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-            setDiscoveryProfiles(pollData.profiles);
-            setDiscoveryStatus('success');
-            handleDiscoveredProfiles(pollData.profiles, editionFilter);
-          }
-        } catch (e) {
-          console.warn('[VistaAFK] Polling token error:', e);
-        }
-      }, 2000);
-    } catch (err: any) {
-      console.warn('[VistaAFK] Cloud discovery failed, checking WebSocket daemon...', err);
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        send({
-          type: 'DISCOVER_MICROSOFT_ACCOUNT',
-          payload: {
-            email: email ? email.trim() : undefined,
-            editionFilter,
-          },
-        });
-      } else {
-        setDiscoveryError(err?.message || 'Failed to start Microsoft authentication');
-        setDiscoveryStatus('error');
-      }
-    }
-  }, [handleDiscoveredProfiles]);
+    setDiscoveryError('Connect your PC or Termux daemon first, then retry. Microsoft sign-in must happen on the daemon so the Bedrock bot can reuse its local credentials without asking you to authenticate again.');
+    setDiscoveryStatus('error');
+  }, []);
 
   // Deploy a saved account to a specific server instance
   const deployAccountToServer = (
