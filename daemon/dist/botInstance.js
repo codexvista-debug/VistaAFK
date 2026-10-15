@@ -452,6 +452,11 @@ class BotInstance {
                 port,
                 username: this.config.name,
                 offline: this.config.authType === 'offline',
+                // Termux does not have a compatible raknet-native binary. Keep the
+                // Bedrock client on the bundled JS transport so Android can connect.
+                transport: 'raknet',
+                raknetBackend: 'jsp-raknet',
+                useRaknetWorkers: false,
                 profilesFolder: tokenFolder,
                 connectTimeout: 45000,
                 onMsaCode: (data) => {
