@@ -231,9 +231,12 @@ function parseMinecraftChat(raw) {
     }
     return typeof raw === 'object' ? JSON.stringify(raw) : String(raw);
 }
-function parseBedrockChatPacket(packet) {
+function parseBedrockChatPacket(packet, usernameForIdentity) {
     const type = String(packet?.type || 'system');
     const source = typeof packet?.source_name === 'string' ? packet.source_name.trim() : '';
+    const cleanSource = cleanBedrockFormatting(source);
+    const xuid = normalizeBedrockIdentity(packet?.xuid);
+    const platformChatId = normalizeBedrockIdentity(packet?.platform_chat_id);
     const rawMessage = typeof packet?.message === 'string' ? packet.message : '';
     const parameters = Array.isArray(packet?.parameters)
         ? packet.parameters.map((value) => String(value ?? ''))
@@ -265,16 +268,45 @@ function parseBedrockChatPacket(packet) {
         }
     }
     // Preserve the actual chat text for regular Bedrock chat/whisper packets.
-    const isPlayerChat = translatedPlayerChat || type === 'chat' || type === 'whisper';
+    const isPlayerChat = translatedPlayerChat || type === 'chat' || type === 'whisper' || type === 'announcement' || Boolean(xuid);
     if (!message && parameters.length)
         message = parameters.join(' ');
     if (!message)
         message = ' '; // Keep an otherwise valid empty chat event visible.
+    // Some server chat formats send the rank as source_name and the text as
+    // message, omitting the actual gamertag from the rendered line. Bedrock's
+    // player_list records map that packet XUID back to the player's username.
+    const username = usernameForIdentity?.(xuid, platformChatId);
+    const rankPattern = '(?:TITAN|KING|CHAMPION|KNIGHT|EMPEROR|OVERLORD\\+{0,2}|LORD|JESTER|MEMBER|VIP\\+?|MVP\\+?|ADMIN|OWNER|MOD)';
+    const rankOnly = new RegExp(`^\\[?${rankPattern}\\]?$`, 'i');
+    const rankMessage = new RegExp(`^\\[?(${rankPattern})\\]?\\s*(?:▶|>|:)\\s*(.*)$`, 'i');
+    const cleanSender = cleanBedrockFormatting(sender);
+    const cleanMessage = cleanBedrockFormatting(message);
+    const knownRank = rankOnly.test(cleanSource) ? cleanSource : (rankOnly.test(cleanSender) ? cleanSender : null);
+    const formattedRankMessage = cleanMessage.match(rankMessage);
+    if (isPlayerChat && username && (knownRank || formattedRankMessage)) {
+        const rank = knownRank || formattedRankMessage?.[1] || '';
+        const body = knownRank ? cleanMessage.replace(/^\s*(?:▶|>|:)\s*/, '') : (formattedRankMessage?.[2] || '');
+        sender = '';
+        message = `${rank} ${username} ▶ ${body}`.trim();
+    }
     return {
         sender: sender || 'Server',
         message,
         isSystem: !isPlayerChat,
     };
+}
+function cleanBedrockFormatting(value) {
+    return value
+        .replace(/§[0-9a-fk-orx]/gi, '')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .trim();
+}
+function normalizeBedrockIdentity(value) {
+    const normalized = String(value ?? '').trim().toLowerCase();
+    if (!normalized || /^0+$/.test(normalized))
+        return '';
+    return /^\d+$/.test(normalized) ? normalized.replace(/^0+(?=\d)/, '') : normalized;
 }
 class BotInstance {
     config;
@@ -316,6 +348,10 @@ class BotInstance {
     bedrockHealth = 20;
     bedrockMaxHealth = 20;
     bedrockFood = 20;
+    bedrockXuidToUsername = new Map();
+    bedrockPlatformChatIdToUsername = new Map();
+    bedrockChatPacketStats = { text: 0, player: 0, system: 0 };
+    bedrockChatStatsLastLoggedAt = 0;
     bedrockInventoryDiagnosticsLogged = false;
     bedrockSelectedSlot = 0;
     bedrockInventorySlots = Array(46).fill(null);
@@ -507,6 +543,10 @@ class BotInstance {
             this.bedrockFood = 20;
             this.bedrockHealth = 20;
             this.bedrockMaxHealth = 20;
+            this.bedrockXuidToUsername.clear();
+            this.bedrockPlatformChatIdToUsername.clear();
+            this.bedrockChatPacketStats = { text: 0, player: 0, system: 0 };
+            this.bedrockChatStatsLastLoggedAt = Date.now();
             this.bedrockInventoryDiagnosticsLogged = false;
             const isMobileDaemon = process.env.VISTAAFK_DEVICE_TYPE === 'mobile';
             let mobileRaknetBackend = 'jsp-raknet';
@@ -646,6 +686,26 @@ class BotInstance {
             });
             client.on('item_registry', (packet) => {
                 this.registerBedrockItemNames(packet?.itemstates);
+            });
+            client.on('player_list', (packet) => {
+                const records = Array.isArray(packet?.records) ? packet.records : [];
+                for (const record of records) {
+                    const xuid = normalizeBedrockIdentity(record?.xbox_user_id ?? record?.xuid);
+                    const platformChatId = normalizeBedrockIdentity(record?.platform_chat_id ?? record?.platform_online_id);
+                    const username = String(record?.username ?? record?.player_name ?? record?.name ?? '').trim();
+                    if (String(record?.type).toLowerCase() === 'remove') {
+                        if (xuid)
+                            this.bedrockXuidToUsername.delete(xuid);
+                        if (platformChatId)
+                            this.bedrockPlatformChatIdToUsername.delete(platformChatId);
+                    }
+                    else if (username) {
+                        if (xuid)
+                            this.bedrockXuidToUsername.set(xuid, username);
+                        if (platformChatId)
+                            this.bedrockPlatformChatIdToUsername.set(platformChatId, username);
+                    }
+                }
             });
             client.on('player_hotbar', (packet) => {
                 const selectedSlot = Number(packet?.selected_slot);
@@ -801,7 +861,13 @@ class BotInstance {
                 }
             });
             client.on('text', (packet) => {
-                const parsed = parseBedrockChatPacket(packet);
+                const parsed = parseBedrockChatPacket(packet, (xuid, platformChatId) => (xuid ? this.bedrockXuidToUsername.get(xuid) : undefined)
+                    || (platformChatId ? this.bedrockPlatformChatIdToUsername.get(platformChatId) : undefined));
+                this.bedrockChatPacketStats.text++;
+                if (parsed.isSystem)
+                    this.bedrockChatPacketStats.system++;
+                else
+                    this.bedrockChatPacketStats.player++;
                 this.callbacks.onChatMessage({
                     botId: this.config.id,
                     timestamp: Date.now(),
@@ -1523,7 +1589,20 @@ class BotInstance {
         this.telemetryInterval = setInterval(() => {
             this.emitTelemetry();
             this.checkSurvivalActions();
+            this.logBedrockChatPacketStats();
         }, 2000);
+    }
+    logBedrockChatPacketStats() {
+        if (!this.bedrockClient)
+            return;
+        const now = Date.now();
+        if (now - this.bedrockChatStatsLastLoggedAt < 30000)
+            return;
+        const elapsedSeconds = Math.max(1, Math.round((now - this.bedrockChatStatsLastLoggedAt) / 1000));
+        const { text, player, system } = this.bedrockChatPacketStats;
+        console.log(`[VistaAFK Bedrock] Chat events for ${this.config.name} (last ${elapsedSeconds}s): text=${text}, player=${player}, system=${system}`);
+        this.bedrockChatPacketStats = { text: 0, player: 0, system: 0 };
+        this.bedrockChatStatsLastLoggedAt = now;
     }
     emitTelemetry() {
         this.callbacks.onTelemetryUpdate(this.getTelemetry());
