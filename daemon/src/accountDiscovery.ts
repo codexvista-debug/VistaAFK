@@ -7,9 +7,12 @@ function getPrismarineHash(input: string): string {
   return crypto.createHash('sha1').update(input ?? '', 'binary').digest('hex').substring(0, 6);
 }
 
-function syncTokenCaches(tokenFolder: string, sourceId: string, targetNames: string[]) {
+function syncMicrosoftTokens(tokenFolder: string, sourceId: string, targetNames: string[]) {
   const sourceHash = getPrismarineHash(sourceId);
-  const cacheIds = ['msal', 'live', 'sisu', 'xbl', 'bed', 'mca', 'mcs', 'pfb'];
+  // Share only the Microsoft sign-in token. Xbox proof keys and edition-specific
+  // Minecraft tokens are bound to a particular Authflow/client and must be issued
+  // again by the Java or Bedrock client that will actually connect.
+  const cacheIds = ['msal', 'live'];
   
   // Expand targetNames with lowercase, uppercase, and trimmed variants
   const expandedTargets = new Set<string>();
@@ -62,6 +65,23 @@ export async function discoverMicrosoftProfiles(
   const accountId = 'msa_discovery_' + (email ? email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : 'acc') + '_' + Date.now();
   console.log(`[VistaAFK Discovery] Initiating Microsoft OAuth device code flow for ${email || 'new account'} (filter: ${editionFilter})...`);
 
+  const onMicrosoftCode = (codeData: any) => {
+    const userCode = codeData.user_code || codeData.userCode;
+    const baseUri = codeData.verification_uri || codeData.verificationUri || 'https://www.microsoft.com/link';
+    let directUri = userCode ? `https://www.microsoft.com/link?otc=${encodeURIComponent(userCode)}` : baseUri;
+    if (email && email.trim()) {
+      directUri += `&login_hint=${encodeURIComponent(email.trim())}`;
+    }
+    directUri += `&prompt=select_account`;
+
+    console.log(`[VistaAFK Discovery] Received Device Code: ${userCode} (Link: ${directUri})`);
+    onDeviceCode({
+      userCode,
+      verificationUri: directUri,
+      expiresIn: codeData.expires_in || codeData.expiresIn || 900,
+    });
+  };
+
   const flow = new Authflow(
     accountId,
     tokenFolder,
@@ -70,22 +90,7 @@ export async function discoverMicrosoftProfiles(
       flow: 'live',
       forceRefresh: true,
     },
-    (codeData: any) => {
-      const userCode = codeData.user_code || codeData.userCode;
-      const baseUri = codeData.verification_uri || codeData.verificationUri || 'https://www.microsoft.com/link';
-      let directUri = userCode ? `https://www.microsoft.com/link?otc=${encodeURIComponent(userCode)}` : baseUri;
-      if (email && email.trim()) {
-        directUri += `&login_hint=${encodeURIComponent(email.trim())}`;
-      }
-      directUri += `&prompt=select_account`;
-
-      console.log(`[VistaAFK Discovery] Received Device Code: ${userCode} (Link: ${directUri})`);
-      onDeviceCode({
-        userCode,
-        verificationUri: directUri,
-        expiresIn: codeData.expires_in || codeData.expiresIn || 900,
-      });
-    }
+    onMicrosoftCode
   );
 
   const result: DiscoveredProfiles = {};
@@ -108,28 +113,33 @@ export async function discoverMicrosoftProfiles(
     }
   }
 
-  // 2. Discover Minecraft: Bedrock Edition / Xbox Live Gamertag
+  // 2. Discover the Bedrock profile using Bedrock's own Xbox title. Reuse the
+  // Microsoft device-code token from the Java flow so the user signs in once.
   if (editionFilter === 'both' || editionFilter === 'bedrock' || !result.java) {
     try {
       let gamertag = '';
       let xuid = '';
 
-      // Direct official Bedrock Minecraft token exchange
-      if (typeof (flow as any).getMinecraftBedrockToken === 'function') {
-        try {
-          const keyPair = crypto.generateKeyPairSync('ec', { namedCurve: 'secp384r1' });
-          const clientX509 = keyPair.publicKey.export({ format: 'der', type: 'spki' }).toString('base64');
-          const loginData = await (flow as any).getMinecraftBedrockToken(clientX509);
-          if (Array.isArray(loginData) && loginData.length > 1) {
-            const jwt = loginData[1];
-            const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64').toString());
-            if (payload?.extraData?.displayName) {
-              gamertag = payload.extraData.displayName;
-              xuid = payload.extraData.XUID || '';
-            }
-          }
-        } catch (e: any) {
-          console.warn('[VistaAFK Discovery] Bedrock token exchange error:', e.message);
+      const bedrockAccountId = `${accountId}_bedrock`;
+      syncMicrosoftTokens(tokenFolder, accountId, [bedrockAccountId]);
+      const bedrockFlow = new Authflow(
+        bedrockAccountId,
+        tokenFolder,
+        {
+          authTitle: Titles.MinecraftNintendoSwitch,
+          flow: 'live',
+        },
+        onMicrosoftCode
+      );
+      const keyPair = crypto.generateKeyPairSync('ec', { namedCurve: 'secp384r1' });
+      const clientX509 = keyPair.publicKey.export({ format: 'der', type: 'spki' }).toString('base64');
+      const bedrockChain = await (bedrockFlow as any).getMinecraftBedrockToken(clientX509);
+      const chain = Array.isArray(bedrockChain) ? bedrockChain : bedrockChain?.chain;
+      if (Array.isArray(chain) && chain.length > 1) {
+        const payload = JSON.parse(Buffer.from(chain[1].split('.')[1], 'base64url').toString('utf8'));
+        if (payload?.extraData?.displayName) {
+          gamertag = payload.extraData.displayName;
+          xuid = String(payload.extraData.XUID || '');
         }
       }
 
@@ -145,16 +155,8 @@ export async function discoverMicrosoftProfiles(
     }
   }
 
-  // 3. Fallback: If no custom Mojang Java name found, provide Bedrock gamer profile from email prefix so user is never blocked
-  if (!result.java && !result.bedrock) {
-    const fallbackName = email ? email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '') : 'Player';
-    result.bedrock = {
-      gamertag: fallbackName,
-    };
-    console.log(`[VistaAFK Discovery] Fallback profile created for ${fallbackName}`);
-  }
-
-  // Sync token caches so future bot instances can instantly connect without re-auth
+  // Copy the reusable Microsoft token so both clients can obtain their own
+  // fresh edition-specific credentials without prompting for another sign-in.
   const targetNames = [
     result.java?.name,
     result.java?.uuid,
@@ -164,7 +166,9 @@ export async function discoverMicrosoftProfiles(
   ].filter(Boolean) as string[];
 
   if (targetNames.length > 0) {
-    syncTokenCaches(tokenFolder, accountId, targetNames);
+    for (const sourceId of [accountId, `${accountId}_bedrock`]) {
+      syncMicrosoftTokens(tokenFolder, sourceId, targetNames);
+    }
   }
 
   return result;

@@ -68,7 +68,7 @@ export default function AccountsPage() {
   const [selectedAccountForDeploy, setSelectedAccountForDeploy] = useState<SavedAccount | null>(null);
   const [inventoryModalBot, setInventoryModalBot] = useState<BotConfig | null>(null);
 
-  // New Account Form State (Microsoft Java OAuth)
+  // New Account Form State (Microsoft OAuth)
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedIncognito, setCopiedIncognito] = useState(false);
   const popupRef = React.useRef<Window | null>(null);
@@ -144,7 +144,7 @@ export default function AccountsPage() {
   };
 
   const handleAddAccountSubmit = () => {
-    // Direct Microsoft Connect: Official Minecraft Java Edition
+    // One Microsoft sign-in discovers both Minecraft editions when they are available.
     const popup = window.open('about:blank', 'ms_oauth_popup', 'width=520,height=680,scrollbars=yes,resizable=yes');
     if (popup) {
       try {
@@ -173,13 +173,13 @@ export default function AccountsPage() {
       popupRef.current = popup;
     }
 
-    discoverMicrosoftAccount(undefined, 'java');
+    discoverMicrosoftAccount(undefined, 'both');
   };
 
   const handleOpenDeploy = (account: SavedAccount) => {
     setSelectedAccountForDeploy(account);
     setTargetServerHost('play.freshsmp.fun');
-    setTargetServerPort(25565);
+    setTargetServerPort(account.edition === 'bedrock' ? 19132 : 25565);
     setSelectedPresetId('freshsmp');
     setTargetServerVersion('');
     setIsDeployModalOpen(true);
@@ -193,7 +193,7 @@ export default function AccountsPage() {
       host: targetServerHost.trim(),
       port: targetServerPort,
       version: targetServerVersion.trim() || undefined,
-      edition: 'java',
+      edition: selectedAccountForDeploy.edition || 'java',
     });
 
     setIsDeployModalOpen(false);
@@ -291,8 +291,8 @@ export default function AccountsPage() {
                           <div>
                             <h3 className="font-black text-slate-900 text-base">{acc.name}</h3>
                             <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border uppercase bg-emerald-50 text-emerald-800 border-emerald-300">
-                                ☕ Java
+                              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border uppercase ${acc.edition === 'bedrock' ? 'bg-sky-50 text-sky-700 border-sky-300' : 'bg-emerald-50 text-emerald-800 border-emerald-300'}`}>
+                                {acc.edition === 'bedrock' ? '🧱 Bedrock' : '☕ Java'}
                               </span>
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                                 {acc.authType === 'microsoft' ? 'MS OAuth' : 'Offline'}
@@ -506,7 +506,7 @@ export default function AccountsPage() {
               <div className="py-6 px-2 space-y-4">
                 <div className="flex items-center space-x-2 text-emerald-800 font-black text-sm">
                   <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                  <span>Account Linked Successfully!</span>
+                  <span>Microsoft Account Linked</span>
                 </div>
                 <div className="space-y-2">
                   {discoveryProfiles.java?.name && (
@@ -526,6 +526,42 @@ export default function AccountsPage() {
                         Saved ✅
                       </span>
                     </div>
+                  )}
+
+                  {discoveryProfiles.bedrock?.gamertag && (
+                    <div className="p-3 bg-sky-50/70 border border-sky-200 rounded-xl flex items-center justify-between">
+                      <div className="flex items-center space-x-2.5">
+                        <img
+                          src={`https://mc-heads.net/avatar/${discoveryProfiles.bedrock.gamertag}/48`}
+                          alt=""
+                          className="w-8 h-8 rounded-lg border border-slate-200"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://mc-heads.net/avatar/MHF_Steve/48'; }}
+                        />
+                        <div>
+                          <span className="font-black text-slate-900 text-xs block">{discoveryProfiles.bedrock.gamertag}</span>
+                          <span className="text-[10px] text-sky-700 font-bold">🧱 Bedrock / Xbox Profile</span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold text-sky-800 bg-sky-100 px-2 py-0.5 rounded-full">
+                        Saved ✅
+                      </span>
+                    </div>
+                  )}
+
+                  {!discoveryProfiles.java?.name && !discoveryProfiles.bedrock?.gamertag && (
+                    <p className="p-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl">
+                      Microsoft sign-in completed, but this account has no discoverable Minecraft profile yet.
+                    </p>
+                  )}
+                  {discoveryProfiles.java?.name && !discoveryProfiles.bedrock?.gamertag && (
+                    <p className="p-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl">
+                      No Xbox gamertag was found, so only the Java profile was saved. Check that the Microsoft account has an Xbox profile before using Bedrock.
+                    </p>
+                  )}
+                  {!discoveryProfiles.java?.name && discoveryProfiles.bedrock?.gamertag && (
+                    <p className="p-3 text-xs text-sky-800 bg-sky-50 border border-sky-200 rounded-xl">
+                      No Java profile was found, so only the Bedrock profile was saved.
+                    </p>
                   )}
 
                 </div>
@@ -558,7 +594,7 @@ export default function AccountsPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => discoverMicrosoftAccount(undefined, 'java')}
+                    onClick={() => discoverMicrosoftAccount(undefined, 'both')}
                     className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl"
                   >
                     Try Again
@@ -569,7 +605,7 @@ export default function AccountsPage() {
               /* Form View: Direct 1-Click Microsoft Java Connect */
               <div className="mt-4 space-y-4">
                 <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl text-xs text-emerald-800 font-medium leading-relaxed">
-                  ☕ <strong>Official Minecraft Java Sign-In:</strong> Click below to generate your secure Microsoft device authorization code and link your Minecraft Java account directly to your vault.
+                  🎮 <strong>Official Microsoft Sign-In:</strong> Link the Java profile and Xbox gamertag available on this Microsoft account in one step.
                 </div>
 
                 <button
@@ -578,7 +614,7 @@ export default function AccountsPage() {
                   className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-700/25 flex items-center justify-center space-x-2 transition"
                 >
                   <ShieldCheck className="h-5 w-5" />
-                  <span>Connect Microsoft Java Account</span>
+                  <span>Connect Microsoft Account</span>
                 </button>
 
                 <div className="flex items-center justify-end pt-2 border-t border-slate-200">
@@ -632,7 +668,13 @@ export default function AccountsPage() {
                       type="button"
                       onClick={() => {
                         const newEd = selectedAccountForDeploy.edition === 'bedrock' ? 'java' : 'bedrock';
-                        setSelectedAccountForDeploy({ ...selectedAccountForDeploy, edition: newEd });
+                        const pairedProfile = selectedAccountForDeploy.microsoftLinkId
+                          ? savedAccounts.find((account) =>
+                              account.microsoftLinkId === selectedAccountForDeploy.microsoftLinkId &&
+                              account.edition === newEd
+                            )
+                          : undefined;
+                        setSelectedAccountForDeploy(pairedProfile || { ...selectedAccountForDeploy, edition: newEd });
                         if (newEd === 'bedrock' && targetServerPort === 25565) setTargetServerPort(19132);
                         if (newEd === 'java' && targetServerPort === 19132) setTargetServerPort(25565);
                       }}

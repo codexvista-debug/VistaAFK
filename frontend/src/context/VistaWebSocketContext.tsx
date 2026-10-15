@@ -387,52 +387,75 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     processedDiscoveryRef.current = discoveryKey;
 
     const currentAccounts = savedAccountsRef.current || [];
-    const newlyAdded: string[] = [];
     let accountsToSync = [...currentAccounts];
+    const microsoftLinkId = profiles.java?.uuid
+      ? `java:${profiles.java.uuid}`
+      : profiles.bedrock?.xuid
+        ? `xuid:${profiles.bedrock.xuid}`
+        : profiles.bedrock?.gamertag
+          ? `gamertag:${profiles.bedrock.gamertag.toLowerCase()}`
+          : undefined;
+
+    const upsertMicrosoftProfile = (
+      profile: SavedAccount,
+      edition: 'java' | 'bedrock',
+      matches: (account: SavedAccount) => boolean
+    ) => {
+      const existingIndex = accountsToSync.findIndex((account) =>
+        account.authType === 'microsoft' &&
+        (account.edition || (account.id.includes('bedrock') ? 'bedrock' : 'java')) === edition &&
+        (account.id === profile.id || matches(account))
+      );
+      if (existingIndex < 0) {
+        accountsToSync.push(profile);
+        return;
+      }
+
+      const existing = accountsToSync[existingIndex];
+      accountsToSync[existingIndex] = {
+        ...existing,
+        ...profile,
+        id: existing.id,
+        createdAt: existing.createdAt,
+      };
+    };
 
     const javaProf = profiles.java;
     if ((filter === 'both' || filter === 'java') && javaProf?.name) {
-      const alreadyExists = accountsToSync.some(
-        (a) =>
-          (a.uuid && javaProf.uuid && a.uuid === javaProf.uuid) ||
-          a.name.toLowerCase() === javaProf.name.toLowerCase()
+      upsertMicrosoftProfile({
+        id: `msa-java-${javaProf.name.toLowerCase()}`,
+        name: javaProf.name,
+        authType: 'microsoft',
+        edition: 'java',
+        uuid: javaProf.uuid,
+        microsoftLinkId,
+        createdAt: Date.now(),
+      }, 'java', (account) =>
+        (Boolean(account.uuid && javaProf.uuid && account.uuid === javaProf.uuid)) ||
+        account.name.toLowerCase() === javaProf.name.toLowerCase()
       );
-      if (!alreadyExists) {
-        const javaAccount: SavedAccount = {
-          id: `msa-java-${javaProf.name.toLowerCase()}`,
-          name: javaProf.name,
-          authType: 'microsoft',
-          edition: 'java',
-          uuid: javaProf.uuid,
-          createdAt: Date.now(),
-        };
-        accountsToSync = [...accountsToSync.filter((a) => a.id !== javaAccount.id), javaAccount];
-        newlyAdded.push(`${javaProf.name} (Java)`);
-      }
     }
 
     const bedrockProf = profiles.bedrock;
     if ((filter === 'both' || filter === 'bedrock') && bedrockProf?.gamertag) {
-      const alreadyExists = accountsToSync.some(
-        (a) =>
-          (a.gamertag && a.gamertag.toLowerCase() === bedrockProf.gamertag.toLowerCase()) ||
-          a.name.toLowerCase() === bedrockProf.gamertag.toLowerCase()
+      upsertMicrosoftProfile({
+        id: `msa-bedrock-${bedrockProf.gamertag.toLowerCase()}`,
+        name: bedrockProf.gamertag,
+        gamertag: bedrockProf.gamertag,
+        authType: 'microsoft',
+        edition: 'bedrock',
+        xuid: bedrockProf.xuid,
+        microsoftLinkId,
+        createdAt: Date.now(),
+      }, 'bedrock', (account) =>
+        (Boolean(account.xuid && bedrockProf.xuid && account.xuid === bedrockProf.xuid)) ||
+        (Boolean(account.gamertag && account.gamertag.toLowerCase() === bedrockProf.gamertag.toLowerCase())) ||
+        account.name.toLowerCase() === bedrockProf.gamertag.toLowerCase()
       );
-      if (!alreadyExists) {
-        const bedrockAccount: SavedAccount = {
-          id: `msa-bedrock-${bedrockProf.gamertag.toLowerCase()}`,
-          name: bedrockProf.gamertag,
-          gamertag: bedrockProf.gamertag,
-          authType: 'microsoft',
-          edition: 'bedrock',
-          createdAt: Date.now(),
-        };
-        accountsToSync = [...accountsToSync.filter((a) => a.id !== bedrockAccount.id), bedrockAccount];
-        newlyAdded.push(`${bedrockProf.gamertag} (Bedrock)`);
-      }
     }
 
-    if (newlyAdded.length > 0) {
+    const profilesChanged = JSON.stringify(accountsToSync) !== JSON.stringify(currentAccounts);
+    if (profilesChanged) {
       setSavedAccounts(accountsToSync);
       if (typeof window !== 'undefined') {
         const currentUser = userRef.current;
@@ -449,7 +472,10 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         id: Math.random().toString(36).substring(2, 9),
         timestamp: Date.now(),
         level: 'success',
-        message: `🎮 Linked Microsoft Account: ${newlyAdded.join(' & ')} added to Vault!`,
+        message: `🎮 Microsoft profiles linked: ${[
+          javaProf?.name ? `${javaProf.name} (Java)` : null,
+          bedrockProf?.gamertag ? `${bedrockProf.gamertag} (Bedrock)` : null,
+        ].filter(Boolean).join(' & ')} synced to Vault!`,
       };
       setNotifications((prev) => {
         if (prev.some((n) => n.message === notif.message)) return prev;

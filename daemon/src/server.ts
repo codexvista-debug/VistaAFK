@@ -212,8 +212,11 @@ wss.on('connection', (ws) => {
           ).then((profiles) => {
             activeDiscoveryCode = null;
             if (!profiles.java && !profiles.bedrock) {
-              const fallbackName = reqEmail ? reqEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '') : 'Player';
-              profiles = { bedrock: { gamertag: fallbackName } };
+              broadcast({
+                type: 'MICROSOFT_DISCOVERY_ERROR',
+                payload: { message: 'No Minecraft Java profile or Xbox gamertag was found on this Microsoft account.' },
+              });
+              return;
             }
             lastDiscoveredProfiles = profiles;
             lastDiscoveryTimestamp = Date.now();

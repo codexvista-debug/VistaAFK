@@ -8,6 +8,9 @@ export interface SavedAccount {
   edition?: MinecraftEdition;
   gamertag?: string;
   uuid?: string;
+  xuid?: string;
+  /** Shared identifier for Java and Bedrock profiles discovered from the same Microsoft sign-in. */
+  microsoftLinkId?: string;
   notes?: string;
   createdAt: number;
 }

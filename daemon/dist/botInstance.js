@@ -292,6 +292,14 @@ class BotInstance {
     async startBedrock() {
         this.isManuallyStopped = false;
         this.clearTimers();
+        const nodeMajorVersion = Number(process.versions.node.split('.')[0]);
+        if (nodeMajorVersion < 24) {
+            const message = `Bedrock connections require Node.js 24 or newer (this daemon is using ${process.versions.node}). Update Node.js on this device, then restart the daemon.`;
+            this.updateStatus('error', message);
+            this.emitActivity('status', `⚠️ ${message}`);
+            this.callbacks.onNotification('error', `[${this.config.name}] ${message}`, this.config.id);
+            return;
+        }
         this.updateStatus('connecting', 'Connecting to Bedrock server...');
         let host = (this.config.host || '').trim();
         let port = this.config.port || 19132;
@@ -328,23 +336,11 @@ class BotInstance {
                 this.callbacks.onNotification('error', `[${this.config.name}] Bedrock package missing: ${reason}`, this.config.id);
                 return;
             }
-            // Patch Geyser 26.x protocol aliases so servers reporting 26.30-26.60 map to protocol 2193, and 2193 maps to 1.26.51
-            try {
-                const Options = (eval('require'))('bedrock-protocol/src/options.js');
-                if (Options?.Versions) {
-                    for (let i = 20; i <= 60; i++) {
-                        Options.Versions[`26.${i}`] = 2193;
-                        Options.Versions[`1.26.${i}`] = 2193;
-                    }
-                    Options.Versions['2193'] = '1.26.51';
-                    Options.Versions[2193] = '1.26.51';
-                }
-            }
-            catch (e) { }
-            // Auto-detect target version: if FreshSMP, DonutSMP, or not set, use 1.26.51 (protocol 2193)
+            // Leave the version unset by default so bedrock-protocol can negotiate the
+            // server's advertised Bedrock protocol. Only honor an explicit user override.
             let targetVersion = this.config.version?.trim();
-            if (!targetVersion || targetVersion === '' || targetVersion.startsWith('26.')) {
-                targetVersion = '1.26.51';
+            if (targetVersion?.startsWith('26.')) {
+                targetVersion = `1.${targetVersion}`;
             }
             // Defensively clean up any previous client
             if (this.bedrockClient) {
@@ -357,16 +353,14 @@ class BotInstance {
                 catch (e) { }
                 this.bedrockClient = null;
             }
-            const client = bedrock.createClient({
+            const clientOptions = {
                 host,
                 port,
                 username: this.config.name,
                 offline: this.config.authType === 'offline',
-                skipPing: true,
                 transport: 'raknet',
                 useRaknetWorkers: false,
                 profilesFolder: tokenFolder,
-                version: targetVersion,
                 raknetBackend: 'jsp-raknet',
                 connectTimeout: 45000,
                 onMsaCode: (data) => {
@@ -382,7 +376,10 @@ class BotInstance {
                     this.callbacks.onNotification('warn', `Microsoft Auth required for Bedrock ${this.config.name}: Visit ${verificationUri} and enter code ${userCode}`, this.config.id);
                     this.emitTelemetry();
                 },
-            });
+            };
+            if (targetVersion)
+                clientOptions.version = targetVersion;
+            const client = bedrock.createClient(clientOptions);
             this.bedrockClient = client;
             client.on('join', () => {
                 if (client.username && client.username !== this.config.name) {

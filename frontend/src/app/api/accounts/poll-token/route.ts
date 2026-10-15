@@ -387,21 +387,13 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3. Final Validation: If no Java or Bedrock profile was found
+    // 3. Require a real edition profile. A fabricated gamertag looks linkable
+    // but cannot authenticate when the Bedrock bot tries to join a server.
     if (!profiles.java && !profiles.bedrock) {
-      if (diagnosticError) {
-        return NextResponse.json({
-          status: 'error',
-          error: diagnosticError,
-        });
-      }
-
-      // Provide fallback gamer profile so user is never blocked
-      const fallbackName = 'Player_' + (userHash ? userHash.slice(-6) : Math.random().toString(36).substring(2, 8));
-      profiles.bedrock = {
-        gamertag: fallbackName,
-        xuid: userHash || '',
-      };
+      return NextResponse.json({
+        status: 'error',
+        error: diagnosticError || 'No Minecraft Java profile or Xbox gamertag was found on this Microsoft account.',
+      });
     }
 
     return NextResponse.json({

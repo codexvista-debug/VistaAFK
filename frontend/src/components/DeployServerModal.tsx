@@ -24,9 +24,6 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
     initialAccount?.id || (savedAccounts.length > 0 ? savedAccounts[0].id : '')
   );
 
-  const initialAcc = savedAccounts.find((a) => a.id === (initialAccount?.id || (savedAccounts.length > 0 ? savedAccounts[0].id : '')));
-  const edition: MinecraftEdition = 'java';
-
   const [selectedPresetId, setSelectedPresetId] = useState<string>(() => {
     return serverPresets.length > 0 ? serverPresets[0].id : 'custom';
   });
@@ -42,9 +39,12 @@ export const DeployServerModal: React.FC<DeployServerModalProps> = ({
   );
 
   const selectedAccount = savedAccounts.find((a) => a.id === selectedAccountId);
+  const edition: MinecraftEdition = selectedAccount?.edition || 'java';
 
   const handleSelectAccount = (acc: SavedAccount) => {
     setSelectedAccountId(acc.id);
+    if (acc.edition === 'bedrock' && targetServerPort === 25565) setTargetServerPort(19132);
+    if (acc.edition !== 'bedrock' && targetServerPort === 19132) setTargetServerPort(25565);
   };
 
   const handlePresetSelect = (preset: ServerPreset) => {

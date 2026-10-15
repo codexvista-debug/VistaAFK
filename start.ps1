@@ -84,6 +84,20 @@ if (-not (Test-Path "node_modules\.bin\tsc.cmd")) {
     }
 }
 
+if (-not (Test-Path "node_modules\bedrock-protocol\package.json")) {
+    Write-Host "[*] Installing Bedrock Edition protocol support..." -ForegroundColor Yellow
+    npm install bedrock-protocol --ignore-scripts --omit=optional
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[!] Bedrock dependency installation failed. Daemon was not started." -ForegroundColor Red
+        exit 1
+    }
+}
+
+$NodeMajorVersion = [int]((node -p "process.versions.node.split('.')[0]").Trim())
+if ($NodeMajorVersion -lt 24) {
+    Write-Host "[!] Bedrock connections require Node.js 24 or newer. Update Node.js to enable Bedrock bots." -ForegroundColor Yellow
+}
+
 Write-Host "[*] Compiling the latest daemon source..." -ForegroundColor Yellow
 npm run build
 if ($LASTEXITCODE -ne 0) {

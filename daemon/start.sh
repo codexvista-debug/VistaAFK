@@ -30,6 +30,11 @@ if [ -d "daemon" ]; then
   cd daemon
 fi
 
+NODE_MAJOR_VERSION=$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)
+if [ "$NODE_MAJOR_VERSION" -lt 24 ]; then
+  echo "⚠️ Bedrock connections require Node.js 24 or newer. Update Node.js to enable Bedrock bots."
+fi
+
 # 5. Ensure Bedrock protocol dependencies are installed
 if [ ! -d "node_modules/bedrock-protocol" ]; then
   echo "📦 Installing Bedrock support (pure JS, 0 compilation)..."
