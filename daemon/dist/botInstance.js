@@ -407,6 +407,27 @@ class BotInstance {
                 clientOptions.version = targetVersion;
             const client = bedrock.createClient(clientOptions);
             this.bedrockClient = client;
+            // bedrock-protocol's default helper sends "completed" immediately after
+            // resource_packs_info. Bedrock servers expect HAVE_ALL_PACKS at this stage,
+            // then COMPLETED after resource_pack_stack. The helper has no pack-downloader,
+            // so acknowledge the offer as accepted without pretending the headless daemon
+            // has rendered/applied any textures.
+            const writeBedrockPacket = client.write.bind(client);
+            let initialPackOfferHandled = false;
+            client.write = (packetName, params) => {
+                if (packetName === 'resource_pack_client_response' &&
+                    params?.response_status === 'completed' &&
+                    !initialPackOfferHandled) {
+                    initialPackOfferHandled = true;
+                    this.emitActivity('status', '📦 Accepted the Bedrock server resource-pack offer (headless client; textures are not rendered).');
+                    return writeBedrockPacket(packetName, {
+                        ...params,
+                        response_status: 'have_all_packs',
+                        response_status_name: 'downloadingfinished',
+                    });
+                }
+                return writeBedrockPacket(packetName, params);
+            };
             // bedrock-protocol emits `session` once Microsoft/Xbox authentication has
             // completed and it is ready to negotiate with the game server. Clearing
             // the device code here prevents a later server/network error from being
