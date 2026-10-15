@@ -310,6 +310,10 @@ export class BotInstance {
   private bedrockClient: any = null;
   private bedrockPosition: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
   private bedrockHealth: number = 20;
+  private bedrockFood: number = 20;
+  private bedrockSelectedSlot: number = 0;
+  private bedrockInventorySlots: any[] = Array(46).fill(null);
+  private bedrockLastEatAt = 0;
   private bedrockGuiWindow: BotGuiWindow | null = null;
   private bedrockItemNames = new Map<number, string>();
   private bedrockGuiRawSlots: any[] = [];
@@ -511,6 +515,10 @@ export class BotInstance {
       this.bedrockItemNames.clear();
       this.bedrockGuiRawSlots = [];
       this.bedrockGuiContainer = { container_id: 'container' };
+      this.bedrockInventorySlots = Array(46).fill(null);
+      this.bedrockSelectedSlot = 0;
+      this.bedrockFood = 20;
+      this.bedrockHealth = 20;
 
       const isMobileDaemon = process.env.VISTAAFK_DEVICE_TYPE === 'mobile';
       let mobileRaknetBackend: 'raknet-native' | 'jsp-raknet' = 'jsp-raknet';
@@ -647,6 +655,24 @@ export class BotInstance {
         this.registerBedrockItemNames(packet?.itemstates);
       });
 
+      client.on('player_hotbar', (packet: any) => {
+        const selectedSlot = Number(packet?.selected_slot);
+        if (packet?.select_slot !== false && Number.isInteger(selectedSlot) && selectedSlot >= 0 && selectedSlot <= 8) {
+          this.bedrockSelectedSlot = selectedSlot;
+          this.emitTelemetry();
+        }
+      });
+
+      client.on('update_attributes', (packet: any) => {
+        if (!Array.isArray(packet?.attributes)) return;
+        const hunger = packet.attributes.find((attribute: any) => /(?:player\.)?hunger$/i.test(String(attribute?.name || '')));
+        const value = Number(hunger?.current);
+        if (Number.isFinite(value)) {
+          this.bedrockFood = Math.max(0, Math.min(20, value));
+          this.emitTelemetry();
+        }
+      });
+
       client.on('container_open', (packet: any) => {
         const windowId = Number(packet?.window_id);
         if (!Number.isInteger(windowId)) return;
@@ -665,7 +691,11 @@ export class BotInstance {
 
       client.on('inventory_content', (packet: any) => {
         const windowId = Number(packet?.window_id);
-        if (!this.bedrockGuiWindow || this.bedrockGuiWindow.kind !== 'container' || this.bedrockGuiWindow.id !== windowId) return;
+        this.updateBedrockPlayerInventory(packet?.container?.container_id, packet?.input, windowId);
+        if (this.bedrockGuiWindow?.kind !== 'container' || this.bedrockGuiWindow.id !== windowId) {
+          this.emitTelemetry();
+          return;
+        }
         const items = Array.isArray(packet?.input) ? packet.input : [];
         this.bedrockGuiRawSlots = [...items];
         const container = packet?.container;
@@ -686,7 +716,11 @@ export class BotInstance {
       client.on('inventory_slot', (packet: any) => {
         const windowId = Number(packet?.window_id);
         const slot = Number(packet?.slot);
-        if (!this.bedrockGuiWindow || this.bedrockGuiWindow.kind !== 'container' || this.bedrockGuiWindow.id !== windowId || !Number.isInteger(slot) || slot < 0) return;
+        this.updateBedrockPlayerInventorySlot(packet?.container?.container_id, slot, packet?.item, windowId);
+        if (this.bedrockGuiWindow?.kind !== 'container' || this.bedrockGuiWindow.id !== windowId || !Number.isInteger(slot) || slot < 0) {
+          this.emitTelemetry();
+          return;
+        }
         const slots = [...this.bedrockGuiWindow.slots];
         while (this.bedrockGuiRawSlots.length <= slot) this.bedrockGuiRawSlots.push(null);
         this.bedrockGuiRawSlots[slot] = packet?.item || null;
@@ -1310,6 +1344,10 @@ export class BotInstance {
   }
 
   private checkSurvivalActions() {
+    if (this.bedrockClient) {
+      this.checkBedrockAutoEat();
+      return;
+    }
     if (!this.bot) return;
 
     // 1. Auto Totem
@@ -1852,6 +1890,38 @@ export class BotInstance {
   }
 
   public async moveSlotItem(sourceSlot: number, targetSlot: number) {
+    if (this.bedrockClient && this.currentStatus === 'online') {
+      const source = this.getBedrockInventoryAddress(sourceSlot);
+      const destination = this.getBedrockInventoryAddress(targetSlot);
+      if (!source || !destination || sourceSlot === targetSlot) return;
+      if (!(this.bedrockClient.startGameData as any)?.server_authoritative_inventory) {
+        this.callbacks.onNotification('warn', 'Bedrock inventory moves are not supported by this server inventory mode yet.', this.config.id);
+        return;
+      }
+      try {
+        const sourceItem = this.bedrockInventorySlots[sourceSlot];
+        const destinationItem = this.bedrockInventorySlots[targetSlot];
+        this.bedrockGuiRequestId = this.bedrockGuiRequestId >= 0x7ffffffe ? 1 : this.bedrockGuiRequestId + 1;
+        this.bedrockClient.queue('item_stack_request', {
+          requests: [{
+            request_id: this.bedrockGuiRequestId,
+            actions: [{
+              type_id: 'swap',
+              legacy_type_id: 0,
+              source: { slot_type: { container_id: source.containerId }, slot: source.slot, stack_id: Number(sourceItem?.stack_id) || 0 },
+              destination: { slot_type: { container_id: destination.containerId }, slot: destination.slot, stack_id: Number(destinationItem?.stack_id) || 0 },
+            }],
+            custom_names: [],
+            cause: 'chat_public',
+          }],
+        });
+        this.emitActivity('survival', `📦 Requested Bedrock inventory move from slot #${sourceSlot} to #${targetSlot}`);
+      } catch (err: any) {
+        console.error(`[VistaAFK] Failed to move Bedrock inventory item:`, err?.message || err);
+        this.callbacks.onNotification('error', `Failed to move inventory item: ${err?.message || 'Unknown error'}`, this.config.id);
+      }
+      return;
+    }
     if (!this.bot || this.currentStatus !== 'online') {
       this.callbacks.onNotification('warn', 'Bot is offline, cannot move items', this.config.id);
       return;
@@ -1876,6 +1946,10 @@ export class BotInstance {
   }
 
   public async setQuickBarSlot(slot: number) {
+    if (this.bedrockClient && this.currentStatus === 'online') {
+      this.selectBedrockHotbarSlot(slot);
+      return;
+    }
     if (!this.bot || this.currentStatus !== 'online') return;
     try {
       this.bot.setQuickBarSlot(slot);
@@ -1892,6 +1966,230 @@ export class BotInstance {
       if (Number.isInteger(runtimeId) && typeof item?.name === 'string') {
         this.bedrockItemNames.set(runtimeId, item.name.replace(/^minecraft:/, ''));
       }
+    }
+  }
+
+  private normalizeBedrockContainerId(containerId: unknown, windowId?: unknown): string | null {
+    if (typeof containerId === 'string') return containerId.toLowerCase();
+    if (typeof containerId === 'number') {
+      const mapped: Record<number, string> = { 6: 'armor', 12: 'hotbar_and_inventory', 28: 'hotbar', 29: 'inventory', 34: 'offhand' };
+      return mapped[containerId] || null;
+    }
+    if (windowId === 0 || windowId === 'inventory') return 'hotbar_and_inventory';
+    return null;
+  }
+
+  private bedrockLogicalSlot(containerId: string, slot: number): number | null {
+    if (!Number.isInteger(slot) || slot < 0) return null;
+    if (containerId === 'hotbar_and_inventory') {
+      if (slot <= 8) return 36 + slot;
+      if (slot <= 35) return slot;
+      return null;
+    }
+    if (containerId === 'hotbar') return slot <= 8 ? 36 + slot : null;
+    if (containerId === 'inventory') return slot <= 26 ? 9 + slot : null;
+    if (containerId === 'armor') return slot <= 3 ? 5 + slot : null;
+    if (containerId === 'offhand') return slot === 0 ? 45 : null;
+    return null;
+  }
+
+  private updateBedrockPlayerInventory(containerId: unknown, items: unknown, windowId?: unknown) {
+    const normalized = this.normalizeBedrockContainerId(containerId, windowId);
+    if (!normalized || !Array.isArray(items)) return;
+    for (let index = 0; index < items.length; index++) {
+      const logicalSlot = this.bedrockLogicalSlot(normalized, index);
+      if (logicalSlot !== null) this.bedrockInventorySlots[logicalSlot] = items[index] || null;
+    }
+  }
+
+  private updateBedrockPlayerInventorySlot(containerId: unknown, slot: number, item: unknown, windowId?: unknown) {
+    const normalized = this.normalizeBedrockContainerId(containerId, windowId);
+    if (!normalized) return;
+    const logicalSlot = this.bedrockLogicalSlot(normalized, slot);
+    if (logicalSlot !== null) this.bedrockInventorySlots[logicalSlot] = item || null;
+  }
+
+  private getBedrockInventoryAddress(logicalSlot: number): { containerId: string; slot: number } | null {
+    if (!Number.isInteger(logicalSlot)) return null;
+    if (logicalSlot >= 9 && logicalSlot <= 35) return { containerId: 'hotbar_and_inventory', slot: logicalSlot };
+    if (logicalSlot >= 36 && logicalSlot <= 44) return { containerId: 'hotbar_and_inventory', slot: logicalSlot - 36 };
+    if (logicalSlot >= 5 && logicalSlot <= 8) return { containerId: 'armor', slot: logicalSlot - 5 };
+    if (logicalSlot === 45) return { containerId: 'offhand', slot: 0 };
+    return null;
+  }
+
+  private selectBedrockHotbarSlot(slot: number) {
+    if (!this.bedrockClient || !Number.isInteger(slot) || slot < 0 || slot > 8) return;
+    const rawItem = this.bedrockInventorySlots[36 + slot] || { network_id: 0, count: 0, metadata: 0, has_stack_id: false, block_runtime_id: 0, extra: { value: {} } };
+    const runtimeId = Number((this.bedrockClient as any).entityId || (this.bedrockClient as any).startGameData?.runtime_entity_id);
+    if (!Number.isFinite(runtimeId)) return;
+    try {
+      this.bedrockClient.queue('mob_equipment', {
+        runtime_entity_id: runtimeId,
+        item: rawItem,
+        slot,
+        selected_slot: slot,
+        window_id: 'inventory',
+      });
+      this.bedrockSelectedSlot = slot;
+      this.emitTelemetry();
+    } catch (err: any) {
+      console.warn(`[VistaAFK] Could not select Bedrock hotbar slot ${slot}:`, err?.message || err);
+    }
+  }
+
+  private checkBedrockAutoEat() {
+    if (!this.config.survival.autoEat || this.isEatingFood || !this.bedrockClient || this.currentStatus !== 'online') return;
+    if (Date.now() - this.bedrockLastEatAt < 5000) return;
+
+    const foodPriority = [
+      'golden_carrot', 'cooked_beef', 'steak', 'cooked_porkchop', 'cooked_mutton', 'cooked_salmon', 'cooked_chicken',
+      'baked_potato', 'bread', 'cooked_cod', 'cooked_rabbit', 'apple', 'carrot', 'sweet_berries', 'glow_berries',
+      'melon_slice', 'pumpkin_pie', 'honey_bottle', 'cookie', 'dried_kelp', 'beetroot', 'mushroom_stew',
+      'rabbit_stew', 'beetroot_soup', 'potato', 'beef', 'porkchop', 'mutton', 'chicken', 'salmon', 'cod', 'rabbit',
+    ];
+    const injured = this.bedrockHealth < 20;
+    const hungry = this.bedrockFood < 20;
+    if (!hungry && !injured) return;
+    const canSwapInventory = Boolean((this.bedrockClient.startGameData as any)?.server_authoritative_inventory);
+    const foodSlots = Array.from({ length: canSwapInventory ? 36 : 9 }, (_, offset) => offset + (canSwapInventory ? 9 : 36));
+
+    let selectedIndex = -1;
+    if (injured) {
+      selectedIndex = foodSlots.find((index) => {
+        const name = this.serializeBedrockItem(this.bedrockInventorySlots[index], index)?.name;
+        return name === 'golden_apple' || name === 'enchanted_golden_apple';
+      }) ?? -1;
+    }
+    if (selectedIndex < 0 && hungry) {
+      for (const foodName of foodPriority) {
+        selectedIndex = foodSlots.find((index) => this.serializeBedrockItem(this.bedrockInventorySlots[index], index)?.name === foodName) ?? -1;
+        if (selectedIndex >= 0) break;
+      }
+    }
+    if (selectedIndex < 0) return;
+
+    const sourceSlot = selectedIndex < 36 ? selectedIndex : null;
+    const selectedItem = this.serializeBedrockItem(this.bedrockInventorySlots[selectedIndex], selectedIndex);
+    if (!selectedItem) return;
+    const previousSlot = this.bedrockSelectedSlot;
+    this.isEatingFood = true;
+    this.bedrockLastEatAt = Date.now();
+    if (sourceSlot !== null) {
+      if (!this.requestBedrockInventorySwap(sourceSlot, 36 + previousSlot)) {
+        this.isEatingFood = false;
+        return;
+      }
+      setTimeout(() => this.beginBedrockEating(36 + previousSlot, previousSlot, previousSlot, sourceSlot, selectedItem.name), 450);
+      return;
+    }
+
+    const hotbarSlot = selectedIndex - 36;
+    this.selectBedrockHotbarSlot(hotbarSlot);
+    this.beginBedrockEating(selectedIndex, hotbarSlot, previousSlot, null, selectedItem.name);
+  }
+
+  private requestBedrockInventorySwap(sourceSlot: number, targetSlot: number): boolean {
+    if (!this.bedrockClient || !(this.bedrockClient.startGameData as any)?.server_authoritative_inventory) return false;
+    const source = this.getBedrockInventoryAddress(sourceSlot);
+    const destination = this.getBedrockInventoryAddress(targetSlot);
+    if (!source || !destination || sourceSlot === targetSlot) return false;
+    const sourceItem = this.bedrockInventorySlots[sourceSlot];
+    const destinationItem = this.bedrockInventorySlots[targetSlot];
+    this.bedrockGuiRequestId = this.bedrockGuiRequestId >= 0x7ffffffe ? 1 : this.bedrockGuiRequestId + 1;
+    try {
+      this.bedrockClient.queue('item_stack_request', {
+        requests: [{
+          request_id: this.bedrockGuiRequestId,
+          actions: [{
+            type_id: 'swap',
+            legacy_type_id: 0,
+            source: { slot_type: { container_id: source.containerId }, slot: source.slot, stack_id: Number(sourceItem?.stack_id) || 0 },
+            destination: { slot_type: { container_id: destination.containerId }, slot: destination.slot, stack_id: Number(destinationItem?.stack_id) || 0 },
+          }],
+          custom_names: [],
+          cause: 'chat_public',
+        }],
+      });
+      return true;
+    } catch (err: any) {
+      console.warn('[VistaAFK] Bedrock inventory swap failed:', err?.message || err);
+      return false;
+    }
+  }
+
+  private beginBedrockEating(inventorySlot: number, hotbarSlot: number, previousSlot: number, swapBackToSlot: number | null, expectedName: string, retry = 0) {
+    if (!this.bedrockClient || this.currentStatus !== 'online') {
+      this.isEatingFood = false;
+      return;
+    }
+    const rawItem = this.bedrockInventorySlots[inventorySlot];
+    const item = this.serializeBedrockItem(rawItem, inventorySlot);
+    if (!item || !rawItem || item.name !== expectedName) {
+      if (retry < 5 && this.bedrockClient && this.currentStatus === 'online') {
+        setTimeout(() => this.beginBedrockEating(inventorySlot, hotbarSlot, previousSlot, swapBackToSlot, expectedName, retry + 1), 200);
+        return;
+      }
+      if (swapBackToSlot !== null && item?.name === expectedName) this.requestBedrockInventorySwap(36 + hotbarSlot, swapBackToSlot);
+      this.isEatingFood = false;
+      return;
+    }
+    const position = this.bedrockPosition;
+    try {
+      this.bedrockClient.queue('inventory_transaction', {
+        transaction: {
+          legacy: { legacy_request_id: 0, legacy_transactions: null },
+          transaction_type: 'item_use',
+          actions: [],
+          transaction_data: {
+            action_type: 'click_air',
+            trigger_type: 'player_input',
+            block_position: { x: 0, y: 0, z: 0 },
+            face: 0xff,
+            hotbar_slot: hotbarSlot,
+            hand: 'main_hand',
+            held_item: rawItem,
+            player_pos: position,
+            click_pos: { x: 0, y: 0, z: 0 },
+            block_runtime_id: 0,
+            client_prediction: 'success',
+            client_cooldown_state: 'off',
+          },
+        },
+      });
+      this.emitActivity('survival', `🍖 Auto-eat: Using ${item.displayName} (HP: ${this.bedrockHealth}/20, Hunger: ${this.bedrockFood}/20)`);
+      setTimeout(() => {
+        if (!this.bedrockClient || this.currentStatus !== 'online') {
+          this.isEatingFood = false;
+          return;
+        }
+        try {
+          this.bedrockClient.queue('inventory_transaction', {
+            transaction: {
+              legacy: { legacy_request_id: 0, legacy_transactions: null },
+              transaction_type: 'item_release',
+              actions: [],
+              transaction_data: {
+                action_type: 'consume',
+                hotbar_slot: hotbarSlot,
+                held_item: rawItem,
+                head_pos: { x: position.x, y: position.y + 1.62, z: position.z },
+              },
+            },
+          });
+        } catch (err: any) {
+          console.warn('[VistaAFK] Bedrock auto-eat release failed:', err?.message || err);
+        }
+        if (swapBackToSlot !== null) this.requestBedrockInventorySwap(36 + hotbarSlot, swapBackToSlot);
+        if (previousSlot !== hotbarSlot) this.selectBedrockHotbarSlot(previousSlot);
+        setTimeout(() => {
+          this.isEatingFood = false;
+          this.emitTelemetry();
+        }, 500);
+      }, 1700);
+    } catch (err: any) {
+      this.isEatingFood = false;
+      console.warn('[VistaAFK] Bedrock auto-eat failed:', err?.message || err);
     }
   }
 
@@ -2009,13 +2307,20 @@ export class BotInstance {
         maxHealth: 20,
         hearts,
         maxHearts: 10,
-        food: 20,
+        food: this.bedrockFood,
         coordinates: pos,
         dimension: 'overworld',
         ping: 0,
         gamemode: 'survival',
         uptimeSeconds: this.connectStartTime ? Math.floor((Date.now() - this.connectStartTime) / 1000) : 0,
-        inventoryCount: 0,
+        heldItem: this.serializeBedrockItem(this.bedrockInventorySlots[36 + this.bedrockSelectedSlot], 36 + this.bedrockSelectedSlot)?.name,
+        offhandItem: this.serializeBedrockItem(this.bedrockInventorySlots[45], 45)?.name,
+        inventoryCount: this.bedrockInventorySlots.reduce((count, item, slot) => count + (this.serializeBedrockItem(item, slot) ? 1 : 0), 0),
+        inventory: this.bedrockInventorySlots.flatMap((item, slot) => {
+          const serialized = this.serializeBedrockItem(item, slot);
+          return serialized ? [serialized] : [];
+        }),
+        selectedSlot: this.bedrockSelectedSlot,
         openWindow: this.bedrockGuiWindow,
         facing: 'North',
         yaw: 0,
