@@ -44,9 +44,23 @@ if ($ScriptDir) {
 try {
     if (Test-Path ".git") {
         Write-Host "[*] Checking for latest VistaAFK updates..." -ForegroundColor Gray
+        # The daemon build rewrites these tracked, generated JavaScript files.
+        # Discard only those build outputs so they cannot block the next pull.
+        git restore --worktree -- daemon/dist 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "[!] Could not reset generated daemon build files. Update stopped." -ForegroundColor Red
+            exit 1
+        }
         git pull origin main 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "[!] Git update failed. Resolve other local changes, then run this command again." -ForegroundColor Red
+            exit 1
+        }
     }
-} catch {}
+} catch {
+    Write-Host "[!] Git update failed: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+}
 
 # 4. Check credentials
 $DaemonDir = Join-Path (Get-Location) "daemon"
@@ -136,11 +150,11 @@ if ($HasCloudflared) {
     Remove-Item "cloudflared.log" -Force -ErrorAction SilentlyContinue
     Remove-Item "cloudflared.err" -Force -ErrorAction SilentlyContinue
     
-    Start-Process -FilePath $CloudflaredBin -ArgumentList "tunnel --no-autoupdate --url http://127.0.0.1:8080" -RedirectStandardOutput "cloudflared.log" -RedirectStandardError "cloudflared.err" -WindowStyle Hidden
+    $TunnelProcess = Start-Process -FilePath $CloudflaredBin -ArgumentList "tunnel --no-autoupdate --url http://127.0.0.1:8080" -RedirectStandardOutput "cloudflared.log" -RedirectStandardError "cloudflared.err" -WindowStyle Hidden -PassThru
     
-    # Wait up to 10 seconds for the public trycloudflare.com URL
+    # Wait for the tunnel to publish its public URL; slower networks can take longer.
     $TunnelUrl = ""
-    for ($i = 0; $i -lt 10; $i++) {
+    for ($i = 0; $i -lt 30; $i++) {
         Start-Sleep -Seconds 1
         if (Test-Path "cloudflared.err") {
             $errContent = Get-Content "cloudflared.err" -Raw -ErrorAction SilentlyContinue
@@ -156,6 +170,7 @@ if ($HasCloudflared) {
                 break
             }
         }
+        if ($TunnelProcess.HasExited) { break }
     }
     
     if ($TunnelUrl) {
@@ -187,8 +202,16 @@ if ($HasCloudflared) {
             } | ConvertTo-Json -Compress
             
             try {
-                Invoke-RestMethod -Uri "$targetCloud/api/daemon/heartbeat" -Method Post -Body $payload -ContentType "application/json" -TimeoutSec 5 -ErrorAction SilentlyContinue | Out-Null
-            } catch {}
+                $linkResult = Invoke-RestMethod -Uri "$targetCloud/api/daemon/heartbeat" -Method Post -Body $payload -ContentType "application/json" -TimeoutSec 10
+                if ($linkResult.success) {
+                    Write-Host "[+] VistaAFK account link confirmed." -ForegroundColor Green
+                } else {
+                    Write-Host "[!] Cloud returned no link confirmation: $($linkResult.error)" -ForegroundColor Yellow
+                }
+            } catch {
+                Write-Host "[!] Could not register the tunnel with VistaAFK: $($_.Exception.Message)" -ForegroundColor Yellow
+                Write-Host "    Check that the account token is current and the PC can reach $targetCloud." -ForegroundColor Yellow
+            }
         }
         
         Write-Host ""
@@ -201,7 +224,15 @@ if ($HasCloudflared) {
         Write-Host "=============================================================" -ForegroundColor Green
         Write-Host ""
     } else {
-        Write-Host "[*] Tunnel starting in background. Local daemon running on ws://localhost:8080" -ForegroundColor Yellow
+        Write-Host "[!] Cloudflare did not provide a public tunnel URL, so this PC cannot connect to the hosted dashboard yet." -ForegroundColor Red
+        if ($TunnelProcess.HasExited) {
+            Write-Host "    cloudflared exited. Recent tunnel output:" -ForegroundColor Yellow
+        } else {
+            Write-Host "    cloudflared is still running, but no URL appeared within 30 seconds. Recent tunnel output:" -ForegroundColor Yellow
+        }
+        if (Test-Path "cloudflared.err") { Get-Content "cloudflared.err" -Tail 12 }
+        if (Test-Path "cloudflared.log") { Get-Content "cloudflared.log" -Tail 12 }
+        Write-Host "    Local daemon will start on ws://localhost:8080; retry after resolving the tunnel issue." -ForegroundColor Yellow
     }
 } else {
     Write-Host "[*] Running local daemon on ws://localhost:8080" -ForegroundColor Yellow
