@@ -5,6 +5,8 @@ import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, InventoryItem, ItemE
 import { sampleTerrainGrid } from './terrainMapper.js';
 import path from 'path';
 
+const BEDROCK_PLAYER_CONTAINERS = new Set(['armor', 'hotbar_and_inventory', 'hotbar', 'inventory', 'offhand']);
+
 export interface BotInstanceCallbacks {
   onTelemetryUpdate: (telemetry: BotTelemetry) => void;
   onChatMessage: (message: ChatMessage) => void;
@@ -772,14 +774,14 @@ export class BotInstance {
         const windowId = Number(packet?.window_id);
         const containerId = packet?.container?.container_id;
         const items = Array.isArray(packet?.input) ? packet.input : [];
-        this.updateBedrockPlayerInventory(containerId, items, windowId);
-        if (!this.bedrockInventoryDiagnosticsLogged) {
+        const playerInventoryUpdated = this.updateBedrockPlayerInventory(containerId, items, windowId);
+        if (playerInventoryUpdated && !this.bedrockInventoryDiagnosticsLogged) {
           this.bedrockInventoryDiagnosticsLogged = true;
           const nonEmpty = items.filter((item: any) => Number(item?.network_id) !== 0 && Number(item?.count) > 0).length;
           console.log(`[VistaAFK Bedrock] Inventory snapshot for ${this.config.name}: container=${String(containerId ?? 'unknown')}, window=${String(packet?.window_id ?? 'unknown')}, slots=${items.length}, non-empty=${nonEmpty}`);
         }
         if (this.bedrockGuiWindow?.kind !== 'container' || this.bedrockGuiWindow.id !== windowId) {
-          this.emitTelemetry();
+          if (playerInventoryUpdated) this.emitTelemetry();
           return;
         }
         this.bedrockGuiRawSlots = [...items];
@@ -802,13 +804,13 @@ export class BotInstance {
         const windowId = Number(packet?.window_id);
         const slot = Number(packet?.slot);
         const containerId = packet?.container?.container_id;
-        this.updateBedrockPlayerInventorySlot(containerId, slot, packet?.item, windowId);
-        if (!this.bedrockInventoryDiagnosticsLogged) {
+        const playerInventoryUpdated = this.updateBedrockPlayerInventorySlot(containerId, slot, packet?.item, windowId);
+        if (playerInventoryUpdated && !this.bedrockInventoryDiagnosticsLogged) {
           this.bedrockInventoryDiagnosticsLogged = true;
           console.log(`[VistaAFK Bedrock] Inventory slot update for ${this.config.name}: container=${String(containerId ?? 'unknown')}, window=${String(packet?.window_id ?? 'unknown')}, slot=${String(packet?.slot ?? 'unknown')}, item=${String(packet?.item?.network_id ?? 'unknown')}x${String(packet?.item?.count ?? 0)}`);
         }
         if (this.bedrockGuiWindow?.kind !== 'container' || this.bedrockGuiWindow.id !== windowId || !Number.isInteger(slot) || slot < 0) {
-          this.emitTelemetry();
+          if (playerInventoryUpdated) this.emitTelemetry();
           return;
         }
         const slots = [...this.bedrockGuiWindow.slots];
@@ -2068,7 +2070,7 @@ export class BotInstance {
   private normalizeBedrockContainerId(containerId: unknown, windowId?: unknown): string | null {
     if (typeof containerId === 'string') {
       const normalized = containerId.trim().toLowerCase();
-      if (!/^\d+$/.test(normalized)) return normalized || null;
+      if (!/^\d+$/.test(normalized)) return BEDROCK_PLAYER_CONTAINERS.has(normalized) ? normalized : null;
       const mapped: Record<number, string> = { 6: 'armor', 12: 'hotbar_and_inventory', 28: 'hotbar', 29: 'inventory', 34: 'offhand' };
       return mapped[Number(normalized)] || null;
     }
@@ -2094,20 +2096,23 @@ export class BotInstance {
     return null;
   }
 
-  private updateBedrockPlayerInventory(containerId: unknown, items: unknown, windowId?: unknown) {
+  private updateBedrockPlayerInventory(containerId: unknown, items: unknown, windowId?: unknown): boolean {
     const normalized = this.normalizeBedrockContainerId(containerId, windowId);
-    if (!normalized || !Array.isArray(items)) return;
+    if (!normalized || !Array.isArray(items)) return false;
     for (let index = 0; index < items.length; index++) {
       const logicalSlot = this.bedrockLogicalSlot(normalized, index);
       if (logicalSlot !== null) this.bedrockInventorySlots[logicalSlot] = items[index] || null;
     }
+    return true;
   }
 
-  private updateBedrockPlayerInventorySlot(containerId: unknown, slot: number, item: unknown, windowId?: unknown) {
+  private updateBedrockPlayerInventorySlot(containerId: unknown, slot: number, item: unknown, windowId?: unknown): boolean {
     const normalized = this.normalizeBedrockContainerId(containerId, windowId);
-    if (!normalized) return;
+    if (!normalized) return false;
     const logicalSlot = this.bedrockLogicalSlot(normalized, slot);
-    if (logicalSlot !== null) this.bedrockInventorySlots[logicalSlot] = item || null;
+    if (logicalSlot === null) return false;
+    this.bedrockInventorySlots[logicalSlot] = item || null;
+    return true;
   }
 
   private getBedrockInventoryAddress(logicalSlot: number): { containerId: string; slot: number } | null {
