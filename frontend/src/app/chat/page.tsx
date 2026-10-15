@@ -259,7 +259,7 @@ function ChatContent() {
           {/* Quick Commands */}
           <div className="px-5 py-2.5 bg-slate-100/70 border-b border-slate-200 flex items-center space-x-2 overflow-x-auto text-xs">
             <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Quick:</span>
-            {['/afk', '/lifesteal', '/home', '/spawn', '/tpa accept', '/help', '/tpahereaccept', '/tpdeny'].map((cmd) => (
+            {['/afk', '/lifesteal', '/home', '/spawn', '/tpa accept', '/help', '/resourcepack', '/tpahereaccept', '/tpdeny'].map((cmd) => (
               <button
                 key={cmd}
                 onClick={() => sendQuickCommand(cmd)}

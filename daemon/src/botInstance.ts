@@ -1,4 +1,5 @@
 import mineflayer, { Bot } from 'mineflayer';
+import { randomUUID } from 'node:crypto';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, InventoryItem, ItemEnchantment, MinimapPlayer, MinimapMob, TerrainGridData, BotGuiWindow } from './types.js';
 import { sampleTerrainGrid } from './terrainMapper.js';
@@ -611,22 +612,47 @@ export class BotInstance {
   public sendChat(message: string) {
     if (this.bedrockClient && this.currentStatus === 'online') {
       try {
-        this.bedrockClient.queue('text', {
-          type: 'chat',
-          needs_translation: false,
-          source_name: this.config.name,
-          message,
-          xuid: '',
-          platform_chat_id: '',
-        });
+        if (message.startsWith('/')) {
+          const uuid = randomUUID();
+          const commandOrigin: Record<string, unknown> = {
+            type: 'player',
+            uuid,
+            request_id: '',
+          };
+          const isModernCommandProtocol = this.bedrockClient.versionGreaterThanOrEqualTo('1.21.130');
+          const hasCommandVersion = this.bedrockClient.versionGreaterThanOrEqualTo('1.19.62');
+          if (isModernCommandProtocol) commandOrigin.player_entity_id = 0n;
+
+          const commandRequest: Record<string, unknown> = {
+            command: message,
+            origin: commandOrigin,
+            internal: false,
+          };
+          if (hasCommandVersion) commandRequest.version = isModernCommandProtocol ? 'latest' : 52;
+          this.bedrockClient.queue('command_request', commandRequest);
+          this.emitActivity('command', `⚡ Sent Bedrock command: ${message}`);
+        } else {
+          this.bedrockClient.queue('text', {
+            type: 'chat',
+            needs_translation: false,
+            source_name: this.config.name,
+            message,
+            xuid: '',
+            platform_chat_id: '',
+          });
+          this.emitActivity('chat', `💬 Sent chat: "${message}"`);
+        }
         this.callbacks.onChatMessage({
           botId: this.config.id,
           timestamp: Date.now(),
-          sender: this.config.name,
-          message,
-          isSystem: false,
+          sender: message.startsWith('/') ? 'VistaAFK' : this.config.name,
+          message: message.startsWith('/') ? `⚡ Sent command: ${message}` : message,
+          isSystem: message.startsWith('/'),
         });
-      } catch (e: any) {}
+      } catch (e: any) {
+        const error = e?.message || 'Unknown Bedrock send error';
+        this.callbacks.onNotification('error', `Failed to send Bedrock message: ${error}`, this.config.id);
+      }
       return;
     }
 
