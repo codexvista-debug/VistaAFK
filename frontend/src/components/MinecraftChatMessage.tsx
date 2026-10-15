@@ -113,7 +113,7 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
     && !senderAlreadyShown
   );
 
-  if (rankPrefixMatch) {
+  if (rankPrefixMatch && showPlayerSender) {
     const rank = rankPrefixMatch[1].toUpperCase();
     const rankColor = LIGHT_RANK_COLORS[rank] || '#475569';
     return (
@@ -125,7 +125,7 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
         )}
         <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text">
           <span className="font-black mr-1 px-1.5 py-0.5 rounded text-[11px]" style={{ color: rankColor, backgroundColor: rankColor + '15', borderColor: rankColor, borderWidth: 1, borderStyle: 'solid' }}>{rank}</span>
-          {showPlayerSender && <span className="mr-1 font-bold text-slate-900">{cleanSender}</span>}
+          <span className="mr-1 font-bold text-slate-900">{cleanSender}</span>
           <span className="text-slate-400 mr-1.5 font-bold">▶</span>
           {parseLightMinecraftColorCodes(rankPrefixMatch[2])}
         </span>
