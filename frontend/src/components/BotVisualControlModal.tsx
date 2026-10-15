@@ -18,6 +18,7 @@ import { BotLookControl } from './BotLookControl';
 import { BotConfig, BotTelemetry } from '../types';
 
 interface BotVisualControlModalProps {
+  embedded?: boolean;
   config: BotConfig;
   telemetry?: BotTelemetry;
   daemonConnected: boolean;
@@ -29,6 +30,7 @@ interface BotVisualControlModalProps {
 }
 
 export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
+  embedded = false,
   config,
   telemetry,
   daemonConnected,
@@ -251,17 +253,17 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto"
+      className={embedded ? 'flex-1 min-h-0 overflow-y-auto' : 'fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto'}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (!embedded && e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="bg-white border-2 border-slate-200 rounded-3xl w-full max-w-5xl flex flex-col shadow-2xl overflow-hidden max-h-[94vh] my-auto"
+        className={embedded ? 'min-h-full w-full flex flex-col bg-transparent' : 'bg-white border-2 border-slate-200 rounded-3xl w-full max-w-5xl flex flex-col shadow-2xl overflow-hidden max-h-[94vh] my-auto'}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 gap-2">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200/80 flex items-center justify-between bg-white/70 gap-2">
           <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
             <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 shrink-0">
               <Compass className="h-5 w-5" />
@@ -278,17 +280,17 @@ export const BotVisualControlModal: React.FC<BotVisualControlModalProps> = ({
               </p>
             </div>
           </div>
-          <button
+          {embedded ? <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${controlsAvailable ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500'}`}>{controlsAvailable ? 'Connected' : 'Waiting for bot'}</span> : <button
             onClick={onClose}
             className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-200 active:scale-95 transition shrink-0"
             title="Close (Esc)"
           >
             <X className="h-5 w-5 stroke-[2.5]" />
-          </button>
+          </button>}
         </div>
 
         {/* Content Body: Left Minimap / Right Controls */}
-        <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 overflow-y-auto">
+        <div className={`p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 ${embedded ? 'flex-1' : 'overflow-y-auto'}`}>
           {/* LEFT: Xaero's Minimap & Target Block (5 cols) */}
           <div className="lg:col-span-6 flex flex-col space-y-4">
             {/* Xaero's Minimap Component */}

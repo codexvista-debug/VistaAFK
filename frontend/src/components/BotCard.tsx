@@ -178,7 +178,7 @@ export const BotCard: React.FC<BotCardProps> = ({
   const isBedrock = config.edition === 'bedrock' || config.port === 19132 || config.id.includes('bedrock');
 
   return (
-    <div className="bg-white border-2 border-slate-200/90 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+    <div className="relative bg-white/90 backdrop-blur-xl border border-white/90 ring-1 ring-slate-900/5 rounded-[1.75rem] overflow-hidden shadow-[0_18px_48px_-24px_rgba(15,23,42,0.36)] hover:-translate-y-0.5 hover:shadow-[0_24px_56px_-24px_rgba(15,23,42,0.42)] transition-all flex flex-col justify-between before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-emerald-400 before:via-teal-400 before:to-cyan-400 before:content-['']">
       <div className="p-5">
         {/* Card Header: Avatar & Server Info */}
         <div className="flex items-start justify-between gap-2">

@@ -18,7 +18,8 @@ fi
 
 # 3. Automatically pull the latest updates from GitHub
 echo "🔄 Checking for latest VistaAFK updates..."
-git pull origin main
+git restore --worktree -- daemon/dist || { echo "Could not reset generated daemon build files."; exit 1; }
+git pull origin main || { echo "Git update failed. Resolve local source changes and run again."; exit 1; }
 
 # Keep global ~/start.sh in sync
 if [ -f "start.sh" ] && [ -d "$HOME" ]; then

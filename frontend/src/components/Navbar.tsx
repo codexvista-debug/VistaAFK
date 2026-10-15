@@ -56,7 +56,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   Vista<span className="text-emerald-400">AFK</span>
                 </span>
                 <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-mono font-bold bg-[#1b2738] text-emerald-300 border border-[#2d4059] rounded-md shadow-inner">
-                  24/7
+                  BETA
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 font-medium hidden md:block">Minecraft Chunk Loader & Multi-Server Bot Controller</p>

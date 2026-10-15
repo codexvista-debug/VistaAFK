@@ -35,7 +35,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 mb-4 sm:mb-6">
       {/* Accounts in Vault */}
-      <div className="bg-white border-2 border-slate-300 rounded-2xl p-3 sm:p-4 shadow-sm hover:shadow transition-shadow">
+      <div className="relative overflow-hidden bg-white/90 backdrop-blur-xl border border-white rounded-2xl p-3 sm:p-4 shadow-[0_14px_35px_-22px_rgba(15,23,42,0.38)] ring-1 ring-slate-900/5 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_rgba(15,23,42,0.4)] transition-all before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-emerald-400 before:via-teal-400 before:to-cyan-400 before:content-['']">
         <div className="flex items-center justify-between">
           <span className="text-[11px] sm:text-xs font-semibold text-slate-500">Vault Accounts</span>
           <div className="p-1.5 sm:p-2 rounded-xl bg-slate-50 text-slate-700 border border-slate-200">
@@ -49,7 +49,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
       </div>
 
       {/* Online Bots */}
-      <div className="bg-white border-2 border-slate-300 rounded-2xl p-3 sm:p-4 shadow-sm hover:shadow transition-shadow">
+      <div className="relative overflow-hidden bg-white/90 backdrop-blur-xl border border-white rounded-2xl p-3 sm:p-4 shadow-[0_14px_35px_-22px_rgba(15,23,42,0.38)] ring-1 ring-slate-900/5 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_rgba(15,23,42,0.4)] transition-all before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-emerald-400 before:via-teal-400 before:to-cyan-400 before:content-['']">
         <div className="flex items-center justify-between">
           <span className="text-[11px] sm:text-xs font-semibold text-slate-500">Deployments</span>
           <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
@@ -63,7 +63,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
       </div>
 
       {/* Pending Auth */}
-      <div className="bg-white border-2 border-slate-300 rounded-2xl p-3 sm:p-4 shadow-sm hover:shadow transition-shadow">
+      <div className="relative overflow-hidden bg-white/90 backdrop-blur-xl border border-white rounded-2xl p-3 sm:p-4 shadow-[0_14px_35px_-22px_rgba(15,23,42,0.38)] ring-1 ring-slate-900/5 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_rgba(15,23,42,0.4)] transition-all before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-amber-400 before:via-orange-400 before:to-rose-400 before:content-['']">
         <div className="flex items-center justify-between">
           <span className="text-[11px] sm:text-xs font-semibold text-slate-500">Pending OAuth</span>
           <div className={`p-1.5 sm:p-2 rounded-xl border ${authenticatingBots > 0 ? 'bg-amber-50 text-amber-600 border-amber-200 animate-pulse' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
@@ -79,7 +79,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
       </div>
 
       {/* Average Latency */}
-      <div className="bg-white border-2 border-slate-300 rounded-2xl p-3 sm:p-4 shadow-sm hover:shadow transition-shadow">
+      <div className="relative overflow-hidden bg-white/90 backdrop-blur-xl border border-white rounded-2xl p-3 sm:p-4 shadow-[0_14px_35px_-22px_rgba(15,23,42,0.38)] ring-1 ring-slate-900/5 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_rgba(15,23,42,0.4)] transition-all before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-sky-400 before:via-cyan-400 before:to-indigo-400 before:content-['']">
         <div className="flex items-center justify-between">
           <span className="text-[11px] sm:text-xs font-semibold text-slate-500">Avg Latency</span>
           <div className="p-1.5 sm:p-2 rounded-xl bg-teal-50 text-teal-600 border border-teal-200">

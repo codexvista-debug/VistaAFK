@@ -29,12 +29,12 @@ export const DaemonSettingsModal: React.FC<DaemonSettingsModalProps> = ({
   const cloudOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://vista-afk.vercel.app';
 
   const termuxCommand = user?.username
-    ? `pkg update -y && pkg install -y git nodejs cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh ${user.username} ${authToken || ''} ${cloudOrigin}`
-    : `pkg update -y && pkg install -y git nodejs cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh guest token ${cloudOrigin}`;
+    ? `pkg update -y && pkg install -y git nodejs cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git restore --worktree -- daemon/dist && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh ${user.username} ${authToken || ''} ${cloudOrigin}`
+    : `pkg update -y && pkg install -y git nodejs cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git restore --worktree -- daemon/dist && git pull origin main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh guest token ${cloudOrigin}`;
 
   const pcCommand = user?.username
-    ? `if (Test-Path "$HOME\\VistaAFK") { Set-Location "$HOME\\VistaAFK"; git pull origin main } else { git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME\\VistaAFK"; Set-Location "$HOME\\VistaAFK" }; powershell -ExecutionPolicy Bypass -File .\\start.ps1 "${user.username}" "${authToken || ''}" "${cloudOrigin}"`
-    : `if (Test-Path "$HOME\\VistaAFK") { Set-Location "$HOME\\VistaAFK"; git pull origin main } else { git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME\\VistaAFK"; Set-Location "$HOME\\VistaAFK" }; powershell -ExecutionPolicy Bypass -File .\\start.ps1 "guest" "token" "${cloudOrigin}"`;
+    ? `if (Test-Path "$HOME\\VistaAFK") { Set-Location "$HOME\\VistaAFK"; git restore --worktree -- daemon/dist; if ($LASTEXITCODE -ne 0) { throw 'Could not reset generated daemon build files.' }; git pull origin main } else { git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME\\VistaAFK"; Set-Location "$HOME\\VistaAFK" }; powershell -ExecutionPolicy Bypass -File .\\start.ps1 "${user.username}" "${authToken || ''}" "${cloudOrigin}"`
+    : `if (Test-Path "$HOME\\VistaAFK") { Set-Location "$HOME\\VistaAFK"; git restore --worktree -- daemon/dist; if ($LASTEXITCODE -ne 0) { throw 'Could not reset generated daemon build files.' }; git pull origin main } else { git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME\\VistaAFK"; Set-Location "$HOME\\VistaAFK" }; powershell -ExecutionPolicy Bypass -File .\\start.ps1 "guest" "token" "${cloudOrigin}"`;
 
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);

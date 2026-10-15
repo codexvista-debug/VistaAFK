@@ -233,6 +233,12 @@ class BotManager {
             instance.setQuickBarSlot(slot);
         }
     }
+    clickGuiWindowSlot(botId, slot, mouseButton = 0) {
+        const instance = this.bots.get(botId);
+        if (instance) {
+            instance.clickGuiWindowSlot(slot, mouseButton);
+        }
+    }
     getAllConfigs() {
         return Array.from(this.configs.values());
     }

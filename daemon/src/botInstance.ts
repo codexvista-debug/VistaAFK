@@ -407,10 +407,7 @@ export class BotInstance {
         port,
         username: this.config.name,
         offline: this.config.authType === 'offline',
-        transport: 'raknet',
-        useRaknetWorkers: false,
         profilesFolder: tokenFolder,
-        raknetBackend: 'jsp-raknet',
         connectTimeout: 45000,
         onMsaCode: (data: any) => {
           const userCode = data.user_code || data.userCode;

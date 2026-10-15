@@ -21,6 +21,7 @@ import {
   Square,
   Users,
   Bug,
+  Gamepad2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { MinecraftChatMessage } from '../../components/MinecraftChatMessage';
@@ -30,7 +31,7 @@ import { BotPlayerPov } from '../../components/BotPlayerPov';
 import { AddBotModal } from '../../components/AddBotModal';
 import { BotVisualControlModal } from '../../components/BotVisualControlModal';
 
-type ChatTab = 'settings' | 'logs' | 'chat' | 'map' | 'inventory';
+type ChatTab = 'settings' | 'logs' | 'chat' | 'map' | 'movement' | 'inventory';
 
 function ChatContent() {
   const searchParams = useSearchParams();
@@ -58,7 +59,6 @@ function ChatContent() {
   const [filter, setFilter] = useState<'all' | 'chat' | 'system'>('all');
   const [activeTab, setActiveTab] = useState<ChatTab>('chat');
   const [isEditingSettings, setIsEditingSettings] = useState(false);
-  const [showMapControls, setShowMapControls] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -112,6 +112,7 @@ function ChatContent() {
     { id: 'logs', label: 'Player Logs', icon: <Activity className="h-4 w-4" /> },
     { id: 'chat', label: 'Chat', icon: <MessageSquare className="h-4 w-4" /> },
     { id: 'map', label: 'Map', icon: <Compass className="h-4 w-4" /> },
+    { id: 'movement', label: 'Movement', icon: <Gamepad2 className="h-4 w-4" /> },
     { id: 'inventory', label: 'Inventory', icon: <Package className="h-4 w-4" /> },
   ];
 
@@ -122,7 +123,7 @@ function ChatContent() {
   return (
     <div className="h-screen flex flex-col bg-transparent text-slate-800 font-sans">
       {/* Light-Themed Top Bar */}
-      <header className="h-16 px-6 border-b border-slate-200 bg-white flex items-center justify-between shadow-xs">
+      <header className="h-16 px-6 border-b border-white/80 bg-white/85 backdrop-blur-xl flex items-center justify-between shadow-[0_8px_28px_-20px_rgba(15,23,42,0.45)]">
         <div className="flex items-center space-x-4">
           <Link
             href="/"
@@ -185,10 +186,10 @@ function ChatContent() {
 
       {/* Workspace with persistent left navigation */}
       <main className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden max-w-7xl w-full mx-auto p-3 sm:p-5 gap-4">
-        <nav aria-label="Bot workspace sections" className="shrink-0 md:w-56 flex md:flex-col gap-1 overflow-x-auto md:overflow-y-auto p-1 bg-white/90 border border-slate-200 rounded-2xl shadow-sm">
-          <div className="hidden md:flex items-center gap-2 px-3 py-3 mb-1 border-b border-slate-100">
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200"><Terminal className="h-4 w-4" /></div>
-            <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-wider text-slate-800">Bot Workspace</p><p className="truncate text-[10px] text-slate-500">{currentConfig?.name || 'Select an account'}</p></div>
+        <nav aria-label="Bot workspace sections" className="shrink-0 md:w-60 flex md:flex-col gap-1.5 overflow-x-auto md:overflow-y-auto p-2 bg-white/75 backdrop-blur-xl border border-white/90 rounded-[1.5rem] shadow-[0_18px_48px_-26px_rgba(15,23,42,0.34)] ring-1 ring-slate-900/5">
+          <div className="hidden md:flex items-center gap-3 px-3 py-4 mb-1 border-b border-slate-200/70">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-900/15"><Terminal className="h-4 w-4" /></div>
+            <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-800">Bot Workspace</p><p className="truncate text-[10px] text-slate-500">{currentConfig?.name || 'Select an account'}</p></div>
           </div>
           {tabs.map((tab) => (
             <button
@@ -196,19 +197,19 @@ function ChatContent() {
               type="button"
               onClick={() => setActiveTab(tab.id)}
               aria-current={activeTab === tab.id ? 'page' : undefined}
-              className={`shrink-0 md:w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition ${activeTab === tab.id ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+              className={`group shrink-0 md:w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${activeTab === tab.id ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-900/15 ring-1 ring-emerald-500/50' : 'text-slate-600 hover:bg-slate-100/90 hover:text-slate-950 hover:translate-x-0.5'}`}
             >
-              {tab.icon}<span className="whitespace-nowrap">{tab.label}</span>
+              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors ${activeTab === tab.id ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-emerald-700'}`}>{tab.icon}</span><span className="whitespace-nowrap">{tab.label}</span>
               {tab.id === 'logs' && playerLogs.length > 0 && <span className={`ml-auto rounded-full px-1.5 py-0.5 text-[9px] ${activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{playerLogs.length}</span>}
             </button>
           ))}
-          <div className="hidden md:block mt-auto p-3 border-t border-slate-100 text-[10px] text-slate-500">
-            <span className={`inline-block w-2 h-2 mr-1.5 rounded-full ${daemonConnected ? 'bg-emerald-500' : 'bg-rose-400'}`} />
+          <div className="hidden md:flex items-center gap-2 mt-auto p-3 border-t border-slate-200/70 text-[10px] text-slate-500">
+            <span className={`inline-block w-2 h-2 rounded-full ${daemonConnected ? 'bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]' : 'bg-rose-400 shadow-[0_0_0_3px_rgba(244,63,94,0.12)]'}`} />
             Daemon {daemonConnected ? 'connected' : 'disconnected'}
           </div>
         </nav>
 
-        <section className="flex-1 min-w-0 min-h-0 flex flex-col bg-white border-2 border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+        <section className="flex-1 min-w-0 min-h-0 flex flex-col bg-white/90 backdrop-blur-xl border border-white rounded-[1.5rem] overflow-hidden shadow-[0_20px_56px_-30px_rgba(15,23,42,0.34)] ring-1 ring-slate-900/5">
           {activeTab === 'chat' && <>
           {/* Sub Header */}
           <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
@@ -358,8 +359,8 @@ function ChatContent() {
 
           {activeTab === 'map' && (
             <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 bg-slate-50">
-              <div className="max-w-5xl mx-auto space-y-4">
-                <div className="flex items-center justify-between gap-3"><div><h1 className="text-sm font-black text-slate-900">World Map</h1><p className="text-[10px] text-slate-500">Terrain, nearby players, and mobs update with live telemetry.</p></div>{currentConfig && <button onClick={() => setShowMapControls(true)} disabled={!daemonConnected || !isOnline} className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-40">Open movement controls</button>}</div>
+              <div className="max-w-6xl mx-auto space-y-4">
+                <div className="flex items-center justify-between gap-3"><div><h1 className="text-sm font-black text-slate-900">World Map</h1><p className="text-[10px] text-slate-500">Terrain, nearby players, and mobs update with live telemetry.</p></div>{currentConfig && <button onClick={() => setActiveTab('movement')} className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold shadow-md shadow-emerald-900/15 hover:brightness-105"><Gamepad2 className="h-3.5 w-3.5" /> Movement controls</button>}</div>
                 {currentConfig ? <>
                 <BotPlayerPov telemetry={currentTelemetry} isOnline={isOnline} onClickGuiSlot={(slot, mouseButton) => clickGuiWindowSlot(currentConfig.id, slot, mouseButton)} />
                 <div className="grid lg:grid-cols-[minmax(400px,520px)_1fr] gap-5 items-start"><div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><XaerosMinimap telemetry={currentTelemetry} botName={currentConfig.name} large /></div><div className="space-y-4">
@@ -371,13 +372,16 @@ function ChatContent() {
             </div>
           )}
 
+          {activeTab === 'movement' && (currentConfig
+            ? <BotVisualControlModal embedded config={currentConfig} telemetry={currentTelemetry} daemonConnected={daemonConnected} onClose={() => setActiveTab('map')} onMove={moveBot} onTogglePatrol={togglePatrol} onLook={lookAt} onAttack={attackBot} />
+            : <div className="flex-1 min-h-0"><EmptyWorkspace message="Select an account to open its movement controls." /></div>)}
+
           {activeTab === 'inventory' && (currentConfig
             ? <BotInventoryModal embedded config={currentConfig} telemetry={currentTelemetry} />
             : <div className="flex-1 min-h-0"><EmptyWorkspace message="Select an account to view its inventory." /></div>)}
         </section>
       </main>
       {isEditingSettings && currentConfig && <AddBotModal initialConfig={currentConfig} onSave={updateBot} onClose={() => setIsEditingSettings(false)} />}
-      {showMapControls && currentConfig && <BotVisualControlModal config={currentConfig} telemetry={currentTelemetry} daemonConnected={daemonConnected} onClose={() => setShowMapControls(false)} onMove={moveBot} onTogglePatrol={togglePatrol} onLook={lookAt} onAttack={attackBot} />}
     </div>
   );
 }

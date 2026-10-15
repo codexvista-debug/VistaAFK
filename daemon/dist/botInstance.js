@@ -94,6 +94,35 @@ function cleanMinecraftJsonText(raw) {
     }
     return String(raw).replace(/§[0-9a-fk-or]/gi, '').trim();
 }
+function serializeGuiWindow(window) {
+    if (!window || !Array.isArray(window.slots))
+        return null;
+    const slots = window.slots.map((item, slot) => {
+        if (!item)
+            return null;
+        const lore = Array.isArray(item.customLore)
+            ? item.customLore.map((line) => cleanMinecraftJsonText(line)).filter(Boolean)
+            : [];
+        return {
+            slot,
+            name: String(item.name || 'unknown'),
+            displayName: cleanMinecraftJsonText(item.customName) || cleanMinecraftJsonText(item.displayName) || String(item.name || 'Unknown item'),
+            count: Number(item.count) || 1,
+            maxStackSize: Number(item.stackSize) || undefined,
+            customName: cleanMinecraftJsonText(item.customName) || undefined,
+            lore: lore.length ? lore : undefined,
+        };
+    });
+    const numericOrUndefined = (value) => Number.isFinite(Number(value)) ? Number(value) : undefined;
+    return {
+        id: numericOrUndefined(window.id) ?? 0,
+        title: cleanMinecraftJsonText(window.title) || 'Server Menu',
+        type: String(window.type || 'container'),
+        slots,
+        inventoryStart: numericOrUndefined(window.inventoryStart),
+        inventoryEnd: numericOrUndefined(window.inventoryEnd),
+    };
+}
 function parseMinecraftChat(raw) {
     if (!raw)
         return 'Unknown reason';
@@ -358,10 +387,7 @@ class BotInstance {
                 port,
                 username: this.config.name,
                 offline: this.config.authType === 'offline',
-                transport: 'raknet',
-                useRaknetWorkers: false,
                 profilesFolder: tokenFolder,
-                raknetBackend: 'jsp-raknet',
                 connectTimeout: 45000,
                 onMsaCode: (data) => {
                     const userCode = data.user_code || data.userCode;
@@ -381,6 +407,17 @@ class BotInstance {
                 clientOptions.version = targetVersion;
             const client = bedrock.createClient(clientOptions);
             this.bedrockClient = client;
+            // bedrock-protocol emits `session` once Microsoft/Xbox authentication has
+            // completed and it is ready to negotiate with the game server. Clearing
+            // the device code here prevents a later server/network error from being
+            // mistaken for an OAuth flow that is still waiting for approval.
+            client.once('session', () => {
+                if (this.authCodeInfo) {
+                    this.authCodeInfo = undefined;
+                    this.updateStatus('connecting', 'Microsoft sign-in complete; joining Bedrock server...');
+                    this.emitActivity('status', '✅ Microsoft sign-in complete; joining the Bedrock server...');
+                }
+            });
             client.on('join', () => {
                 if (client.username && client.username !== this.config.name) {
                     console.log(`[VistaAFK Bedrock] In-game gamertag updated: ${this.config.name} -> ${client.username}`);
@@ -456,8 +493,9 @@ class BotInstance {
             client.on('close', () => {
                 this.bedrockClient = null;
                 if (!this.isManuallyStopped) {
-                    // If the bot is currently authenticating (waiting for the user to approve the device code on microsoft.com/link), do not aggressively auto-reconnect
-                    if (this.currentStatus === 'authenticating' && this.authCodeInfo) {
+                    // Don't start another OAuth flow while the current device code is
+                    // awaiting approval, even if an error event changed the status first.
+                    if (this.authCodeInfo) {
                         this.emitActivity('status', `⏳ Awaiting Microsoft authorization: Visit ${this.authCodeInfo.verificationUri} and enter ${this.authCodeInfo.userCode}`);
                         return;
                     }
@@ -470,6 +508,7 @@ class BotInstance {
             });
             client.on('error', (err) => {
                 const errorMsg = err?.message || 'Bedrock connection error';
+                console.error(`[VistaAFK Bedrock] Connection error for ${this.config.name} (${host}:${port}):`, err);
                 this.updateStatus('error', errorMsg);
                 this.emitActivity('status', `⚠️ Bedrock Error: ${errorMsg}`);
             });
@@ -556,6 +595,15 @@ class BotInstance {
     bindBotEvents() {
         if (!this.bot)
             return;
+        this.bot.on('windowOpen', (window) => {
+            // Mineflayer's window events carry the real server menu (including custom
+            // inventory GUIs); expose it so the web control panel can display it.
+            const updateTelemetry = () => this.emitTelemetry();
+            window?.on?.('updateSlot', updateTelemetry);
+            window?.on?.('update', updateTelemetry);
+            this.emitTelemetry();
+        });
+        this.bot.on('windowClose', () => this.emitTelemetry());
         this.bot.once('spawn', () => {
             if (this.bot?.username && this.bot.username !== this.config.name) {
                 console.log(`[VistaAFK Java] Verified player username updated: ${this.config.name} -> ${this.bot.username}`);
@@ -1506,6 +1554,22 @@ class BotInstance {
             console.error(`[VistaAFK] Failed to set quick bar slot ${slot}:`, err.message);
         }
     }
+    async clickGuiWindowSlot(slot, mouseButton = 0) {
+        if (!this.bot || this.currentStatus !== 'online')
+            return;
+        const window = this.bot.currentWindow;
+        if (!window || !Number.isInteger(slot) || slot < 0 || slot >= window.slots.length)
+            return;
+        try {
+            await this.bot.clickWindow(slot, mouseButton, 0);
+            this.emitTelemetry();
+            setTimeout(() => this.emitTelemetry(), 120);
+        }
+        catch (err) {
+            console.error(`[VistaAFK] Failed to click server GUI slot ${slot}:`, err?.message || err);
+            this.callbacks.onNotification('error', `Failed to click server menu: ${err?.message || 'Unknown error'}`, this.config.id);
+        }
+    }
     getTelemetry() {
         if (this.bedrockClient) {
             const pos = this.bedrockPosition || { x: 0, y: 0, z: 0 };
@@ -1528,6 +1592,7 @@ class BotInstance {
                 gamemode: 'survival',
                 uptimeSeconds: this.connectStartTime ? Math.floor((Date.now() - this.connectStartTime) / 1000) : 0,
                 inventoryCount: 0,
+                openWindow: null,
                 facing: 'North',
                 yaw: 0,
                 pitch: 0,
@@ -1560,6 +1625,7 @@ class BotInstance {
                 gamemode: 'survival',
                 uptimeSeconds: 0,
                 inventoryCount: 0,
+                openWindow: null,
                 facing: 'North',
                 yaw: 0,
                 pitch: 0,
@@ -1861,6 +1927,7 @@ class BotInstance {
             offhandItem: offhand?.name,
             inventoryCount: this.bot.inventory ? this.bot.inventory.items().length : 0,
             inventory: inventoryList,
+            openWindow: serializeGuiWindow(this.bot.currentWindow),
             selectedSlot: this.bot.quickBarSlot ?? 0,
             facing,
             yaw: Math.round(yaw * 100) / 100,
