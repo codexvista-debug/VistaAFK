@@ -975,9 +975,10 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
     let host = (server.host || '').trim();
     let port = edition === 'bedrock' && server.port === 25565 ? 19132 : server.port;
 
-    // Auto-map DonutSMP Bedrock server address
-    if (edition === 'bedrock' && host.toLowerCase().includes('donutsmp.net') && !host.toLowerCase().startsWith('bedrock.')) {
-      host = 'bedrock.donutsmp.net';
+    // DonutSMP's official Bedrock endpoint is donutsmp.net:19132. Keep the
+    // same host for Java and Bedrock; only the port changes by edition.
+    if (edition === 'bedrock' && host.toLowerCase().includes('donutsmp.net')) {
+      host = 'donutsmp.net';
       port = 19132;
     } else if (edition === 'bedrock' && host.toLowerCase().includes('freshsmp') && port === 25565) {
       port = 19132;

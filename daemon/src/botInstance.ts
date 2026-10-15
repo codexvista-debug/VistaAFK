@@ -350,9 +350,10 @@ export class BotInstance {
     let host = (this.config.host || '').trim();
     let port = this.config.port || 19132;
 
-    // Auto-map DonutSMP Bedrock server address
-    if (host.toLowerCase().includes('donutsmp.net') && !host.toLowerCase().startsWith('bedrock.')) {
-      host = 'bedrock.donutsmp.net';
+    // DonutSMP's official Bedrock endpoint is donutsmp.net:19132. Normalize
+    // older saved configs that used bedrock.donutsmp.net as well.
+    if (host.toLowerCase().includes('donutsmp.net')) {
+      host = 'donutsmp.net';
       port = 19132;
     } else if (host.toLowerCase().includes('freshsmp') && port === 25565) {
       port = 19132;

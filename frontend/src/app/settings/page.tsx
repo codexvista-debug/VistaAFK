@@ -38,8 +38,6 @@ export default function SettingsPage() {
     isConnectionLocked,
     toggleConnectionLock,
     daemonDeviceType,
-    daemonDeviceLabel,
-    daemonSystemInfo,
   } = useVistaWebSocket();
 
   const [inputUrl, setInputUrl] = useState(daemonUrl);
@@ -356,8 +354,7 @@ export default function SettingsPage() {
 
             {/* Live Indicator Status Badge & Device Source */}
             <div className="flex flex-wrap items-center gap-2 shrink-0">
-              {/* Show device connection pill when connected */}
-              {isConnected && (
+              {isConnected && daemonDeviceType && (
                 <div
                   className={`px-3 py-1.5 rounded-xl border text-xs font-black flex items-center space-x-1.5 shadow-2xs ${
                     daemonDeviceType === 'pc'
@@ -366,16 +363,14 @@ export default function SettingsPage() {
                       ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
                       : 'bg-slate-100 border-slate-300 text-slate-800'
                   }`}
-                  title={`Daemon controller is running on: ${daemonDeviceLabel || (daemonDeviceType === 'pc' ? 'Windows PC' : 'Mobile Termux')}`}
+                  title={`Connected from ${daemonDeviceType === 'pc' ? 'PC' : 'Mobile'}`}
                 >
                   {daemonDeviceType === 'pc' ? (
                     <Monitor className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-                  ) : daemonDeviceType === 'mobile' ? (
-                    <Smartphone className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                   ) : (
-                    <Server className="h-3.5 w-3.5 text-slate-600 shrink-0" />
+                    <Smartphone className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                   )}
-                  <span>{daemonDeviceLabel || (daemonDeviceType === 'pc' ? 'Windows PC' : daemonDeviceType === 'mobile' ? 'Mobile (Termux)' : 'Connected Device')}</span>
+                  <span>{daemonDeviceType === 'pc' ? 'PC' : 'Mobile'}</span>
                 </div>
               )}
 
@@ -479,13 +474,6 @@ export default function SettingsPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-bold text-slate-800">WebSocket Daemon URL</label>
-                <span className="text-[10px] text-slate-500 font-medium">
-                  {daemonDeviceType === 'pc'
-                    ? 'Active: 💻 Windows PC (Auto-synced)'
-                    : daemonDeviceType === 'mobile'
-                    ? 'Active: 📱 Mobile Termux (Auto-synced)'
-                    : 'Auto-updated by Phone, PC or manual'}
-                </span>
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
@@ -514,35 +502,6 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Live Connected Source Details */}
-              {isConnected && (
-                <div className="mt-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-[11px] font-bold text-slate-500">Controller Source:</span>
-                    {daemonDeviceType === 'pc' ? (
-                      <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-lg bg-blue-100 text-blue-900 border border-blue-300 font-bold text-[11px]">
-                        <Monitor className="h-3.5 w-3.5 text-blue-600" />
-                        <span>Connected via Windows PC (PowerShell)</span>
-                      </span>
-                    ) : daemonDeviceType === 'mobile' ? (
-                      <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-[11px]">
-                        <Smartphone className="h-3.5 w-3.5 text-emerald-600" />
-                        <span>Connected via Mobile (Termux 24/7)</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-lg bg-slate-200 text-slate-800 font-bold text-[11px]">
-                        <Server className="h-3.5 w-3.5 text-slate-600" />
-                        <span>{daemonDeviceLabel || 'Active Controller'}</span>
-                      </span>
-                    )}
-                  </div>
-                  {daemonSystemInfo?.os && (
-                    <span className="text-[10px] font-mono text-slate-500">
-                      Platform: {daemonSystemInfo.os} {daemonSystemInfo.hostname ? `(${daemonSystemInfo.hostname})` : ''}
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
 
             {saveSuccess && (
