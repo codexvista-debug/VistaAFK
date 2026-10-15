@@ -343,6 +343,7 @@ export class BotInstance {
   private lastChatTimestamp: number = 0;
   private lastAntiAfkLogTime: number = 0;
   private isEatingFood: boolean = false;
+  private lastJavaGuiWindowId: number | null = null;
   private customMaxHealth: number = 0;
   private terrainGridCache: TerrainGridData | null = null;
   private terrainGridSampledAt = 0;
@@ -480,6 +481,7 @@ export class BotInstance {
     }
 
     try {
+      this.lastJavaGuiWindowId = null;
       this.bot = mineflayer.createBot(options);
       this.bindBotEvents();
     } catch (err: any) {
@@ -1000,6 +1002,7 @@ export class BotInstance {
       }
       this.bot = null;
     }
+    this.lastJavaGuiWindowId = null;
     this.updateStatus('offline', 'Disconnected');
     if (this.connectStartTime) {
       this.emitActivity('disconnect', `⏹️ Disconnected by user (Session Uptime: ${uptime})`);
@@ -1083,6 +1086,7 @@ export class BotInstance {
     this.bot.on('windowOpen', (window: any) => {
       // Mineflayer's window events carry the real server menu (including custom
       // inventory GUIs); expose it so the web control panel can display it.
+      this.lastJavaGuiWindowId = Number.isInteger(window?.id) ? window.id : null;
       const updateTelemetry = () => this.emitTelemetry();
       window?.on?.('updateSlot', updateTelemetry);
       window?.on?.('update', updateTelemetry);
@@ -1296,6 +1300,7 @@ export class BotInstance {
       const uptime = this.getSessionUptime();
       this.clearTimers();
       this.bot = null;
+      this.lastJavaGuiWindowId = null;
       if (!this.isManuallyStopped) {
         if (this.connectStartTime) {
           this.emitActivity('disconnect', `🔴 Disconnected from server (Session Uptime: ${uptime})`);
@@ -1559,6 +1564,9 @@ export class BotInstance {
           }
 
           if (selectedFood) {
+            const previousHotbarSlot = Number.isInteger((this.bot as any).quickBarSlot)
+              ? (this.bot as any).quickBarSlot as number
+              : 0;
             this.isEatingFood = true;
             const foodToEat = selectedFood;
             const foodName = foodToEat.displayName || foodToEat.name;
@@ -1572,18 +1580,50 @@ export class BotInstance {
                 } catch (err: any) {
                   // Eating interrupted or failed
                 } finally {
+                  await this.restoreJavaMainHandAfterEating(previousHotbarSlot);
                   this.isEatingFood = false;
                   this.emitTelemetry();
                 }
               })
               .catch(() => {
+                void this.restoreJavaMainHandAfterEating(previousHotbarSlot);
                 this.isEatingFood = false;
+                this.emitTelemetry();
               });
           }
         }
       } catch (e) {
         this.isEatingFood = false;
       }
+    }
+  }
+
+  private async restoreJavaMainHandAfterEating(previousHotbarSlot: number) {
+    const bot = this.bot;
+    if (!bot || this.currentStatus !== 'online' || !bot.inventory) return;
+
+    try {
+      if (this.config.farming?.enabled && this.config.farming.autoEquipSword) {
+        const isWeapon = (item: any) => Boolean(item && (item.name?.includes('sword') || item.name?.includes('axe')));
+        if (isWeapon(bot.heldItem)) return;
+
+        const hotbarWeapon = Array.from({ length: 9 }, (_, slot) => bot.inventory.slots[36 + slot])
+          .find(isWeapon);
+        if (hotbarWeapon) {
+          bot.setQuickBarSlot(hotbarWeapon.slot - 36);
+          return;
+        }
+
+        const inventoryWeapon = bot.inventory.items().find(isWeapon);
+        if (inventoryWeapon) {
+          await bot.equip(inventoryWeapon, 'hand');
+          return;
+        }
+      }
+
+      bot.setQuickBarSlot(Math.max(0, Math.min(8, previousHotbarSlot)));
+    } catch (err: any) {
+      console.warn(`[VistaAFK] Could not restore the preferred main-hand item after eating: ${err?.message || err}`);
     }
   }
 
@@ -2421,12 +2461,36 @@ export class BotInstance {
       return;
     }
 
-    const window = this.bot?.currentWindow;
-    if (!this.bot || this.currentStatus !== 'online' || !window) return;
-    try {
-      await this.bot.closeWindow(window);
+    const bot = this.bot;
+    if (!bot || this.currentStatus !== 'online') return;
+    const window = bot.currentWindow;
+    const windowId = window?.id ?? this.lastJavaGuiWindowId;
+    if (typeof windowId !== 'number' || !Number.isInteger(windowId)) {
       this.emitTelemetry();
+      return;
+    }
+    try {
+      if (window && typeof bot.closeWindow === 'function') {
+        await bot.closeWindow(window);
+      } else {
+        // The dashboard may still show an open-menu snapshot after Mineflayer
+        // has cleared its local window. Send the protocol close using the last
+        // server window id so the menu is closed in-game as well.
+        bot._client.write('close_window', { windowId });
+      }
+      this.lastJavaGuiWindowId = null;
+      this.emitTelemetry();
+      this.emitActivity('status', 'Closed the open server menu');
     } catch (err: any) {
+      try {
+        bot._client.write('close_window', { windowId });
+        if (window && bot.currentWindow === window) {
+          bot.currentWindow = null;
+          bot.emit('windowClose', window);
+        }
+        this.lastJavaGuiWindowId = null;
+        this.emitTelemetry();
+      } catch {}
       console.error(`[VistaAFK] Failed to close Java GUI for ${this.config.name}:`, err?.message || err);
       this.callbacks.onNotification('error', `Failed to close menu: ${err?.message || 'Unknown error'}`, this.config.id);
     }
