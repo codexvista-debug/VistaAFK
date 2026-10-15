@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "============================================="
-echo "      🚀 Starting VistaAFK Daemon v1.2.7      "
+echo "      🚀 Starting VistaAFK Daemon v1.2.8      "
 echo "============================================="
 
 # 0. Automatically acquire Termux Wake Lock so Android OS never sleeps or throttles daemon
@@ -65,6 +65,13 @@ if [ ! -d "node_modules/bedrock-protocol" ]; then
   echo "📦 Installing Bedrock support (pure JS, 0 compilation)..."
   npm install bedrock-protocol --ignore-scripts --omit=optional
 fi
+
+# Termux needs a compatibility fix for the bundled JavaScript RakNet transport.
+echo "🔧 Preparing the Bedrock transport for Termux..."
+node ./scripts/patch-mobile-raknet.cjs || {
+  echo "❌ Could not prepare the Termux Bedrock transport; daemon was not started."
+  exit 1
+}
 
 # Always compile after pulling updates. Running the old dist files leaves the
 # daemon's telemetry (including inventory enchantments) stale.

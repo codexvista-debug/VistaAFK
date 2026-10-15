@@ -1,0 +1,84 @@
+const fs = require('node:fs')
+const path = require('node:path')
+
+function patchFile (relativePath, before, after, marker, label) {
+  const filePath = path.resolve(__dirname, '..', relativePath)
+  let source = fs.readFileSync(filePath, 'utf8')
+  if (source.includes(marker)) return
+
+  const matches = source.split(before).length - 1
+  if (matches !== 1) {
+    throw new Error(`Expected one ${label} patch point in ${relativePath}, found ${matches}.`)
+  }
+
+  source = source.replace(before, after)
+  fs.writeFileSync(filePath, source, 'utf8')
+  console.log(`[VistaAFK Mobile] Applied ${label}.`)
+}
+
+try {
+  patchFile(
+    'node_modules/jsp-raknet/js/Client.js',
+    '    constructor(hostname, port) {',
+    '    constructor(hostname, port, options = {}) {',
+    'constructor(hostname, port, options = {})',
+    'RakNet constructor options'
+  )
+  patchFile(
+    'node_modules/jsp-raknet/js/Client.js',
+    '        this.port = port;\n        this.address = new InetAddress_1.default(this.hostname, this.port);',
+    '        this.port = port;\n        this.protocolVersion = options.protocolVersion ?? 10;\n        this.address = new InetAddress_1.default(this.hostname, this.port);',
+    'this.protocolVersion = options.protocolVersion ?? 10',
+    'current Bedrock RakNet protocol selection'
+  )
+  patchFile(
+    'node_modules/jsp-raknet/js/Client.js',
+    '        packet.protocol = RAKNET_PROTOCOL;',
+    '        packet.protocol = this.protocolVersion;',
+    'packet.protocol = this.protocolVersion',
+    'current Bedrock RakNet protocol handshake'
+  )
+
+  patchFile(
+    'node_modules/bedrock-protocol/src/client.js',
+    '      this.connection = new RakClient({ useWorkers: this.options.useRaknetWorkers, host, port }, this)',
+    "      this.connection = new RakClient({ useWorkers: this.options.useRaknetWorkers, host, port, raknetProtocolVersion: this.versionGreaterThanOrEqualTo('1.19.30') ? 11 : 10 }, this)",
+    'raknetProtocolVersion: this.versionGreaterThanOrEqualTo',
+    'Bedrock protocol version handoff'
+  )
+
+  patchFile(
+    'node_modules/bedrock-protocol/src/rak.js',
+    `  async plainConnect (host = this.options.host, port = this.options.port) {
+    this.raknet = new Client(host, port)
+    await this.raknet.connect()
+
+    this.raknet.on('connecting', () => {
+      console.log(\`[client] connecting to \${host}/\${port}\`)
+    })
+
+    this.raknet.on('connected', this.onConnected)
+    this.raknet.on('encapsulated', (encapsulated, addr) => this.onEncapsulated(encapsulated, addr.hash))
+    this.raknet.on('disconnect', (reason) => this.onCloseConnection(reason))
+  }`,
+    `  async plainConnect (host = this.options.host, port = this.options.port) {
+    this.raknet = new Client(host, port, { protocolVersion: this.options.raknetProtocolVersion })
+
+    // Register before opening the socket: the RakNet handshake can complete
+    // while Client.connect() is still waiting on its first retry interval.
+    this.raknet.on('connecting', () => {
+      console.log(\`[client] connecting to \${host}/\${port}\`)
+    })
+    this.raknet.on('connected', this.onConnected)
+    this.raknet.on('encapsulated', (encapsulated, addr) => this.onEncapsulated(encapsulated, addr.hash))
+    this.raknet.on('disconnect', (reason) => this.onCloseConnection(reason))
+
+    await this.raknet.connect()
+  }`,
+    'protocolVersion: this.options.raknetProtocolVersion',
+    'RakNet handshake listener ordering'
+  )
+} catch (error) {
+  console.error(`[VistaAFK Mobile] Could not patch the Bedrock transport: ${error.message}`)
+  process.exitCode = 1
+}

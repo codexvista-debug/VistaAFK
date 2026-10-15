@@ -476,8 +476,11 @@ export class BotInstance {
         offline: this.config.authType === 'offline',
         transport: 'raknet',
         // Termux does not have a compatible raknet-native binary. Keep mobile
-        // on the bundled JS transport; desktop platforms use native RakNet.
-        ...(isMobileDaemon ? { raknetBackend: 'jsp-raknet', useRaknetWorkers: false } : {}),
+        // on the bundled JS transport and skip its discovery ping, which
+        // bedrock-protocol hard-wires to raknet-native. The mobile launcher
+        // patches jsp-raknet to use the current RakNet protocol and register
+        // its handshake listeners before starting the handshake.
+        ...(isMobileDaemon ? { raknetBackend: 'jsp-raknet', useRaknetWorkers: false, skipPing: true } : {}),
         profilesFolder: tokenFolder,
         connectTimeout: 45000,
         onMsaCode: (data: any) => {
@@ -1047,7 +1050,9 @@ export class BotInstance {
 
     this.bot.on('error', (err: any) => {
       let friendlyMsg = err?.message || 'Connection failed';
-      if (friendlyMsg.includes('ECONNREFUSED')) {
+      if (friendlyMsg.includes('Failed to obtain profile data') && process.env.VISTAAFK_DEVICE_TYPE === 'mobile') {
+        friendlyMsg = `Termux could not load a Java profile for ${this.config.name}. Sign in to this Microsoft account from Add Account while the Termux daemon is connected; PC Minecraft credentials are stored locally and are not copied to your phone.`;
+      } else if (friendlyMsg.includes('ECONNREFUSED')) {
         friendlyMsg = `Cannot connect to ${this.config.host}:${this.config.port} — no Minecraft server is running there.`;
       } else if (friendlyMsg.includes('ENOTFOUND')) {
         friendlyMsg = `Server address not found: ${this.config.host}`;

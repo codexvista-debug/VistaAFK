@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "============================================="
-echo "      🚀 Starting VistaAFK Daemon v1.2.7      "
+echo "      🚀 Starting VistaAFK Daemon v1.2.8      "
 echo "============================================="
 
 # 1. Kill any existing zombie processes
@@ -41,6 +41,13 @@ if [ ! -d "node_modules/bedrock-protocol" ]; then
   echo "📦 Installing Bedrock support (pure JS, 0 compilation)..."
   npm install bedrock-protocol --ignore-scripts --omit=optional
 fi
+
+# Termux needs a compatibility fix for the bundled JavaScript RakNet transport.
+echo "🔧 Preparing the Bedrock transport for Termux..."
+node ./scripts/patch-mobile-raknet.cjs || {
+  echo "❌ Could not prepare the Termux Bedrock transport; daemon was not started."
+  exit 1
+}
 
 # Rebuild every time so git-pulled daemon fixes are actually used.
 if [ ! -x "node_modules/.bin/tsc" ]; then
