@@ -40,7 +40,11 @@ node ./scripts/patch-termux-raknet-native.cjs || {
   exit 0
 }
 
-if [ ! -x "node_modules/.bin/cmake-js" ]; then
+if [ -f "node_modules/cmake-js/bin/cmake-js" ]; then
+  CMAKE_JS_BIN="$PWD/node_modules/cmake-js/bin/cmake-js"
+elif [ -f "node_modules/raknet-native/node_modules/cmake-js/bin/cmake-js" ]; then
+  CMAKE_JS_BIN="$PWD/node_modules/raknet-native/node_modules/cmake-js/bin/cmake-js"
+else
   echo "⚠️ cmake-js is unavailable; the daemon will use the JSP RakNet fallback."
   exit 0
 fi
@@ -53,7 +57,7 @@ if [ ! -d "node_modules/raknet-native/raknet/Source" ]; then
   }
 fi
 
-(cd node_modules/raknet-native && ../../node_modules/.bin/cmake-js compile) || {
+(cd node_modules/raknet-native && node "$CMAKE_JS_BIN" compile) || {
   echo "⚠️ Native RakNet build failed; the daemon will use the JSP RakNet fallback."
   exit 0
 }
