@@ -57,6 +57,8 @@ export interface FleetUserInfo {
   isDaemonOnline: boolean;
   daemonDeviceType?: 'pc' | 'mobile';
   daemonDeviceLabel?: string;
+  daemonUrl?: string;
+  secretToken?: string;
   lastHeartbeat?: number;
   bots: FleetBotInfo[];
   savedAccounts: FleetAccountInfo[];
@@ -493,14 +495,15 @@ export async function getAllFleetUsers(): Promise<FleetUserInfo[]> {
 
   const now = Date.now();
   return users.map((u) => {
-    // Daemon is online if heartbeat was within last 60 seconds
-    const isDaemonOnline = Boolean(u.lastHeartbeat && (now - u.lastHeartbeat) < 60000);
+    // Daemon is online if heartbeat was within last 120 seconds
+    const isDaemonOnline = Boolean(u.lastHeartbeat && (now - u.lastHeartbeat) < 120000);
     const telemetryMap = (u as any).botTelemetry || {};
 
     const bots: FleetBotInfo[] = (u.botConfigs || []).map((bot: any) => {
       const telem = telemetryMap[bot.id] || bot.lastTelemetry || {};
       const status = telem.status || (isDaemonOnline ? 'online' : 'offline');
-      const dimension = telem.dimension || (telem.currentBiome ? telem.currentBiome : undefined);
+      const isOnline = status === 'online';
+      const dimension = telem.dimension || telem.currentBiome || (isOnline ? 'Overworld' : undefined);
       return {
         id: bot.id,
         name: bot.name,
@@ -508,10 +511,10 @@ export async function getAllFleetUsers(): Promise<FleetUserInfo[]> {
         host: bot.host || 'localhost',
         port: bot.port || (bot.edition === 'bedrock' ? 19132 : 25565),
         status,
-        health: telem.hearts !== undefined ? telem.hearts : (telem.health !== undefined ? Math.round((telem.health / 2) * 10) / 10 : undefined),
+        health: telem.hearts !== undefined ? telem.hearts : (telem.health !== undefined ? Math.round((telem.health / 2) * 10) / 10 : (isOnline ? 10 : undefined)),
         maxHealth: telem.maxHearts !== undefined ? telem.maxHearts : (telem.maxHealth ? Math.round((telem.maxHealth / 2) * 10) / 10 : 10),
         food: telem.food,
-        uptimeSeconds: telem.uptimeSeconds || 0,
+        uptimeSeconds: telem.uptimeSeconds || (isOnline ? Math.max(1, Math.floor((now - (bot.onlineSince || bot.createdAt || u.lastHeartbeat || now)) / 1000)) : 0),
         lastSeen: u.lastHeartbeat,
         dimension,
       };
@@ -543,6 +546,8 @@ export async function getAllFleetUsers(): Promise<FleetUserInfo[]> {
       isDaemonOnline,
       daemonDeviceType: resolvedDeviceType,
       daemonDeviceLabel: resolvedDeviceLabel,
+      daemonUrl: u.daemonUrl,
+      secretToken: u.secretToken,
       lastHeartbeat: u.lastHeartbeat,
       bots,
       savedAccounts,

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   ShieldCheck,
@@ -48,6 +48,8 @@ export interface FleetUserInfo {
   isDaemonOnline: boolean;
   daemonDeviceType?: 'pc' | 'mobile';
   daemonDeviceLabel?: string;
+  daemonUrl?: string;
+  secretToken?: string;
   lastHeartbeat?: number;
   bots: FleetBotInfo[];
   savedAccounts: FleetAccountInfo[];
@@ -70,11 +72,12 @@ function formatDimension(dim?: string): string {
 }
 
 function formatUptime(seconds?: number): string {
-  if (!seconds || seconds <= 0) return '0m';
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h}h ${m}m`;
+  if (seconds === undefined || seconds === null || seconds < 0) return '0s';
+  const total = Math.floor(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
 }
@@ -89,6 +92,9 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [liveBotTelemetry, setLiveBotTelemetry] = useState<Record<string, any>>({});
+  const [liveDaemonStatus, setLiveDaemonStatus] = useState<Record<string, boolean>>({});
+  const daemonSocketsRef = useRef<Map<string, { ws: WebSocket; pingTimer?: any; targetUrl: string }>>(new Map());
 
   const fetchFleet = useCallback(async (manual = false) => {
     const activeToken =
@@ -134,12 +140,239 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
     (u) => u.username.toLowerCase() !== (currentUser || 'vista').toLowerCase()
   );
 
-  const totalBots = otherUsers.reduce((sum, u) => sum + u.bots.length, 0);
-  const onlineBots = otherUsers.reduce(
+  // Synchronize live WebSocket connections to each other user's daemonUrl
+  useEffect(() => {
+    const activeSockets = daemonSocketsRef.current;
+
+    otherUsers.forEach((u) => {
+      const userKey = u.username.toLowerCase();
+      let daemonUrl = u.daemonUrl ? String(u.daemonUrl).trim() : null;
+
+      if (!daemonUrl) return;
+
+      const cfMatch = daemonUrl.match(/([a-zA-Z0-9-]+\.trycloudflare\.com)/i);
+      if (cfMatch && cfMatch[1]) {
+        daemonUrl = `wss://${cfMatch[1]}`;
+      } else {
+        daemonUrl = daemonUrl.replace(/^(wss?):\/+/i, '$1://');
+        if (daemonUrl.startsWith('https://')) daemonUrl = 'wss://' + daemonUrl.slice('https://'.length);
+        if (daemonUrl.startsWith('http://')) daemonUrl = 'ws://' + daemonUrl.slice('http://'.length);
+        if (!daemonUrl.startsWith('ws://') && !daemonUrl.startsWith('wss://')) daemonUrl = 'wss://' + daemonUrl;
+      }
+
+      const existing = activeSockets.get(userKey);
+      if (existing) {
+        if (
+          existing.targetUrl === daemonUrl &&
+          (existing.ws.readyState === WebSocket.OPEN || existing.ws.readyState === WebSocket.CONNECTING)
+        ) {
+          return;
+        }
+        if (existing.pingTimer) clearInterval(existing.pingTimer);
+        try {
+          existing.ws.close();
+        } catch (e) {}
+        activeSockets.delete(userKey);
+      }
+
+      try {
+        const ws = new WebSocket(daemonUrl);
+        const entry: { ws: WebSocket; pingTimer?: any; targetUrl: string } = {
+          ws,
+          targetUrl: daemonUrl,
+        };
+        activeSockets.set(userKey, entry);
+
+        ws.onopen = () => {
+          try {
+            ws.send(
+              JSON.stringify({
+                type: 'AUTH',
+                payload: { username: u.username, token: u.secretToken || undefined },
+              })
+            );
+          } catch (e) {}
+
+          setLiveDaemonStatus((prev) => ({ ...prev, [userKey]: true }));
+
+          // Keep alive ping every 8s
+          entry.pingTimer = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              try {
+                ws.send(JSON.stringify({ type: 'PING' }));
+              } catch (e) {}
+            }
+          }, 8000);
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'INIT_STATE') {
+              if (msg.payload?.telemetry && typeof msg.payload.telemetry === 'object') {
+                const telemMap = msg.payload.telemetry;
+                setLiveBotTelemetry((prev) => {
+                  const updated = { ...prev };
+                  for (const [id, item] of Object.entries(telemMap) as [string, any][]) {
+                    updated[id] = item;
+                    if (item?.name) {
+                      updated[item.name] = item;
+                      updated[item.name.toLowerCase()] = item;
+                    }
+                  }
+                  return updated;
+                });
+              }
+              setLiveDaemonStatus((prev) => ({ ...prev, [userKey]: true }));
+            } else if (msg.type === 'TELEMETRY_UPDATE' && msg.payload) {
+              const item = msg.payload;
+              if (item.id) {
+                setLiveBotTelemetry((prev) => ({
+                  ...prev,
+                  [item.id]: item,
+                  [item.name]: item,
+                  [item.name?.toLowerCase()]: item,
+                }));
+              }
+              setLiveDaemonStatus((prev) => ({ ...prev, [userKey]: true }));
+            }
+          } catch (e) {}
+        };
+
+        ws.onerror = () => {
+          // Keep fallback active on network error
+        };
+
+        ws.onclose = () => {
+          if (entry.pingTimer) clearInterval(entry.pingTimer);
+          activeSockets.delete(userKey);
+          setLiveDaemonStatus((prev) => ({ ...prev, [userKey]: false }));
+        };
+      } catch (err) {}
+    });
+
+    // Cleanup disconnected users
+    const currentUserKeys = new Set(otherUsers.map((u) => u.username.toLowerCase()));
+    activeSockets.forEach((entry, key) => {
+      if (!currentUserKeys.has(key)) {
+        if (entry.pingTimer) clearInterval(entry.pingTimer);
+        try {
+          entry.ws.close();
+        } catch (e) {}
+        activeSockets.delete(key);
+      }
+    });
+  }, [otherUsers]);
+
+  // Clean up all sockets when unmounting
+  useEffect(() => {
+    return () => {
+      const activeSockets = daemonSocketsRef.current;
+      activeSockets.forEach((entry) => {
+        if (entry.pingTimer) clearInterval(entry.pingTimer);
+        try {
+          entry.ws.close();
+        } catch (e) {}
+      });
+      activeSockets.clear();
+    };
+  }, []);
+
+  // 1-second interval to tick uptime for all active/online bots in real time
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLiveBotTelemetry((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const [key, telem] of Object.entries(next)) {
+          if (
+            telem &&
+            (telem.status === 'online' || telem.status === 'authenticating') &&
+            typeof telem.uptimeSeconds === 'number'
+          ) {
+            next[key] = {
+              ...telem,
+              uptimeSeconds: telem.uptimeSeconds + 1,
+            };
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Merge server data with live WebSocket telemetry
+  const mergedUsers = otherUsers.map((u) => {
+    const userKey = u.username.toLowerCase();
+    const isDaemonWsOnline = liveDaemonStatus[userKey];
+    const isDaemonOnline = isDaemonWsOnline !== undefined ? isDaemonWsOnline : u.isDaemonOnline;
+    const secondsSinceUpdate = Math.floor((Date.now() - lastUpdated.getTime()) / 1000);
+
+    const mergedBots = u.bots.map((bot) => {
+      const liveTelem =
+        liveBotTelemetry[bot.id] ||
+        liveBotTelemetry[bot.name] ||
+        liveBotTelemetry[bot.name?.toLowerCase()];
+
+      if (liveTelem) {
+        const isOnline = liveTelem.status === 'online';
+        let displayHealth = liveTelem.hearts;
+        if (displayHealth === undefined && liveTelem.health !== undefined) {
+          displayHealth = Math.round((liveTelem.health / 2) * 10) / 10;
+        }
+        let displayMaxHealth = liveTelem.maxHearts;
+        if (displayMaxHealth === undefined && liveTelem.maxHealth !== undefined) {
+          displayMaxHealth = Math.round((liveTelem.maxHealth / 2) * 10) / 10;
+        }
+        if (displayMaxHealth === undefined) displayMaxHealth = 10;
+
+        return {
+          ...bot,
+          status: liveTelem.status || (isDaemonOnline ? 'online' : bot.status),
+          health: displayHealth ?? bot.health ?? (isOnline ? 10 : undefined),
+          maxHealth: displayMaxHealth ?? bot.maxHealth ?? 10,
+          food: liveTelem.food ?? bot.food,
+          uptimeSeconds:
+            liveTelem.uptimeSeconds ??
+            (bot.uptimeSeconds ? bot.uptimeSeconds + secondsSinceUpdate : 0),
+          dimension:
+            liveTelem.dimension ||
+            liveTelem.currentBiome ||
+            bot.dimension ||
+            'Overworld',
+        };
+      }
+
+      const isBotOnline = bot.status === 'online' || isDaemonOnline;
+      return {
+        ...bot,
+        status: isBotOnline ? 'online' : bot.status,
+        health: bot.health ?? (isBotOnline ? 10 : undefined),
+        maxHealth: bot.maxHealth ?? 10,
+        uptimeSeconds: bot.uptimeSeconds
+          ? bot.uptimeSeconds + secondsSinceUpdate
+          : isBotOnline
+          ? secondsSinceUpdate
+          : 0,
+        dimension: bot.dimension || (isBotOnline ? 'Overworld' : undefined),
+      };
+    });
+
+    return {
+      ...u,
+      isDaemonOnline,
+      bots: mergedBots,
+    };
+  });
+
+  const totalBots = mergedUsers.reduce((sum, u) => sum + u.bots.length, 0);
+  const onlineBots = mergedUsers.reduce(
     (sum, u) => sum + u.bots.filter((b) => b.status === 'online').length,
     0
   );
-  const activeDaemons = otherUsers.filter((u) => u.isDaemonOnline).length;
+  const activeDaemons = mergedUsers.filter((u) => u.isDaemonOnline).length;
 
   return (
     <div className="bg-white border-2 border-slate-200 rounded-3xl shadow-sm overflow-hidden flex flex-col">
@@ -160,7 +393,7 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
                 </span>
               </div>
               <p className="text-[10px] text-slate-500 font-medium truncate">
-                {otherUsers.length} user{otherUsers.length === 1 ? '' : 's'} • {activeDaemons} live • {onlineBots}/{totalBots} bots online
+                {mergedUsers.length} user{mergedUsers.length === 1 ? '' : 's'} • {activeDaemons} live • {onlineBots}/{totalBots} bots online
               </p>
             </div>
           </div>
@@ -188,7 +421,7 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
         <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-200/80 text-center">
           <div className="bg-white/80 border border-slate-200 rounded-xl p-1.5 shadow-2xs">
             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Other Users</span>
-            <span className="text-xs font-black text-slate-800">{otherUsers.length}</span>
+            <span className="text-xs font-black text-slate-800">{mergedUsers.length}</span>
           </div>
           <div className="bg-white/80 border border-slate-200 rounded-xl p-1.5 shadow-2xs">
             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Daemons</span>
@@ -203,22 +436,22 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
 
       {/* Widget Content Body */}
       <div className="p-3 sm:p-4 space-y-4 max-h-[640px] overflow-y-auto">
-        {isLoading && otherUsers.length === 0 ? (
+        {isLoading && mergedUsers.length === 0 ? (
           <div className="py-10 flex flex-col items-center justify-center text-slate-400 space-y-2 text-xs">
             <RefreshCw className="h-5 w-5 animate-spin text-emerald-600" />
             <span>Scanning connected fleet...</span>
           </div>
-        ) : error && otherUsers.length === 0 ? (
+        ) : error && mergedUsers.length === 0 ? (
           <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center space-x-2">
             <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
             <span>{error}</span>
           </div>
-        ) : otherUsers.length === 0 ? (
+        ) : mergedUsers.length === 0 ? (
           <div className="py-8 text-center text-slate-400 text-xs">
             No other user accounts connected yet.
           </div>
         ) : (
-          otherUsers.map((u) => {
+          mergedUsers.map((u) => {
             const isUserVista = u.username.toLowerCase() === 'vista';
             const userOnlineBots = u.bots.filter((b) => b.status === 'online').length;
 

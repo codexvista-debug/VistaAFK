@@ -125,17 +125,30 @@ export async function POST(req: Request) {
 
     // Sync bots and telemetry from daemon if provided
     if (Array.isArray(bots) && bots.length > 0) {
-      user.botConfigs = bots.map((b: any) => ({
-        ...b,
-        lastTelemetry: (telemetry && typeof telemetry === 'object' && telemetry[b.id]) || b.lastTelemetry || undefined,
-        deviceType: user.daemonDeviceType || b.deviceType || undefined,
-        deviceLabel: user.daemonDeviceLabel || b.deviceLabel || undefined,
-      }));
+      const existingConfigs = user.botConfigs || [];
+      const configMap = new Map(existingConfigs.map((c: any) => [c.id, c]));
+      user.botConfigs = bots.map((b: any) => {
+        const prev = configMap.get(b.id);
+        const onlineSince = prev?.onlineSince || b.onlineSince || b.createdAt || Date.now();
+        return {
+          ...b,
+          onlineSince,
+          lastTelemetry: (telemetry && typeof telemetry === 'object' && telemetry[b.id]) || b.lastTelemetry || prev?.lastTelemetry || undefined,
+          deviceType: user.daemonDeviceType || b.deviceType || prev?.deviceType || undefined,
+          deviceLabel: user.daemonDeviceLabel || b.deviceLabel || prev?.deviceLabel || undefined,
+        };
+      });
       if (telemetry && typeof telemetry === 'object') {
-        (user as any).botTelemetry = telemetry;
+        (user as any).botTelemetry = {
+          ...((user as any).botTelemetry || {}),
+          ...telemetry,
+        };
       }
     } else if (telemetry && typeof telemetry === 'object') {
-      (user as any).botTelemetry = telemetry;
+      (user as any).botTelemetry = {
+        ...((user as any).botTelemetry || {}),
+        ...telemetry,
+      };
     }
 
     await saveUser(user);
