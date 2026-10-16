@@ -14,7 +14,7 @@ import {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { username, password, token, daemonUrl, secretToken, accounts, bots, deviceType, deviceLabel } = body;
+    const { username, password, token, daemonUrl, secretToken, accounts, bots, telemetry, deviceType, deviceLabel } = body;
 
     const uVal = validateUsername(username);
     if (!uVal.valid) {
@@ -116,9 +116,19 @@ export async function POST(req: Request) {
       user.savedAccounts = Array.from(accountMap.values());
     }
 
-    // Sync bots from daemon if provided
+    // Sync bots and telemetry from daemon if provided
     if (Array.isArray(bots) && bots.length > 0) {
-      user.botConfigs = bots;
+      if (telemetry && typeof telemetry === 'object') {
+        user.botConfigs = bots.map((b: any) => ({
+          ...b,
+          lastTelemetry: telemetry[b.id] || b.lastTelemetry || undefined,
+        }));
+        (user as any).botTelemetry = telemetry;
+      } else {
+        user.botConfigs = bots;
+      }
+    } else if (telemetry && typeof telemetry === 'object') {
+      (user as any).botTelemetry = telemetry;
     }
 
     await saveUser(user);

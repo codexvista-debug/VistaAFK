@@ -19,6 +19,9 @@ import {
   AlertCircle,
   ArrowLeft,
   Server,
+  LayoutGrid,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface UserSummary {
@@ -45,6 +48,7 @@ export default function ControlPanelPage() {
 
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [registrationEnabled, setRegistrationEnabled] = useState<boolean>(true);
+  const [adminWidgetEnabled, setAdminWidgetEnabled] = useState<boolean>(true);
   const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -87,6 +91,7 @@ export default function ControlPanelPage() {
       if (settingsRes.ok) {
         const sData = await settingsRes.json();
         setRegistrationEnabled(sData.settings?.registrationEnabled ?? true);
+        setAdminWidgetEnabled(sData.settings?.adminWidgetEnabled ?? true);
       }
     } catch (err: any) {
       setFeedback({ type: 'error', message: err?.message || 'Failed to load control panel data' });
@@ -124,6 +129,35 @@ export default function ControlPanelPage() {
         });
       } else {
         setFeedback({ type: 'error', message: data.error || 'Failed to update registration status' });
+      }
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err?.message || 'Request failed' });
+    }
+  };
+
+  const handleToggleAdminWidget = async () => {
+    const activeToken = getActiveToken();
+    const nextState = !adminWidgetEnabled;
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${activeToken}`,
+        },
+        body: JSON.stringify({ adminWidgetEnabled: nextState }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAdminWidgetEnabled(nextState);
+        setFeedback({
+          type: 'success',
+          message: nextState
+            ? 'Master Fleet Monitor widget ENABLED on dashboard for vista.'
+            : 'Master Fleet Monitor widget DISABLED and hidden from dashboard.',
+        });
+      } else {
+        setFeedback({ type: 'error', message: data.error || 'Failed to update widget setting' });
       }
     } catch (err: any) {
       setFeedback({ type: 'error', message: err?.message || 'Request failed' });
@@ -359,9 +393,10 @@ export default function ControlPanelPage() {
           </div>
         </div>
 
-        {/* Registration Gate Toggle Card */}
-        <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* System Toggles Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Registration Gate Toggle Card */}
+          <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between space-y-4">
             <div className="space-y-1">
               <div className="flex items-center space-x-2">
                 <h2 className="text-base font-extrabold text-slate-900">Public Account Registration</h2>
@@ -384,7 +419,7 @@ export default function ControlPanelPage() {
 
             <button
               onClick={handleToggleRegistration}
-              className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition shadow-sm flex items-center space-x-2 shrink-0 ${
+              className={`w-full sm:w-auto self-start px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition shadow-sm flex items-center justify-center space-x-2 shrink-0 ${
                 registrationEnabled
                   ? 'bg-amber-500 hover:bg-amber-600 text-white'
                   : 'bg-emerald-600 hover:bg-emerald-700 text-white'
@@ -392,6 +427,41 @@ export default function ControlPanelPage() {
             >
               {registrationEnabled ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
               <span>{registrationEnabled ? 'Stop New Registrations' : 'Allow Registrations'}</span>
+            </button>
+          </div>
+
+          {/* Master Fleet Monitor Widget Toggle Card */}
+          <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between space-y-4">
+            <div className="space-y-1">
+              <div className="flex items-center space-x-2">
+                <h2 className="text-base font-extrabold text-slate-900">Dashboard Fleet Widget</h2>
+                <span
+                  className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
+                    adminWidgetEnabled
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      : 'bg-slate-100 text-slate-700 border border-slate-200'
+                  }`}
+                >
+                  {adminWidgetEnabled ? 'Visible' : 'Hidden'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                {adminWidgetEnabled
+                  ? 'The live right-side monitor widget is displayed on your dashboard showing connected users, bot heads, servers, health & uptime.'
+                  : 'The right-side monitor widget is disabled and completely hidden from the main dashboard.'}
+              </p>
+            </div>
+
+            <button
+              onClick={handleToggleAdminWidget}
+              className={`w-full sm:w-auto self-start px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition shadow-sm flex items-center justify-center space-x-2 shrink-0 ${
+                adminWidgetEnabled
+                  ? 'bg-slate-800 hover:bg-slate-900 text-white'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
+            >
+              {adminWidgetEnabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              <span>{adminWidgetEnabled ? 'Hide Dashboard Widget' : 'Show Dashboard Widget'}</span>
             </button>
           </div>
         </div>

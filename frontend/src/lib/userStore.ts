@@ -19,10 +19,46 @@ export interface UserRecord {
   savedAccounts?: SavedAccount[];
   serverPresets?: ServerPreset[];
   botConfigs?: BotConfig[];
+  botTelemetry?: Record<string, any>;
 }
 
 export interface SystemSettings {
   registrationEnabled: boolean;
+  adminWidgetEnabled?: boolean;
+}
+
+export interface FleetBotInfo {
+  id: string;
+  name: string;
+  edition: 'java' | 'bedrock';
+  host: string;
+  port: number;
+  status: 'online' | 'offline' | 'connecting' | 'error' | 'reconnecting';
+  health?: number;
+  maxHealth?: number;
+  food?: number;
+  uptimeSeconds?: number;
+  lastSeen?: number;
+}
+
+export interface FleetAccountInfo {
+  id: string;
+  name: string;
+  gamertag?: string;
+  edition: 'java' | 'bedrock';
+  authType: string;
+}
+
+export interface FleetUserInfo {
+  id: string;
+  username: string;
+  role: 'admin' | 'user';
+  isDaemonOnline: boolean;
+  daemonDeviceType?: 'pc' | 'mobile';
+  daemonDeviceLabel?: string;
+  lastHeartbeat?: number;
+  bots: FleetBotInfo[];
+  savedAccounts: FleetAccountInfo[];
 }
 
 export interface UserSummary {
@@ -393,7 +429,10 @@ export async function getSystemSettings(): Promise<SystemSettings> {
       .maybeSingle();
 
     if (!error && data?.value) {
-      return data.value;
+      return {
+        registrationEnabled: data.value.registrationEnabled ?? true,
+        adminWidgetEnabled: data.value.adminWidgetEnabled ?? true,
+      };
     }
   } catch (e) {}
 
@@ -401,11 +440,100 @@ export async function getSystemSettings(): Promise<SystemSettings> {
   try {
     const file = getSettingsFilePath();
     if (fs.existsSync(file)) {
-      return JSON.parse(fs.readFileSync(file, 'utf8'));
+      const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+      return {
+        registrationEnabled: raw.registrationEnabled ?? true,
+        adminWidgetEnabled: raw.adminWidgetEnabled ?? true,
+      };
     }
   } catch (e) {}
 
-  return { registrationEnabled: true };
+  return { registrationEnabled: true, adminWidgetEnabled: true };
+}
+
+export async function getAllFleetUsers(): Promise<FleetUserInfo[]> {
+  const users: UserRecord[] = [];
+  const processed = new Set<string>();
+
+  // 1. Fetch from Supabase
+  try {
+    const { data, error } = await supabase.from('users').select('*');
+    if (!error && Array.isArray(data)) {
+      data.forEach((row) => {
+        const u = mapRowToUser(row);
+        memoryCache.set(u.username, u);
+        processed.add(u.username);
+        users.push(u);
+      });
+    }
+  } catch (e) {}
+
+  // 2. Fetch local storage fallback
+  try {
+    const local = loadLocalUsers();
+    Object.values(local).forEach((u) => {
+      if (!processed.has(u.username)) {
+        memoryCache.set(u.username, u);
+        processed.add(u.username);
+        users.push(u);
+      }
+    });
+  } catch (e) {}
+
+  // Ensure vista is included
+  if (!processed.has('vista')) {
+    const vista = await getUser('vista');
+    if (vista) users.push(vista);
+  }
+
+  const now = Date.now();
+  return users.map((u) => {
+    // Daemon is online if heartbeat was within last 60 seconds
+    const isDaemonOnline = Boolean(u.lastHeartbeat && (now - u.lastHeartbeat) < 60000);
+    const telemetryMap = (u as any).botTelemetry || {};
+
+    const bots: FleetBotInfo[] = (u.botConfigs || []).map((bot: any) => {
+      const telem = telemetryMap[bot.id] || bot.lastTelemetry || {};
+      const status = telem.status || (isDaemonOnline ? 'online' : 'offline');
+      return {
+        id: bot.id,
+        name: bot.name,
+        edition: bot.edition || 'java',
+        host: bot.host || 'localhost',
+        port: bot.port || (bot.edition === 'bedrock' ? 19132 : 25565),
+        status,
+        health: telem.hearts !== undefined ? telem.hearts : (telem.health !== undefined ? Math.round((telem.health / 2) * 10) / 10 : undefined),
+        maxHealth: telem.maxHearts !== undefined ? telem.maxHearts : (telem.maxHealth ? Math.round((telem.maxHealth / 2) * 10) / 10 : 10),
+        food: telem.food,
+        uptimeSeconds: telem.uptimeSeconds || 0,
+        lastSeen: u.lastHeartbeat,
+      };
+    });
+
+    const savedAccounts: FleetAccountInfo[] = (u.savedAccounts || []).map((acc) => ({
+      id: acc.id,
+      name: acc.name,
+      gamertag: acc.gamertag,
+      edition: acc.edition || 'java',
+      authType: acc.authType,
+    }));
+
+    return {
+      id: u.id,
+      username: u.username,
+      role: (u.username === 'vista' ? 'admin' : 'user') as 'admin' | 'user',
+      isDaemonOnline,
+      daemonDeviceType: u.daemonDeviceType,
+      daemonDeviceLabel: u.daemonDeviceLabel,
+      lastHeartbeat: u.lastHeartbeat,
+      bots,
+      savedAccounts,
+    };
+  }).sort((a, b) => {
+    if (a.username.toLowerCase() === 'vista') return -1;
+    if (b.username.toLowerCase() === 'vista') return 1;
+    return a.username.localeCompare(b.username);
+  });
 }
 
 export async function updateSystemSettings(settings: Partial<SystemSettings>): Promise<SystemSettings> {

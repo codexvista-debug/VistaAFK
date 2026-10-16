@@ -355,6 +355,7 @@ async function sendCloudHeartbeat() {
                     deviceType: system.deviceType,
                     deviceLabel: system.deviceLabel,
                     bots: botManager.getAllConfigs(),
+                    telemetry: botManager.getAllTelemetry(),
                 }),
             });
             if (res.ok) {

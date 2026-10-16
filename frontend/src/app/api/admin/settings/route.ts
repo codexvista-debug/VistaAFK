@@ -23,11 +23,13 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { registrationEnabled } = body;
+    const { registrationEnabled, adminWidgetEnabled } = body;
 
-    const updated = await updateSystemSettings({
-      registrationEnabled: typeof registrationEnabled === 'boolean' ? registrationEnabled : true,
-    });
+    const payload: any = {};
+    if (typeof registrationEnabled === 'boolean') payload.registrationEnabled = registrationEnabled;
+    if (typeof adminWidgetEnabled === 'boolean') payload.adminWidgetEnabled = adminWidgetEnabled;
+
+    const updated = await updateSystemSettings(payload);
 
     return NextResponse.json({ success: true, settings: updated });
   } catch (err: any) {

@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useVistaWebSocket } from '../hooks/useVistaWebSocket';
 import { Navbar } from '../components/Navbar';
 import { StatsOverview } from '../components/StatsOverview';
 import { BotCard } from '../components/BotCard';
 import { DeployServerModal } from '../components/DeployServerModal';
 import { NotificationToast } from '../components/NotificationToast';
+import { AdminFleetWidget } from '../components/AdminFleetWidget';
 import { SavedAccount } from '../types';
 import { Plus, Server, AlertTriangle, RefreshCw, Layers, Users, Play, Leaf } from 'lucide-react';
 import Link from 'next/link';
@@ -38,7 +39,30 @@ function ServerBrandMark({ presetId }: { presetId: string }) {
 }
 
 export default function Dashboard() {
-  const { user, openAuthModal } = useAuth();
+  const { user, token, openAuthModal } = useAuth();
+  const isVista = user?.username?.toLowerCase() === 'vista';
+  const [adminWidgetEnabled, setAdminWidgetEnabled] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (isVista) {
+      const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('vistaafk_auth_token') : null);
+      if (activeToken) {
+        fetch('/api/admin/settings', {
+          headers: { Authorization: `Bearer ${activeToken}` },
+        })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data?.settings && typeof data.settings.adminWidgetEnabled === 'boolean') {
+              setAdminWidgetEnabled(data.settings.adminWidgetEnabled);
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [isVista, token]);
+
+  const showAdminWidget = isVista && adminWidgetEnabled;
+
   const {
     daemonUrl,
     secretToken,
@@ -84,7 +108,7 @@ export default function Dashboard() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className={`flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 transition-all ${showAdminWidget ? 'max-w-[1700px]' : 'max-w-7xl'}`}>
         {/* Auth Error Banner */}
         {authError && (
           <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center justify-between text-xs shadow-sm">
@@ -130,7 +154,9 @@ export default function Dashboard() {
             )}
           </div>
 
-          {configs.length === 0 ? (
+          <div className={showAdminWidget ? 'flex flex-col xl:flex-row gap-6 items-start' : ''}>
+            <div className={showAdminWidget ? 'flex-1 min-w-0 w-full' : 'w-full'}>
+              {configs.length === 0 ? (
             /* Contextual Empty State */
             savedAccounts.length > 0 ? (
               /* User HAS accounts in Vault - Offer Quick Server Connect */
@@ -266,7 +292,7 @@ export default function Dashboard() {
               </div>
             )
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className={`grid grid-cols-1 ${showAdminWidget ? 'lg:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-3'} gap-5`}>
               {configs.map((cfg) => (
                 <BotCard
                   key={cfg.id}
@@ -284,6 +310,19 @@ export default function Dashboard() {
               ))}
             </div>
           )}
+            </div>
+
+            {/* Right-Side Admin Fleet & Users Monitor Widget (Vista only) */}
+            {showAdminWidget && (
+              <div className="w-full xl:w-80 2xl:w-96 shrink-0 xl:sticky xl:top-24">
+                <AdminFleetWidget
+                  token={token}
+                  currentUser={user?.username}
+                  localTelemetry={telemetry}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </main>
 
