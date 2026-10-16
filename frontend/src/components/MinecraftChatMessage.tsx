@@ -137,6 +137,72 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   rawText = rawText.replace(/[\uFFFD\u25C6\u25C7]/g, '').trim();
   const cleanText = stripMinecraftFormatting(rawText);
   const cleanSender = stripMinecraftFormatting(message.sender || '');
+
+  // Compact timestamp for mobile screens (e.g. 02:06) vs full seconds on desktop (02:06:44)
+  const date = new Date(message.timestamp);
+  const timeShort = date.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
+  const timeFull = date.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  // 1. Matches rank + player username + message (e.g. "MEMBER _StarWings9451 ▶ ay un kit inicial")
+  const rankPlayerMatch = cleanText.match(/^(?:\[?(TITAN|KING|CHAMPION|KNIGHT|EMPEROR|OVERLORD\+{0,2}|LORD|JESTER|MEMBER|VIP\+?|MVP\+?|ADMIN|OWNER|MOD)\]?)\s+([a-zA-Z0-9_]{3,16})(?:\s+\[[^\]]{1,12}\])?\s*(?:▶|>|:)\s*(.*)$/i);
+
+  if (rankPlayerMatch) {
+    const rank = rankPlayerMatch[1].toUpperCase();
+    const username = rankPlayerMatch[2];
+    const cleanBody = rankPlayerMatch[3];
+    const rankColor = LIGHT_RANK_COLORS[rank] || '#475569';
+
+    // Extract color-coded message body from rawText if available
+    let rawBody = cleanBody;
+    const arrowIndex = rawText.search(/[▶>:]/);
+    if (arrowIndex !== -1) {
+      rawBody = rawText.slice(arrowIndex + 1).replace(/^[\s§r]+/, '');
+    }
+
+    return (
+      <div className="group min-w-0 max-w-full flex items-start gap-1.5 py-1 px-1.5 sm:px-2 hover:bg-slate-100/80 rounded-lg transition-colors">
+        {showTimestamp && (
+          <time
+            className="text-[9.5px] sm:text-[10px] text-slate-400 font-mono shrink-0 select-none pt-0.5 leading-none tabular-nums"
+            title={timeFull}
+          >
+            <span className="sm:hidden">{timeShort}</span>
+            <span className="hidden sm:inline">{timeFull}</span>
+          </time>
+        )}
+        <div className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text text-xs leading-relaxed font-sans">
+          {/* Rank Badge */}
+          <span
+            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider mr-1.5 shrink-0 align-baseline select-none shadow-2xs font-mono"
+            style={{
+              color: rankColor,
+              backgroundColor: `${rankColor}14`,
+              borderColor: `${rankColor}30`,
+              borderWidth: 1,
+              borderStyle: 'solid',
+            }}
+          >
+            {rank}
+          </span>
+
+          {/* Gamertag */}
+          <span className="font-bold text-slate-900 mr-1 tracking-tight">
+            {username}
+          </span>
+
+          {/* Separator */}
+          <span className="text-slate-400 font-bold mr-1.5 select-none text-[10px]">▶</span>
+
+          {/* Chat Body */}
+          <span className="font-medium text-slate-800">
+            {rawBody && rawBody.includes('§') ? parseLightMinecraftColorCodes(rawBody) : cleanBody}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Rank only in message prefix, player in sender
   const rankPrefixMatch = cleanText.match(/^(?:\[?(TITAN|KING|CHAMPION|KNIGHT|EMPEROR|OVERLORD\+{0,2}|LORD|JESTER|MEMBER|VIP\+?|MVP\+?|ADMIN|OWNER|MOD)\]?)\s*(?:▶|>|:)\s*(.*)$/i);
   const senderIsRank = /^(?:TITAN|KING|CHAMPION|KNIGHT|EMPEROR|OVERLORD\+{0,2}|LORD|JESTER|MEMBER|VIP\+?|MVP\+?|ADMIN|OWNER|MOD)$/i.test(cleanSender);
   const senderAlreadyShown = cleanText.split(/[\s▶>:]+/).some((token) => token.toLowerCase() === cleanSender.toLowerCase());
@@ -152,40 +218,40 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
     const rank = rankPrefixMatch[1].toUpperCase();
     const rankColor = LIGHT_RANK_COLORS[rank] || '#475569';
     return (
-      <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-slate-100/70 rounded transition">
+      <div className="group min-w-0 max-w-full flex items-start gap-1.5 py-1 px-1.5 sm:px-2 hover:bg-slate-100/80 rounded-lg transition-colors">
         {showTimestamp && (
-          <span className="text-slate-400 text-[10px] shrink-0 select-none">
-            [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
-          </span>
+          <time
+            className="text-[9.5px] sm:text-[10px] text-slate-400 font-mono shrink-0 select-none pt-0.5 leading-none tabular-nums"
+            title={timeFull}
+          >
+            <span className="sm:hidden">{timeShort}</span>
+            <span className="hidden sm:inline">{timeFull}</span>
+          </time>
         )}
-        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text">
-          <span className="font-black mr-1 px-1.5 py-0.5 rounded text-[11px]" style={{ color: rankColor, backgroundColor: rankColor + '15', borderColor: rankColor, borderWidth: 1, borderStyle: 'solid' }}>{rank}</span>
-          <span className="mr-1 font-bold text-slate-900">{cleanSender}</span>
-          <span className="text-slate-400 mr-1.5 font-bold">▶</span>
-          {parseLightMinecraftColorCodes(rankPrefixMatch[2])}
-        </span>
+        <div className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text text-xs leading-relaxed font-sans">
+          <span
+            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider mr-1.5 shrink-0 align-baseline select-none shadow-2xs font-mono"
+            style={{
+              color: rankColor,
+              backgroundColor: `${rankColor}14`,
+              borderColor: `${rankColor}30`,
+              borderWidth: 1,
+              borderStyle: 'solid',
+            }}
+          >
+            {rank}
+          </span>
+          <span className="mr-1 font-bold text-slate-900 tracking-tight">{cleanSender}</span>
+          <span className="text-slate-400 mr-1.5 font-bold select-none text-[10px]">▶</span>
+          <span className="font-medium text-slate-800">
+            {parseLightMinecraftColorCodes(rankPrefixMatch[2])}
+          </span>
+        </div>
       </div>
     );
   }
 
-  // If text has § color codes
-  if (rawText.includes('§')) {
-    return (
-      <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-slate-100/70 rounded transition">
-        {showTimestamp && (
-          <span className="text-slate-400 text-[10px] shrink-0 select-none">
-            [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
-          </span>
-        )}
-        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text">
-          {showPlayerSender && <span className="mr-1 font-bold text-sky-700">&lt;{cleanSender}&gt;</span>}
-          {parseLightMinecraftColorCodes(rawText)}
-        </span>
-      </div>
-    );
-  }
-
-  // 1. Death Messages (Red/Rose)
+  // 3. Death & Combat Messages (Rose background with skull icon)
   const deathKeywords = [
     'was slain by',
     'was obliterated',
@@ -203,154 +269,139 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
     'was pummeled by',
   ];
 
-  const isDeath = deathKeywords.some((k) => rawText.toLowerCase().includes(k));
+  const isDeath = deathKeywords.some((k) => cleanText.toLowerCase().includes(k));
   if (isDeath) {
-    const formattedDeath = rawText.replace(/(using\s+)(.+)/i, '$1<CYAN>$2</CYAN>');
-    const parts = formattedDeath.split(/(<CYAN>.*?<\/CYAN>)/g);
-
     return (
-      <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-rose-50/50 rounded transition text-rose-600 font-medium">
+      <div className="min-w-0 max-w-full flex items-start gap-1.5 py-1 px-1.5 sm:px-2 hover:bg-rose-50/70 rounded-lg transition-colors text-rose-700 bg-rose-50/35 border border-rose-100/80">
         {showTimestamp && (
-          <span className="text-slate-400 text-[10px] shrink-0 select-none">
-            [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
-          </span>
+          <time
+            className="text-[9.5px] sm:text-[10px] text-rose-400 font-mono shrink-0 select-none pt-0.5 leading-none tabular-nums"
+            title={timeFull}
+          >
+            <span className="sm:hidden">{timeShort}</span>
+            <span className="hidden sm:inline">{timeFull}</span>
+          </time>
         )}
-        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text">
-          <span className="mr-1 text-rose-500 font-bold">☠</span>
-          {parts.map((p, i) => {
-            if (p.startsWith('<CYAN>')) {
-              const weapon = p.replace('<CYAN>', '').replace('</CYAN>', '');
-              return (
-                <span key={i} className="text-sky-600 font-black underline">
-                  {weapon}
-                </span>
-              );
-            }
-            return <span key={i}>{p}</span>;
-          })}
+        <span className="text-rose-500 font-bold shrink-0 select-none text-[11px] leading-tight">☠</span>
+        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text font-sans text-xs font-semibold leading-relaxed">
+          {cleanText}
         </span>
       </div>
     );
   }
 
-  // 2. Economy & Orders (Green with Amber amounts)
-  const isEconomy = /You sold|has ordered|ordered|balance|\$[0-9,]+/i.test(rawText);
+  // 4. Economy & Orders (Green with dollar icon)
+  const isEconomy = /You sold|has ordered|ordered|balance|\$[0-9,]+/i.test(cleanText);
   if (isEconomy) {
-    const parts = rawText.split(/(\$[0-9,]+(?:\/each)?)/g);
     return (
-      <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-emerald-50/50 rounded transition text-emerald-700 font-medium">
+      <div className="min-w-0 max-w-full flex items-start gap-1.5 py-1 px-1.5 sm:px-2 hover:bg-emerald-50/70 rounded-lg transition-colors text-emerald-800 bg-emerald-50/35 border border-emerald-100/80">
         {showTimestamp && (
-          <span className="text-slate-400 text-[10px] shrink-0 select-none">
-            [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
-          </span>
+          <time
+            className="text-[9.5px] sm:text-[10px] text-emerald-500/70 font-mono shrink-0 select-none pt-0.5 leading-none tabular-nums"
+            title={timeFull}
+          >
+            <span className="sm:hidden">{timeShort}</span>
+            <span className="hidden sm:inline">{timeFull}</span>
+          </time>
         )}
-        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text">
-          <span className="mr-1 text-amber-600 font-bold">$</span>
-          {parts.map((p, i) => {
-            if (p.startsWith('$')) {
-              return (
-                <span key={i} className="text-amber-600 font-black">
-                  {p}
-                </span>
-              );
-            }
-            return <span key={i}>{p}</span>;
-          })}
+        <span className="text-amber-600 font-bold shrink-0 select-none text-xs leading-tight font-mono">$</span>
+        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text font-sans text-xs font-semibold leading-relaxed">
+          {cleanText}
         </span>
       </div>
     );
   }
 
-  // 3. Vault & System Actions (Amber/Gold)
-  const isVault = /Successfully (?:opened|closed) vault|teleported|warp/i.test(rawText);
+  // 5. Vault & Teleport Actions (Amber/Gold)
+  const isVault = /Successfully (?:opened|closed) vault|teleported|warp/i.test(cleanText);
   if (isVault) {
     return (
-      <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-amber-50/50 rounded transition text-amber-700 font-medium">
+      <div className="min-w-0 max-w-full flex items-start gap-1.5 py-1 px-1.5 sm:px-2 hover:bg-amber-50/70 rounded-lg transition-colors text-amber-800 bg-amber-50/35 border border-amber-100/80">
         {showTimestamp && (
-          <span className="text-slate-400 text-[10px] shrink-0 select-none">
-            [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
-          </span>
+          <time
+            className="text-[9.5px] sm:text-[10px] text-amber-500/70 font-mono shrink-0 select-none pt-0.5 leading-none tabular-nums"
+            title={timeFull}
+          >
+            <span className="sm:hidden">{timeShort}</span>
+            <span className="hidden sm:inline">{timeFull}</span>
+          </time>
         )}
-        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text">
-          <span className="mr-1">📦</span>
-          {rawText}
+        <span className="mr-0.5 select-none text-[11px] leading-tight">📦</span>
+        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text font-sans text-xs font-semibold leading-relaxed">
+          {cleanText}
         </span>
       </div>
     );
   }
 
-  // 4. VistaAFK / System Bot Events (Emerald Green)
+  // 6. VistaAFK / System Bot Events (Emerald Green Pill)
   if (message.sender === 'VistaAFK' || message.sender === 'AutoCommand') {
     return (
-      <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-emerald-50/50 rounded transition text-emerald-700 font-medium">
+      <div className="min-w-0 max-w-full flex items-start gap-1.5 py-1 px-1.5 sm:px-2 hover:bg-emerald-50/70 rounded-lg transition-colors text-emerald-800 bg-emerald-50/40 border border-emerald-100/80">
         {showTimestamp && (
-          <span className="text-slate-400 text-[10px] shrink-0 select-none">
-            [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
-          </span>
+          <time
+            className="text-[9.5px] sm:text-[10px] text-emerald-500/70 font-mono shrink-0 select-none pt-0.5 leading-none tabular-nums"
+            title={timeFull}
+          >
+            <span className="sm:hidden">{timeShort}</span>
+            <span className="hidden sm:inline">{timeFull}</span>
+          </time>
         )}
-        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text font-bold">{rawText}</span>
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white shrink-0 select-none shadow-2xs font-mono">
+          {message.sender}
+        </span>
+        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text font-mono text-xs font-bold leading-relaxed text-emerald-950">
+          {cleanText}
+        </span>
       </div>
     );
   }
 
-  // 5. Player Chat with Rank Badges
-  // Matches: "TITAN ANK_PATRICK ▶ Check Ank2 orders" or "EMPEROR PluhWalkk ▶ Selling..."
-  const rankMatch = rawText.match(/^(?:\[?(TITAN|KING|CHAMPION|KNIGHT|EMPEROR|OVERLORD\+{0,2}|LORD|JESTER|MEMBER|VIP\+?|MVP\+?|ADMIN|OWNER|MOD)\]?)\s+([a-zA-Z0-9_]{3,16})(?:\s+\[[^\]]{1,12}\])?\s*(?:▶|>|:)\s*(.*)$/i);
-  if (rankMatch) {
-    const rank = rankMatch[1].toUpperCase();
-    const username = rankMatch[2];
-    const chatContent = rankMatch[3];
-    const rankColor = LIGHT_RANK_COLORS[rank] || '#475569';
-
+  // 7. General Colored Minecraft Chat / Announcements
+  if (rawText.includes('§')) {
     return (
-      <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-slate-100/70 rounded transition">
+      <div className="group min-w-0 max-w-full flex items-start gap-1.5 py-1 px-1.5 sm:px-2 hover:bg-slate-100/80 rounded-lg transition-colors">
         {showTimestamp && (
-          <span className="text-slate-400 text-[10px] shrink-0 select-none">
-            [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
-          </span>
-        )}
-        <div className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text text-slate-800">
-          <span
-            className="font-black mr-1 px-1.5 py-0.5 rounded text-[11px]"
-            style={{
-              color: rankColor,
-              backgroundColor: `${rankColor}15`,
-              border: `1px solid ${rankColor}30`,
-            }}
+          <time
+            className="text-[9.5px] sm:text-[10px] text-slate-400 font-mono shrink-0 select-none pt-0.5 leading-none tabular-nums"
+            title={timeFull}
           >
-            {rank}
-          </span>
-          <span className="mr-1 font-bold text-slate-900">
-            {username}
-          </span>
-          <span className="text-slate-400 mr-1.5 font-bold">▶</span>
-          <span className="text-slate-800 font-medium">{chatContent}</span>
+            <span className="sm:hidden">{timeShort}</span>
+            <span className="hidden sm:inline">{timeFull}</span>
+          </time>
+        )}
+        <div className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text text-xs leading-relaxed font-sans">
+          {showPlayerSender && (
+            <span className="mr-1.5 font-bold text-sky-700 font-sans">&lt;{cleanSender}&gt;</span>
+          )}
+          {parseLightMinecraftColorCodes(rawText)}
         </div>
       </div>
     );
   }
 
-  // 6. Default Server / Player Message
+  // 8. Default Server / Player Message Fallback
   const isServer = message.sender === 'Server';
-  const senderColor = isServer ? '#d97706' : LIGHT_RANK_COLORS[message.sender.toUpperCase()] || '#0284c7';
+  const senderColor = isServer ? '#d97706' : LIGHT_RANK_COLORS[message.sender?.toUpperCase()] || '#0284c7';
 
   return (
-    <div className="min-w-0 max-w-full font-mono text-xs leading-normal flex items-start gap-1.5 py-1 px-1.5 hover:bg-slate-100/70 rounded transition text-slate-800">
+    <div className="group min-w-0 max-w-full flex items-start gap-1.5 py-1 px-1.5 sm:px-2 hover:bg-slate-100/80 rounded-lg transition-colors text-slate-800">
       {showTimestamp && (
-        <span className="text-slate-400 text-[10px] shrink-0 select-none">
-          [{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
-        </span>
+        <time
+          className="text-[9.5px] sm:text-[10px] text-slate-400 font-mono shrink-0 select-none pt-0.5 leading-none tabular-nums"
+          title={timeFull}
+        >
+          <span className="sm:hidden">{timeShort}</span>
+          <span className="hidden sm:inline">{timeFull}</span>
+        </time>
       )}
-      <div className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text">
+      <div className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text text-xs leading-relaxed font-sans">
         {message.sender && (
-          <span
-            className="font-bold mr-1.5"
-            style={{ color: senderColor }}
-          >
+          <span className="font-bold mr-1.5 font-sans" style={{ color: senderColor }}>
             {message.isSystem ? `[${message.sender}]` : `<${message.sender}>`}
           </span>
         )}
-        <span className="text-slate-800 font-medium">{rawText}</span>
+        <span className="font-medium text-slate-800">{cleanText}</span>
       </div>
     </div>
   );

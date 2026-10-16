@@ -282,16 +282,16 @@ function ChatContent() {
         <section className="flex-1 min-w-0 min-h-0 flex flex-col bg-white/90 backdrop-blur-xl border border-white rounded-[1.5rem] overflow-hidden shadow-[0_20px_56px_-30px_rgba(15,23,42,0.34)] ring-1 ring-slate-900/5">
           {activeTab === 'chat' && <>
           {/* Sub Header */}
-          <div className="px-3 py-3 sm:px-5 border-b border-slate-200 bg-slate-50 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="px-2.5 py-2 sm:px-5 sm:py-3 border-b border-slate-200 bg-slate-50 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                 <Terminal className="h-4 w-4 stroke-[2.5]" />
               </div>
               <div className="min-w-0">
                 <span className="block truncate font-black text-slate-900 text-xs uppercase tracking-wide">
                   {currentConfig?.name || 'No Bot Selected'} &bull; Live Game Console
                 </span>
-                <p className="text-[10px] text-slate-500 font-mono font-medium">
+                <p className="text-[10px] text-slate-500 font-mono font-medium truncate">
                   {currentConfig ? `${currentConfig.host}:${currentConfig.port}` : ''}
                 </p>
               </div>
@@ -301,7 +301,7 @@ function ChatContent() {
             <div className="bg-slate-200/80 p-0.5 rounded-lg border border-slate-300 text-xs flex font-bold self-start sm:self-auto">
               <button
                 onClick={() => setFilter('all')}
-                className={`px-3 py-1 rounded-md transition ${
+                className={`px-2.5 sm:px-3 py-1 rounded-md transition text-xs ${
                   filter === 'all' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -309,7 +309,7 @@ function ChatContent() {
               </button>
               <button
                 onClick={() => setFilter('chat')}
-                className={`px-3 py-1 rounded-md transition ${
+                className={`px-2.5 sm:px-3 py-1 rounded-md transition text-xs ${
                   filter === 'chat' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -317,7 +317,7 @@ function ChatContent() {
               </button>
               <button
                 onClick={() => setFilter('system')}
-                className={`px-3 py-1 rounded-md transition ${
+                className={`px-2.5 sm:px-3 py-1 rounded-md transition text-xs ${
                   filter === 'system' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -327,14 +327,14 @@ function ChatContent() {
           </div>
 
           {/* Quick Commands */}
-          <div className="mobile-scrollbar-hidden px-3 sm:px-5 py-2.5 bg-slate-100/70 border-b border-slate-200 flex items-center space-x-2 overflow-x-auto text-xs">
-            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Quick:</span>
+          <div className="mobile-scrollbar-hidden px-2.5 sm:px-5 py-1.5 sm:py-2 bg-slate-100/70 border-b border-slate-200 flex items-center space-x-1.5 sm:space-x-2 overflow-x-auto text-xs">
+            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider shrink-0">Quick:</span>
             {['/afk', '/lifesteal', '/home', '/spawn', '/tpa accept', '/help', '/resourcepack', '/tpahereaccept', '/tpdeny'].map((cmd) => (
               <button
                 key={cmd}
                 onClick={() => sendQuickCommand(cmd)}
                 disabled={!isOnline}
-                className="px-2.5 py-1 bg-white hover:bg-emerald-600 hover:text-white disabled:opacity-40 text-slate-800 font-mono text-[11px] font-bold rounded-lg border border-slate-300 shadow-2xs transition whitespace-nowrap"
+                className="px-2 sm:px-2.5 py-1 bg-white hover:bg-emerald-600 hover:text-white disabled:opacity-40 text-slate-800 font-mono text-[10px] sm:text-[11px] font-bold rounded-lg border border-slate-300 shadow-2xs transition whitespace-nowrap"
               >
                 {cmd}
               </button>
@@ -342,7 +342,7 @@ function ChatContent() {
           </div>
 
           {/* Light-Mode Chat Terminal Box */}
-          <div className="flex-1 min-h-0 min-w-0 p-3 sm:p-5 overflow-y-auto bg-[#f8fafc] flex flex-col space-y-0.5">
+          <div className="flex-1 min-h-0 min-w-0 p-1.5 sm:p-4 overflow-y-auto bg-[#f8fafc] flex flex-col space-y-0.5 sm:space-y-1">
             {filteredLogs.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2">
                 <MessageSquare className="h-10 w-10 stroke-[1.5]" />
@@ -358,20 +358,20 @@ function ChatContent() {
           </div>
 
           {/* Send Input Bar */}
-          <form onSubmit={handleSend} className="p-2.5 sm:p-3.5 border-t border-slate-200 bg-slate-50 flex min-w-0 items-center gap-1.5 sm:gap-2">
-            <span className="text-emerald-600 font-mono font-bold text-sm px-1">&gt;</span>
+          <form onSubmit={handleSend} className="p-2 sm:p-3 border-t border-slate-200 bg-slate-50 flex min-w-0 items-center gap-1.5 sm:gap-2">
+            <span className="text-emerald-600 font-mono font-bold text-sm px-0.5 sm:px-1">&gt;</span>
             <input
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               disabled={!isOnline}
               placeholder={isOnline ? 'Message or command…' : 'Connect bot to chat'}
-              className="min-w-0 flex-1 bg-white border border-slate-300 focus:border-emerald-600 focus:outline-none rounded-xl px-2.5 sm:px-4 py-2.5 text-xs text-slate-900 font-mono placeholder-slate-400 disabled:opacity-50 shadow-xs"
+              className="min-w-0 flex-1 bg-white border border-slate-300 focus:border-emerald-600 focus:outline-none rounded-xl px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs text-slate-900 font-mono placeholder-slate-400 disabled:opacity-50 shadow-xs"
             />
             <button
               type="submit"
               disabled={!isOnline || !inputMessage.trim()}
-              className="px-3 sm:px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition flex items-center gap-2 shadow-sm font-mono"
+              className="px-3 sm:px-5 py-2 sm:py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 sm:gap-2 shadow-sm font-mono"
             >
               <Send className="h-4 w-4" />
               <span className="hidden sm:inline">Send</span>
@@ -428,23 +428,23 @@ function ChatContent() {
           )}
 
           {activeTab === 'raw_chat' && (
-            <div className="flex-1 min-h-0 flex flex-col bg-[#0b101b] text-slate-200">
+            <div className="flex-1 min-h-0 flex flex-col bg-[#f8fafc] text-slate-800">
               {/* Sub Header */}
-              <div className="px-3 py-3 sm:px-5 border-b border-slate-800 bg-[#0f172a] flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="px-3 py-2.5 sm:px-5 sm:py-3 border-b border-slate-200 bg-slate-50 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                  <div className="p-2 rounded-xl bg-cyan-950/80 text-cyan-400 border border-cyan-800/80">
+                  <div className="p-2 rounded-xl bg-cyan-50 text-cyan-700 border border-cyan-200">
                     <Terminal className="h-4 w-4 stroke-[2.5]" />
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-slate-100 text-xs uppercase tracking-wide">
+                      <span className="font-mono font-bold text-slate-900 text-xs uppercase tracking-wide">
                         {currentConfig?.name || 'Bot'} &bull; Raw Bedrock Chat Packets
                       </span>
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">
                         {logs.length} captured
                       </span>
                     </div>
-                    <p className="text-[10px] text-slate-400 font-mono">
+                    <p className="text-[10px] text-slate-500 font-mono truncate">
                       Direct server packet fields: source_name, xuid, parameters, message
                     </p>
                   </div>
@@ -457,8 +457,8 @@ function ChatContent() {
                     onClick={() => setRawPacketsAutoScroll((prev) => !prev)}
                     className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-bold font-mono transition ${
                       rawPacketsAutoScroll
-                        ? 'border-cyan-500/50 bg-cyan-950 text-cyan-300'
-                        : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200'
+                        ? 'border-cyan-300 bg-cyan-50 text-cyan-800'
+                        : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
                     }`}
                   >
                     <ArrowDown className="h-3 w-3" />
@@ -472,17 +472,17 @@ function ChatContent() {
                       setCopiedIdx(-1);
                       setTimeout(() => setCopiedIdx(null), 2000);
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 px-2.5 py-1 text-[10px] font-bold font-mono text-slate-200 transition cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 px-2.5 py-1 text-[10px] font-bold font-mono text-slate-700 shadow-2xs transition cursor-pointer"
                     title="Copy all raw packets as JSON"
                   >
-                    {copiedIdx === -1 ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3 text-slate-300" />}
+                    {copiedIdx === -1 ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3 text-slate-500" />}
                     <span>{copiedIdx === -1 ? 'Copied All!' : 'Copy All JSON'}</span>
                   </button>
                 </div>
               </div>
 
               {/* Filter and Search Bar */}
-              <div className="px-3 sm:px-5 py-2 bg-[#0d1424] border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="px-3 sm:px-5 py-2 bg-slate-100/70 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
                 {/* Filter pills */}
                 <div className="flex items-center gap-1 font-mono text-[10px] flex-wrap">
                   {(['all', 'translation', 'chat', 'with_xuid', 'with_source'] as const).map((mode) => (
@@ -492,7 +492,7 @@ function ChatContent() {
                       className={`px-2 py-0.5 rounded-md transition font-bold uppercase cursor-pointer ${
                         rawPacketFilter === mode
                           ? 'bg-cyan-600 text-white shadow-xs'
-                          : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+                          : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-300 shadow-2xs'
                       }`}
                     >
                       {mode.replace('_', ' ')}
@@ -507,13 +507,13 @@ function ChatContent() {
                     value={rawPacketSearch}
                     onChange={(e) => setRawPacketSearch(e.target.value)}
                     placeholder="Filter by text, xuid, or src…"
-                    className="w-full bg-[#070b13] border border-slate-800 rounded-lg px-2.5 py-1 text-[11px] font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-[11px] font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-500 shadow-2xs"
                   />
                   {rawPacketSearch && (
                     <button
                       type="button"
                       onClick={() => setRawPacketSearch('')}
-                      className="absolute right-2 top-1.5 text-[10px] text-slate-400 hover:text-white"
+                      className="absolute right-2 top-1.5 text-[10px] text-slate-400 hover:text-slate-700"
                     >
                       &times;
                     </button>
@@ -522,10 +522,10 @@ function ChatContent() {
               </div>
 
               {/* Packets Stream */}
-              <div ref={rawPacketsRef} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 space-y-2.5 scrollbar-thin">
+              <div ref={rawPacketsRef} className="flex-1 min-h-0 overflow-y-auto p-2.5 sm:p-5 space-y-2.5 scrollbar-thin bg-[#f8fafc]">
                 {filteredRawPackets.length === 0 ? (
-                  <div className="h-full min-h-48 flex flex-col items-center justify-center text-slate-500 space-y-2 font-mono text-xs">
-                    <Terminal className="h-10 w-10 stroke-[1.5] text-slate-600" />
+                  <div className="h-full min-h-48 flex flex-col items-center justify-center text-slate-400 space-y-2 font-mono text-xs">
+                    <Terminal className="h-10 w-10 stroke-[1.5] text-slate-400" />
                     <p>
                       {logs.length === 0
                         ? (isOnline ? 'Waiting for incoming chat packets from the server…' : 'Bot is offline. Connect to start streaming packets.')
@@ -540,46 +540,46 @@ function ChatContent() {
                     return (
                       <article
                         key={idx}
-                        className="bg-[#0f172a] border border-slate-800 rounded-xl p-3 font-mono text-xs shadow-md transition hover:border-slate-700"
+                        className="bg-white border border-slate-200 rounded-2xl p-3 font-mono text-xs shadow-xs transition hover:border-slate-300 hover:shadow-sm"
                       >
                         {/* Header: Timestamp, Type, Source, XUID, Username */}
-                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-slate-500 text-[10px]">{time}</span>
+                            <span className="text-slate-400 text-[10px] font-mono">{time}</span>
                             <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border ${
                               raw?.type === 'translation'
-                                ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
+                                ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
                                 : raw?.type === 'chat'
-                                  ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                                  : 'bg-purple-950 text-purple-300 border-purple-800'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-purple-50 text-purple-700 border-purple-200'
                             }`}>
                               type: {raw?.type || 'packet'}
                             </span>
 
                             <span className={`px-1.5 py-0.5 rounded text-[10px] border ${
                               raw?.source_name
-                                ? 'bg-amber-950/60 text-amber-300 border-amber-800/80 font-bold'
-                                : 'bg-slate-900 text-slate-500 border-slate-800 italic'
+                                ? 'bg-amber-50 text-amber-800 border-amber-200 font-bold'
+                                : 'bg-slate-50 text-slate-400 border-slate-200 italic'
                             }`}>
                               source_name: {raw?.source_name ? `"${raw.source_name}"` : '<empty>'}
                             </span>
 
                             <span className={`px-1.5 py-0.5 rounded text-[10px] border ${
                               raw?.xuid
-                                ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800/80 font-bold'
-                                : 'bg-slate-900 text-slate-500 border-slate-800'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 font-bold'
+                                : 'bg-slate-50 text-slate-400 border-slate-200'
                             }`}>
                               xuid: {raw?.xuid || '<none>'}
                             </span>
 
                             {raw?.resolved_username && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-teal-950 text-teal-300 border border-teal-800 font-bold">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-teal-50 text-teal-800 border border-teal-200 font-bold">
                                 user_list: {raw.resolved_username}
                               </span>
                             )}
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <button
                               type="button"
                               onClick={() => {
@@ -595,16 +595,16 @@ function ChatContent() {
                                 setCopiedIdx(idx);
                                 setTimeout(() => setCopiedIdx(null), 1500);
                               }}
-                              className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition cursor-pointer"
+                              className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition cursor-pointer"
                               title="Copy packet JSON"
                             >
-                              {copiedIdx === idx ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                              {copiedIdx === idx ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
                             </button>
 
                             <button
                               type="button"
                               onClick={() => setExpandedJsonIndices((prev) => ({ ...prev, [idx]: !prev[idx] }))}
-                              className="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer font-bold"
+                              className="text-[10px] px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer font-bold border border-slate-200"
                             >
                               {isExpanded ? 'Hide JSON' : 'JSON'}
                             </button>
@@ -613,14 +613,14 @@ function ChatContent() {
 
                         {/* Parameters section if present */}
                         {raw?.parameters && raw.parameters.length > 0 && (
-                          <div className="mt-2 p-2 bg-[#070b13] rounded-lg border border-slate-800/80 space-y-1">
-                            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                          <div className="mt-2 p-2 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
+                            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                               Parameters ({raw.parameters.length}):
                             </span>
                             <div className="space-y-0.5">
                               {raw.parameters.map((param, pIdx) => (
-                                <div key={pIdx} className="text-[11px] text-cyan-200 flex items-start gap-1">
-                                  <span className="text-slate-500 font-mono select-none">[{pIdx}]:</span>
+                                <div key={pIdx} className="text-[11px] text-cyan-800 flex items-start gap-1">
+                                  <span className="text-slate-400 font-mono select-none">[{pIdx}]:</span>
                                   <span className="break-words [overflow-wrap:anywhere]">{param}</span>
                                 </div>
                               ))}
@@ -630,23 +630,23 @@ function ChatContent() {
 
                         {/* Raw Message String */}
                         <div className="mt-2 text-[11px]">
-                          <span className="text-slate-400 font-bold uppercase text-[9px] tracking-wider block">Raw message:</span>
-                          <p className="mt-0.5 text-slate-100 bg-[#070b13] p-2 rounded-lg border border-slate-800/80 break-words [overflow-wrap:anywhere]">
+                          <span className="text-slate-500 font-bold uppercase text-[9px] tracking-wider block">Raw message:</span>
+                          <p className="mt-0.5 text-slate-800 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 break-words [overflow-wrap:anywhere] font-medium">
                             {raw?.raw_message !== undefined ? raw.raw_message : msg.message}
                           </p>
                         </div>
 
                         {/* Parsed / Rendered Message in Console */}
-                        <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-400">
-                          <span className="font-bold text-slate-500 uppercase tracking-wider">Rendered as:</span>
-                          <span className="text-slate-300 font-bold break-words [overflow-wrap:anywhere]">
+                        <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-500">
+                          <span className="font-bold text-slate-400 uppercase tracking-wider">Rendered as:</span>
+                          <span className="text-slate-700 font-bold break-words [overflow-wrap:anywhere]">
                             {msg.sender ? `[${msg.sender}] ${msg.message}` : msg.message}
                           </span>
                         </div>
 
                         {/* Collapsible JSON View */}
                         {isExpanded && (
-                          <div className="mt-2 p-2.5 bg-black/60 rounded-lg border border-slate-800 overflow-x-auto text-[10px] text-emerald-300">
+                          <div className="mt-2 p-2.5 bg-slate-900 text-emerald-400 rounded-xl border border-slate-800 overflow-x-auto text-[10px]">
                             <pre>{JSON.stringify(raw || msg, null, 2)}</pre>
                           </div>
                         )}

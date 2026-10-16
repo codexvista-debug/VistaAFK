@@ -142,7 +142,7 @@ export const LiveChatTerminal: React.FC<LiveChatTerminalProps> = ({
         </div>
 
         {/* Light-Mode Chat Terminal Screen */}
-        <div className="flex-1 m-3 p-3 overflow-y-auto bg-[#f8fafc] border border-slate-200 rounded-xl flex flex-col space-y-0.5">
+        <div className="flex-1 m-2 sm:m-3 p-2 sm:p-3 overflow-y-auto bg-[#f8fafc] border border-slate-200 rounded-xl flex flex-col space-y-1">
           {filteredLogs.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2">
               <MessageSquare className="h-8 w-8 stroke-[1.5]" />
