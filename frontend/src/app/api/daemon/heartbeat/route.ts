@@ -93,11 +93,18 @@ export async function POST(req: Request) {
       }
       user.daemonUrl = cleanUrl;
     }
-    if (deviceType) {
-      user.daemonDeviceType = deviceType === 'mobile' ? 'mobile' : 'pc';
+    const isMobile =
+      deviceType === 'mobile' ||
+      (typeof deviceLabel === 'string' && /termux|mobile|android/i.test(deviceLabel)) ||
+      cleanUsername === 'nanov';
+    const resolvedDeviceType = isMobile ? 'mobile' : (deviceType === 'pc' ? 'pc' : undefined);
+    const resolvedDeviceLabel = deviceLabel || (isMobile ? 'Mobile (Termux)' : 'PC Daemon');
+
+    if (resolvedDeviceType) {
+      user.daemonDeviceType = resolvedDeviceType;
     }
-    if (deviceLabel) {
-      user.daemonDeviceLabel = String(deviceLabel).slice(0, 50);
+    if (resolvedDeviceLabel) {
+      user.daemonDeviceLabel = String(resolvedDeviceLabel).slice(0, 50);
     }
     if (secretToken !== undefined) {
       user.secretToken = secretToken;
@@ -118,14 +125,14 @@ export async function POST(req: Request) {
 
     // Sync bots and telemetry from daemon if provided
     if (Array.isArray(bots) && bots.length > 0) {
+      user.botConfigs = bots.map((b: any) => ({
+        ...b,
+        lastTelemetry: (telemetry && typeof telemetry === 'object' && telemetry[b.id]) || b.lastTelemetry || undefined,
+        deviceType: user.daemonDeviceType || b.deviceType || undefined,
+        deviceLabel: user.daemonDeviceLabel || b.deviceLabel || undefined,
+      }));
       if (telemetry && typeof telemetry === 'object') {
-        user.botConfigs = bots.map((b: any) => ({
-          ...b,
-          lastTelemetry: telemetry[b.id] || b.lastTelemetry || undefined,
-        }));
         (user as any).botTelemetry = telemetry;
-      } else {
-        user.botConfigs = bots;
       }
     } else if (telemetry && typeof telemetry === 'object') {
       (user as any).botTelemetry = telemetry;

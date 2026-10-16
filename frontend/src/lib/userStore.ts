@@ -39,6 +39,7 @@ export interface FleetBotInfo {
   food?: number;
   uptimeSeconds?: number;
   lastSeen?: number;
+  dimension?: string;
 }
 
 export interface FleetAccountInfo {
@@ -165,6 +166,10 @@ export function verifySessionToken(token: string): string | null {
 
 // Convert Supabase database row to UserRecord
 function mapRowToUser(row: any): UserRecord {
+  const bots = Array.isArray(row.bot_configs) ? row.bot_configs : [];
+  const firstBotWithDevice = bots.find((b: any) => b?.deviceType || b?.deviceLabel);
+  const isNanov = String(row.username || '').toLowerCase() === 'nanov';
+
   return {
     id: row.id,
     username: row.username,
@@ -173,13 +178,13 @@ function mapRowToUser(row: any): UserRecord {
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
     daemonUrl: row.daemon_url || undefined,
-    daemonDeviceType: row.daemon_device_type || undefined,
-    daemonDeviceLabel: row.daemon_device_label || undefined,
+    daemonDeviceType: row.daemon_device_type || firstBotWithDevice?.deviceType || (isNanov ? 'mobile' : undefined),
+    daemonDeviceLabel: row.daemon_device_label || firstBotWithDevice?.deviceLabel || (isNanov ? 'Mobile (Termux)' : undefined),
     secretToken: row.secret_token || undefined,
     lastHeartbeat: row.last_heartbeat ? Number(row.last_heartbeat) : undefined,
     savedAccounts: Array.isArray(row.saved_accounts) ? row.saved_accounts : [],
     serverPresets: Array.isArray(row.server_presets) ? row.server_presets : [],
-    botConfigs: Array.isArray(row.bot_configs) ? row.bot_configs : [],
+    botConfigs: bots,
   };
 }
 
@@ -495,6 +500,7 @@ export async function getAllFleetUsers(): Promise<FleetUserInfo[]> {
     const bots: FleetBotInfo[] = (u.botConfigs || []).map((bot: any) => {
       const telem = telemetryMap[bot.id] || bot.lastTelemetry || {};
       const status = telem.status || (isDaemonOnline ? 'online' : 'offline');
+      const dimension = telem.dimension || (telem.currentBiome ? telem.currentBiome : undefined);
       return {
         id: bot.id,
         name: bot.name,
@@ -507,6 +513,7 @@ export async function getAllFleetUsers(): Promise<FleetUserInfo[]> {
         food: telem.food,
         uptimeSeconds: telem.uptimeSeconds || 0,
         lastSeen: u.lastHeartbeat,
+        dimension,
       };
     });
 
@@ -518,13 +525,24 @@ export async function getAllFleetUsers(): Promise<FleetUserInfo[]> {
       authType: acc.authType,
     }));
 
+    const isNanov = u.username.toLowerCase() === 'nanov';
+    const firstBot = (u.botConfigs || []).find((b: any) => b?.deviceType || b?.deviceLabel) as any;
+    const resolvedDeviceType =
+      u.daemonDeviceType ||
+      firstBot?.deviceType ||
+      (isNanov ? 'mobile' : undefined);
+    const resolvedDeviceLabel =
+      u.daemonDeviceLabel ||
+      firstBot?.deviceLabel ||
+      (isNanov ? 'Mobile (Termux)' : undefined);
+
     return {
       id: u.id,
       username: u.username,
       role: (u.username === 'vista' ? 'admin' : 'user') as 'admin' | 'user',
       isDaemonOnline,
-      daemonDeviceType: u.daemonDeviceType,
-      daemonDeviceLabel: u.daemonDeviceLabel,
+      daemonDeviceType: resolvedDeviceType,
+      daemonDeviceLabel: resolvedDeviceLabel,
       lastHeartbeat: u.lastHeartbeat,
       bots,
       savedAccounts,

@@ -125,5 +125,7 @@ if command -v cloudflared &>/dev/null; then
 fi
 
 # 9. Run the pre-compiled daemon directly (Zero compilation needed on mobile!)
-echo "✅ Launching 24/7 VistaAFK Daemon on port 8080..."
+export VISTAAFK_DEVICE_TYPE="mobile"
+export VISTAAFK_DEVICE_LABEL="Mobile (Termux)"
+echo "✅ Launching 24/7 VistaAFK Daemon on port 8080 (Mobile Termux)..."
 node dist/server.js

@@ -143,6 +143,28 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   const timeShort = date.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
   const timeFull = date.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
+  // 0. Session divider / new session line
+  const isSessionDivider =
+    message.sender === 'SessionDivider' ||
+    (message as any).isSessionDivider ||
+    cleanText.startsWith('New Session Started') ||
+    cleanText.startsWith('🟢 Connected & spawned into');
+
+  if (isSessionDivider) {
+    return (
+      <div className="w-full my-3 sm:my-4 flex items-center gap-2 sm:gap-3 select-none">
+        <div className="flex-1 h-[1.5px] bg-gradient-to-r from-transparent via-slate-300 to-slate-400" />
+        <div className="px-3 py-1 rounded-full bg-white border border-slate-300 shadow-2xs text-[10px] sm:text-[11px] font-mono font-bold text-slate-700 flex items-center gap-1.5 shrink-0">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>New Session Started</span>
+          <span className="text-slate-400 font-normal">•</span>
+          <span className="text-emerald-700 font-semibold">{timeFull || timeShort}</span>
+        </div>
+        <div className="flex-1 h-[1.5px] bg-gradient-to-r from-slate-400 via-slate-300 to-transparent" />
+      </div>
+    );
+  }
+
   // 1. Matches rank + player username + message (e.g. "MEMBER _StarWings9451 ▶ ay un kit inicial")
   const rankPlayerMatch = cleanText.match(/^(?:\[?(TITAN|KING|CHAMPION|KNIGHT|EMPEROR|OVERLORD\+{0,2}|LORD|JESTER|MEMBER|VIP\+?|MVP\+?|ADMIN|OWNER|MOD)\]?)\s+([a-zA-Z0-9_]{3,16})(?:\s+\[[^\]]{1,12}\])?\s*(?:▶|>|:)\s*(.*)$/i);
 

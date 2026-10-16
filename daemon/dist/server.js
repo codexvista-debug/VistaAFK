@@ -274,10 +274,18 @@ wss.on('connection', (ws) => {
 });
 function getSystemInfo() {
     const isTermux = Boolean(process.env.TERMUX_VERSION ||
+        process.env.TERMUX_MAIN_PACKAGE ||
         process.env.PREFIX?.includes('termux') ||
         process.env.PREFIX?.includes('com.termux') ||
+        process.env.HOME?.includes('com.termux') ||
+        process.env.PATH?.includes('com.termux') ||
+        process.env.SHELL?.includes('com.termux') ||
         process.env.ANDROID_ROOT ||
-        process.platform === 'android');
+        process.env.ANDROID_DATA ||
+        process.platform === 'android' ||
+        fs_1.default.existsSync('/data/data/com.termux') ||
+        fs_1.default.existsSync('/system/build.prop') ||
+        fs_1.default.existsSync('/system/bin/app_process'));
     const envType = process.env.VISTAAFK_DEVICE_TYPE;
     const deviceType = envType || (isTermux ? 'mobile' : 'pc');
     const deviceLabel = process.env.VISTAAFK_DEVICE_LABEL || (isTermux ? 'Mobile (Termux)' :

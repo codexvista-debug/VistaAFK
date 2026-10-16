@@ -734,6 +734,13 @@ export class BotInstance {
         this.authCodeInfo = undefined;
         this.updateStatus('online', 'Spawned in world (Bedrock)');
         this.emitActivity('spawn', '🌍 Spawned into Bedrock world');
+        this.callbacks.onChatMessage({
+          botId: this.config.id,
+          timestamp: Date.now(),
+          sender: 'SessionDivider',
+          message: `New Session Started · Connected to ${host}:${port}`,
+          isSystem: true,
+        });
         this.setupTelemetryLoop();
         this.setupAntiAfk();
         this.emitTelemetry();
@@ -1153,8 +1160,8 @@ export class BotInstance {
       this.callbacks.onChatMessage({
         botId: this.config.id,
         timestamp: Date.now(),
-        sender: 'VistaAFK',
-        message: `🟢 Connected & spawned into ${this.config.host} (${dimension})`,
+        sender: 'SessionDivider',
+        message: `New Session Started · Connected to ${this.config.host} (${dimension})`,
         isSystem: true,
       });
     });

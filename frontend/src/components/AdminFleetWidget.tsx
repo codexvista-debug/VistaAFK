@@ -30,6 +30,7 @@ export interface FleetBotInfo {
   food?: number;
   uptimeSeconds?: number;
   lastSeen?: number;
+  dimension?: string;
 }
 
 export interface FleetAccountInfo {
@@ -57,6 +58,15 @@ interface AdminFleetWidgetProps {
   currentUser?: string;
   localTelemetry?: Record<string, any>;
   onRefreshTrigger?: () => void;
+}
+
+function formatDimension(dim?: string): string {
+  if (!dim || dim === 'unknown') return 'Overworld';
+  const clean = dim.toLowerCase().replace(/^(minecraft:)?(the_)?/, '');
+  if (clean.includes('nether')) return 'Nether';
+  if (clean.includes('end')) return 'The End';
+  if (clean.includes('overworld')) return 'Overworld';
+  return dim.charAt(0).toUpperCase() + dim.slice(1);
 }
 
 function formatUptime(seconds?: number): string {
@@ -119,45 +129,17 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
     return () => clearInterval(interval);
   }, [fetchFleet]);
 
-  // Merge local telemetry for currently logged in admin vista if available
-  const augmentedUsers = fleetUsers.map((u) => {
-    if (u.username.toLowerCase() === (currentUser || 'vista').toLowerCase()) {
-      const mergedBots = u.bots.map((bot) => {
-        const live = localTelemetry[bot.id];
-        if (!live) return bot;
-        return {
-          ...bot,
-          status: live.status || bot.status,
-          health:
-            live.hearts !== undefined
-              ? live.hearts
-              : live.health !== undefined
-              ? Math.round((live.health / 2) * 10) / 10
-              : bot.health,
-          maxHealth:
-            live.maxHearts !== undefined
-              ? live.maxHearts
-              : live.maxHealth
-              ? Math.round((live.maxHealth / 2) * 10) / 10
-              : bot.maxHealth,
-          uptimeSeconds: live.uptimeSeconds || bot.uptimeSeconds,
-        };
-      });
-      return {
-        ...u,
-        isDaemonOnline: true,
-        bots: mergedBots,
-      };
-    }
-    return u;
-  });
+  // Filter out current user (vista) so their own accounts are not duplicated on the right
+  const otherUsers = fleetUsers.filter(
+    (u) => u.username.toLowerCase() !== (currentUser || 'vista').toLowerCase()
+  );
 
-  const totalBots = augmentedUsers.reduce((sum, u) => sum + u.bots.length, 0);
-  const onlineBots = augmentedUsers.reduce(
+  const totalBots = otherUsers.reduce((sum, u) => sum + u.bots.length, 0);
+  const onlineBots = otherUsers.reduce(
     (sum, u) => sum + u.bots.filter((b) => b.status === 'online').length,
     0
   );
-  const activeDaemons = augmentedUsers.filter((u) => u.isDaemonOnline).length;
+  const activeDaemons = otherUsers.filter((u) => u.isDaemonOnline).length;
 
   return (
     <div className="bg-white border-2 border-slate-200 rounded-3xl shadow-sm overflow-hidden flex flex-col">
@@ -171,14 +153,14 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
             <div className="min-w-0">
               <div className="flex items-center space-x-1.5">
                 <h3 className="font-black text-sm text-slate-900 tracking-tight truncate">
-                  Fleet & Users Monitor
+                  Users Fleet Monitor
                 </h3>
                 <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
                   Admin
                 </span>
               </div>
               <p className="text-[10px] text-slate-500 font-medium truncate">
-                {activeDaemons} daemons live • {onlineBots}/{totalBots} bots online
+                {otherUsers.length} user{otherUsers.length === 1 ? '' : 's'} • {activeDaemons} live • {onlineBots}/{totalBots} bots online
               </p>
             </div>
           </div>
@@ -205,8 +187,8 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
         {/* Live Counters Pill */}
         <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-200/80 text-center">
           <div className="bg-white/80 border border-slate-200 rounded-xl p-1.5 shadow-2xs">
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Users</span>
-            <span className="text-xs font-black text-slate-800">{augmentedUsers.length}</span>
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Other Users</span>
+            <span className="text-xs font-black text-slate-800">{otherUsers.length}</span>
           </div>
           <div className="bg-white/80 border border-slate-200 rounded-xl p-1.5 shadow-2xs">
             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Daemons</span>
@@ -221,22 +203,22 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
 
       {/* Widget Content Body */}
       <div className="p-3 sm:p-4 space-y-4 max-h-[640px] overflow-y-auto">
-        {isLoading && augmentedUsers.length === 0 ? (
+        {isLoading && otherUsers.length === 0 ? (
           <div className="py-10 flex flex-col items-center justify-center text-slate-400 space-y-2 text-xs">
             <RefreshCw className="h-5 w-5 animate-spin text-emerald-600" />
             <span>Scanning connected fleet...</span>
           </div>
-        ) : error && augmentedUsers.length === 0 ? (
+        ) : error && otherUsers.length === 0 ? (
           <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center space-x-2">
             <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
             <span>{error}</span>
           </div>
-        ) : augmentedUsers.length === 0 ? (
+        ) : otherUsers.length === 0 ? (
           <div className="py-8 text-center text-slate-400 text-xs">
-            No registered users found.
+            No other user accounts connected yet.
           </div>
         ) : (
-          augmentedUsers.map((u) => {
+          otherUsers.map((u) => {
             const isUserVista = u.username.toLowerCase() === 'vista';
             const userOnlineBots = u.bots.filter((b) => b.status === 'online').length;
 
@@ -341,10 +323,13 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
                                     {isBedrock ? 'BEDROCK' : 'JAVA'}
                                   </span>
                                 </div>
-                                <div className="flex items-center space-x-1 text-[10px] font-mono text-slate-500 truncate">
+                                <div className="flex items-center space-x-1.5 text-[10px] font-mono text-slate-500 truncate">
                                   <Server className="h-2.5 w-2.5 text-slate-400 shrink-0" />
                                   <span className="truncate">
                                     {bot.host}:{bot.port}
+                                  </span>
+                                  <span className="px-1.5 py-0.2 rounded text-[8.5px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200 shrink-0 font-sans">
+                                    🌍 {formatDimension(bot.dimension)}
                                   </span>
                                 </div>
                               </div>
