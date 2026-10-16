@@ -334,25 +334,43 @@ function parseBedrockChatPacket(packet, usernameForIdentity) {
     // instead of a server/system line containing the untranslated key.
     let sender = source || 'Server';
     let message = rawMessage;
+    // Bedrock JSON rawtext parsing (e.g. {"rawtext":[{"text":"..."}]})
+    if (message.startsWith('{') && (message.includes('rawtext') || message.includes('text'))) {
+        try {
+            const parsedJson = JSON.parse(message);
+            if (Array.isArray(parsedJson?.rawtext)) {
+                message = parsedJson.rawtext.map((e) => e?.text || e?.translate || '').join('');
+            }
+            else if (parsedJson?.text) {
+                message = parsedJson.text;
+            }
+        }
+        catch (e) { }
+    }
     let translatedPlayerChat = false;
-    if (type === 'translation' && parameters.length >= 2) {
-        if (rawMessage === 'chat.type.text' || rawMessage === 'chat.type.emote') {
+    if (type === 'translation') {
+        if (parameters.length >= 2 && (rawMessage === 'chat.type.text' || rawMessage === 'chat.type.emote')) {
             sender = parameters[0] || sender;
             message = parameters.slice(1).join(' ');
             translatedPlayerChat = true;
         }
-        else if (rawMessage === 'commands.message.display.incoming') {
+        else if (parameters.length >= 2 && rawMessage === 'commands.message.display.incoming') {
             sender = parameters[0] || sender;
             message = `whispers to you: ${parameters.slice(1).join(' ')}`;
             translatedPlayerChat = true;
         }
-        else if (rawMessage === 'commands.message.display.outgoing') {
+        else if (parameters.length >= 2 && rawMessage === 'commands.message.display.outgoing') {
             sender = 'You';
             message = `whisper to ${parameters[0]}: ${parameters.slice(1).join(' ')}`;
             translatedPlayerChat = true;
         }
         else if (parameters.length) {
-            message = `${rawMessage}: ${parameters.join(' ')}`.trim();
+            if (rawMessage && !rawMessage.startsWith('%') && !rawMessage.includes('.')) {
+                message = `${rawMessage} ${parameters.join(' ')}`.trim();
+            }
+            else {
+                message = parameters.join(' ').trim();
+            }
         }
     }
     // Preserve the actual chat text for regular Bedrock chat/whisper packets.
@@ -487,6 +505,7 @@ class BotInstance {
     bedrockGuiRawSlots = [];
     bedrockGuiContainer = { container_id: 'container' };
     bedrockGuiRequestId = 0;
+    bedrockHeartbeatInterval = null;
     tokenFolder;
     afkRewardsAvailable = 0;
     constructor(config, callbacks, tokenFolder) {
@@ -723,6 +742,36 @@ class BotInstance {
                 clientOptions.version = targetVersion;
             const client = bedrock.createClient(clientOptions);
             this.bedrockClient = client;
+            // Force immediate, unbuffered packet transmission over RakNet so slash commands,
+            // chat messages, and form actions are dispatched immediately without sitting in RakNet's
+            // internal MEDIUM_PRIORITY queue or waiting for MTU buffer coalescing.
+            if (typeof client.sendMCPE === 'function') {
+                const origSendMCPE = client.sendMCPE.bind(client);
+                client.sendMCPE = (buffer, immediate) => {
+                    return origSendMCPE(buffer, immediate !== false);
+                };
+            }
+            if (typeof client.onEncryptedPacket === 'function') {
+                client.onEncryptedPacket = (buf) => {
+                    const packet = client.batchHeader ? Buffer.concat([Buffer.from([client.batchHeader]), buf]) : buf;
+                    client.sendMCPE(packet, true);
+                };
+            }
+            const patchConnectionImmediate = () => {
+                if (client.connection && typeof client.connection.sendReliable === 'function') {
+                    const conn = client.connection;
+                    if (!conn._immediatePatched) {
+                        conn._immediatePatched = true;
+                        const origSendReliable = conn.sendReliable.bind(conn);
+                        conn.sendReliable = (buffer, immediate) => {
+                            return origSendReliable(buffer, immediate !== false);
+                        };
+                    }
+                }
+            };
+            patchConnectionImmediate();
+            client.on('connect_allowed', patchConnectionImmediate);
+            client.once('session', patchConnectionImmediate);
             // bedrock-protocol's default helper sends "completed" immediately after
             // resource_packs_info. Bedrock servers expect HAVE_ALL_PACKS at this stage,
             // then COMPLETED after resource_pack_stack. The helper has no pack-downloader,
@@ -801,6 +850,35 @@ class BotInstance {
                     sender: 'SessionDivider',
                     message: `New Session Started · Connected to ${host}:${port}`,
                     isSystem: true,
+                });
+                // Request initial chunks so server streams in-game state
+                try {
+                    client.queue('request_chunk_radius', { chunk_radius: 8 });
+                }
+                catch (e) { }
+                // Active Bedrock keepalive loop (500ms) - essential on 1.21+ where bedrock-protocol omits tick_sync
+                if (this.bedrockHeartbeatInterval)
+                    clearInterval(this.bedrockHeartbeatInterval);
+                let tickCount = 0n;
+                this.bedrockHeartbeatInterval = setInterval(() => {
+                    if (this.bedrockClient && this.currentStatus === 'online') {
+                        try {
+                            this.bedrockClient.queue('tick_sync', {
+                                request_time: tickCount,
+                                response_time: 0n,
+                            });
+                            tickCount += 10n;
+                        }
+                        catch (e) { }
+                    }
+                }, 500);
+                client.on('tick_sync', (packet) => {
+                    if (packet?.response_time != null) {
+                        try {
+                            tickCount = BigInt(packet.response_time);
+                        }
+                        catch (e) { }
+                    }
                 });
                 this.setupTelemetryLoop();
                 this.setupAntiAfk();
@@ -1023,6 +1101,54 @@ class BotInstance {
                     ...parsed,
                 });
             });
+            client.on('command_output', (packet) => {
+                const outputs = Array.isArray(packet?.output) ? packet.output : [];
+                for (const out of outputs) {
+                    const msgId = String(out?.message_id || '');
+                    const params = Array.isArray(out?.parameters) ? out.parameters.map((p) => String(p ?? '')) : [];
+                    let text = msgId;
+                    if (params.length > 0) {
+                        text = params.join(' ');
+                    }
+                    if (text.trim()) {
+                        this.callbacks.onChatMessage({
+                            botId: this.config.id,
+                            timestamp: Date.now(),
+                            sender: 'Server',
+                            message: text,
+                            isSystem: true,
+                            raw: { type: 'command_output', raw_message: text, parameters: params },
+                        });
+                    }
+                }
+            });
+            client.on('set_title', (packet) => {
+                let text = String(packet?.text || '').trim();
+                if (text) {
+                    if (text.startsWith('{') && text.includes('text')) {
+                        try {
+                            const parsed = JSON.parse(text);
+                            if (parsed?.rawtext && Array.isArray(parsed.rawtext)) {
+                                text = parsed.rawtext.map((r) => r?.text || '').join('');
+                            }
+                            else if (parsed?.text) {
+                                text = parsed.text;
+                            }
+                        }
+                        catch (e) { }
+                    }
+                    if (text.trim()) {
+                        this.callbacks.onChatMessage({
+                            botId: this.config.id,
+                            timestamp: Date.now(),
+                            sender: 'Server',
+                            message: text,
+                            isSystem: true,
+                            raw: { type: `title_${packet?.type || 'action'}`, raw_message: text },
+                        });
+                    }
+                }
+            });
             // Boar's transaction watchdog uses negative NetworkStackLatency timestamps
             // as transaction IDs and expects the Bedrock client to echo them. The
             // stock bedrock-protocol helper only echoes packets with needs_response,
@@ -1056,6 +1182,9 @@ class BotInstance {
                 if (this.bedrockHandshakeTimeout)
                     clearTimeout(this.bedrockHandshakeTimeout);
                 this.bedrockHandshakeTimeout = null;
+                if (this.bedrockHeartbeatInterval)
+                    clearInterval(this.bedrockHeartbeatInterval);
+                this.bedrockHeartbeatInterval = null;
                 this.bedrockClient = null;
                 this.bedrockGuiWindow = null;
                 this.bedrockGuiRawSlots = [];
@@ -1130,16 +1259,18 @@ class BotInstance {
         if (this.bedrockClient && this.currentStatus === 'online') {
             try {
                 if (message.startsWith('/')) {
-                    const uuid = (0, node_crypto_1.randomUUID)();
+                    const profileUuid = this.bedrockClient.profile?.uuid;
+                    const uuid = profileUuid && typeof profileUuid === 'string' && profileUuid.length > 8 ? profileUuid : (0, node_crypto_1.randomUUID)();
                     const commandOrigin = {
                         type: 'player',
                         uuid,
-                        request_id: '',
+                        request_id: uuid,
                     };
                     const isModernCommandProtocol = this.bedrockClient.versionGreaterThanOrEqualTo('1.21.130');
                     const hasCommandVersion = this.bedrockClient.versionGreaterThanOrEqualTo('1.19.62');
+                    const playerEid = BigInt(this.bedrockClient.entityId || this.bedrockClient.startGameData?.runtime_entity_id || 0);
                     if (isModernCommandProtocol)
-                        commandOrigin.player_entity_id = 0n;
+                        commandOrigin.player_entity_id = playerEid;
                     const commandRequest = {
                         command: message,
                         origin: commandOrigin,
@@ -1147,20 +1278,18 @@ class BotInstance {
                     };
                     if (hasCommandVersion)
                         commandRequest.version = isModernCommandProtocol ? 'latest' : 52;
-                    this.bedrockClient.queue('command_request', commandRequest);
+                    this.bedrockClient.write('command_request', commandRequest);
                     this.emitActivity('command', `⚡ Sent Bedrock command: ${message}`);
                 }
                 else {
-                    this.bedrockClient.queue('text', {
+                    this.bedrockClient.write('text', {
                         category: 'authored',
                         type: 'chat',
                         needs_translation: false,
-                        source_name: this.config.name,
+                        source_name: this.bedrockClient.profile?.name || this.config.name,
                         message,
-                        xuid: String(this.bedrockClient.profile?.xuid || '0'),
+                        xuid: this.bedrockClient.profile?.xuid || '',
                         platform_chat_id: '',
-                        has_filtered_message: false,
-                        filtered_message: '',
                     });
                     this.emitActivity('chat', `💬 Sent chat: "${message}"`);
                 }
@@ -2566,7 +2695,7 @@ class BotInstance {
         if (window.formType === 'custom' && (!Array.isArray(response) || response.length !== (window.formElements?.length || 0)))
             return;
         try {
-            this.bedrockClient.queue('modal_form_response', {
+            this.bedrockClient.write('modal_form_response', {
                 form_id: window.id,
                 has_response_data: true,
                 data: JSON.stringify(response),
@@ -2588,7 +2717,7 @@ class BotInstance {
                 return;
             try {
                 if (window.kind === 'form') {
-                    this.bedrockClient.queue('modal_form_response', {
+                    this.bedrockClient.write('modal_form_response', {
                         form_id: window.id,
                         has_response_data: false,
                         has_cancel_reason: true,
@@ -2596,7 +2725,7 @@ class BotInstance {
                     });
                 }
                 else {
-                    this.bedrockClient.queue('container_close', {
+                    this.bedrockClient.write('container_close', {
                         window_id: window.id,
                         window_type: window.type || 'container',
                         server: false,
@@ -3106,6 +3235,8 @@ class BotInstance {
             clearTimeout(this.reconnectTimeout);
         if (this.bedrockHandshakeTimeout)
             clearTimeout(this.bedrockHandshakeTimeout);
+        if (this.bedrockHeartbeatInterval)
+            clearInterval(this.bedrockHeartbeatInterval);
         if (this.antiAfkInterval)
             clearInterval(this.antiAfkInterval);
         if (this.telemetryInterval)
@@ -3127,6 +3258,7 @@ class BotInstance {
         this.manualMovementControls.clear();
         this.reconnectTimeout = null;
         this.bedrockHandshakeTimeout = null;
+        this.bedrockHeartbeatInterval = null;
         this.antiAfkInterval = null;
         this.telemetryInterval = null;
         this.patrolInterval = null;
