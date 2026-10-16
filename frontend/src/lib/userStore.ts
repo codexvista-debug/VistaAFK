@@ -79,6 +79,34 @@ export interface UserSummary {
 
 const SECRET_KEY = process.env.VISTAAFK_AUTH_SECRET || 'vistaafk_cloud_auth_secret_token_2026';
 
+let resolvedUsersTable: string = process.env.VISTAAFK_USERS_TABLE || 'vista_users';
+let resolvedSettingsTable: string = process.env.VISTAAFK_SETTINGS_TABLE || 'vista_settings';
+
+function isMissingTableError(error: any): boolean {
+  if (!error) return false;
+  const code = String(error.code || '');
+  const msg = (String(error.message || '') + ' ' + String(error.details || '')).toLowerCase();
+  return code === 'PGRST205' || code === '42P01' || msg.includes('does not exist') || msg.includes('not found') || msg.includes('schema cache');
+}
+
+async function queryUsersTable<T = any>(runQuery: (tableName: string) => PromiseLike<{ data: T; error: any }> | any): Promise<{ data: T; error: any }> {
+  let res = await runQuery(resolvedUsersTable);
+  if (isMissingTableError(res?.error) && resolvedUsersTable !== 'users') {
+    resolvedUsersTable = 'users';
+    res = await runQuery('users');
+  }
+  return res as { data: T; error: any };
+}
+
+async function querySettingsTable<T = any>(runQuery: (tableName: string) => PromiseLike<{ data: T; error: any }> | any): Promise<{ data: T; error: any }> {
+  let res = await runQuery(resolvedSettingsTable);
+  if (isMissingTableError(res?.error) && resolvedSettingsTable !== 'settings') {
+    resolvedSettingsTable = 'settings';
+    res = await runQuery('settings');
+  }
+  return res as { data: T; error: any };
+}
+
 // In-memory cache for ultra-fast session & auth verification
 const memoryCache = new Map<string, UserRecord>();
 
@@ -198,11 +226,13 @@ export async function getUser(rawUsername: string): Promise<UserRecord | null> {
 
   // 1. Check Supabase Postgres database first (live multi-device / multi-tab source of truth)
   try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('username', username)
-      .maybeSingle();
+    const { data, error } = await queryUsersTable((table) =>
+      supabase
+        .from(table)
+        .select('*')
+        .eq('username', username)
+        .maybeSingle()
+    );
 
     if (!error && data) {
       const user = mapRowToUser(data);
@@ -289,7 +319,9 @@ export async function saveUser(user: UserRecord): Promise<void> {
       bot_configs: user.botConfigs || [],
     };
 
-    const { error } = await supabase.from('users').upsert(payload, { onConflict: 'username' });
+    const { error } = await queryUsersTable((table) =>
+      supabase.from(table).upsert(payload, { onConflict: 'username' })
+    );
     if (error) {
       console.warn('[UserStore] Supabase saveUser notice:', error.message);
     }
@@ -304,7 +336,9 @@ export async function getAllUsers(): Promise<UserSummary[]> {
 
   // 1. Fetch from Supabase
   try {
-    const { data, error } = await supabase.from('users').select('*');
+    const { data, error } = await queryUsersTable((table) =>
+      supabase.from(table).select('*')
+    );
     if (!error && Array.isArray(data)) {
       data.forEach((row) => {
         const u = mapRowToUser(row);
@@ -390,7 +424,9 @@ export async function deleteUser(rawUsername: string): Promise<{ success: boolea
 
   // 3. Supabase
   try {
-    await supabase.from('users').delete().eq('username', username);
+    await queryUsersTable((table) =>
+      supabase.from(table).delete().eq('username', username)
+    );
   } catch (e) {}
 
   return { success: true };
@@ -430,11 +466,13 @@ function getSettingsFilePath(): string {
 export async function getSystemSettings(): Promise<SystemSettings> {
   // 1. Supabase
   try {
-    const { data, error } = await supabase
-      .from('settings')
-      .select('value')
-      .eq('key', 'system')
-      .maybeSingle();
+    const { data, error } = await querySettingsTable((table) =>
+      supabase
+        .from(table)
+        .select('value')
+        .eq('key', 'system')
+        .maybeSingle()
+    );
 
     if (!error && data?.value) {
       return {
@@ -465,7 +503,9 @@ export async function getAllFleetUsers(): Promise<FleetUserInfo[]> {
 
   // 1. Fetch from Supabase
   try {
-    const { data, error } = await supabase.from('users').select('*');
+    const { data, error } = await queryUsersTable((table) =>
+      supabase.from(table).select('*')
+    );
     if (!error && Array.isArray(data)) {
       data.forEach((row) => {
         const u = mapRowToUser(row);
@@ -573,7 +613,9 @@ export async function updateSystemSettings(settings: Partial<SystemSettings>): P
 
   // 2. Save Supabase
   try {
-    await supabase.from('settings').upsert({ key: 'system', value: updated }, { onConflict: 'key' });
+    await querySettingsTable((table) =>
+      supabase.from(table).upsert({ key: 'system', value: updated }, { onConflict: 'key' })
+    );
   } catch (e) {}
 
   return updated;
