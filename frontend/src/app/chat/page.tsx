@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useVistaWebSocket } from '../../hooks/useVistaWebSocket';
 import {
@@ -69,7 +69,6 @@ function ChatContent() {
   });
   const [isEditingSettings, setIsEditingSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const playerLogsRef = useRef<HTMLDivElement | null>(null);
   const [playerLogsAutoScroll, setPlayerLogsAutoScroll] = useState(true);
 
@@ -94,49 +93,9 @@ function ChatContent() {
   const playerLogs = selectedBotId ? activityLogs[selectedBotId] || [] : [];
   const isConnecting = ['connecting', 'authenticating', 'reconnecting'].includes(currentTelemetry?.status || '');
 
-  const scrollToChatBottom = useCallback((smooth = false) => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
-    }
-  }, []);
-
-  // When switching to the Chat tab from POV, Movement, Inventory, etc., jump straight to the latest chat
   useEffect(() => {
-    if (activeTab === 'chat') {
-      scrollToChatBottom(false);
-      const raf = requestAnimationFrame(() => {
-        scrollToChatBottom(false);
-      });
-      const timer = setTimeout(() => {
-        scrollToChatBottom(false);
-      }, 50);
-      return () => {
-        cancelAnimationFrame(raf);
-        clearTimeout(timer);
-      };
-    }
-  }, [activeTab, scrollToChatBottom]);
-
-  // When new chat messages arrive or filter/bot changes, scroll smoothly to bottom
-  useEffect(() => {
-    if (activeTab === 'chat') {
-      const timer = setTimeout(() => {
-        if (chatContainerRef.current) {
-          const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-          const isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
-          if (isNearBottom) {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }
-        } else {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }
-      }, 20);
-      return () => clearTimeout(timer);
-    }
-  }, [logs, filter, selectedBotId, activeTab]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [logs]);
 
   useEffect(() => {
     if (playerLogsAutoScroll && activeTab === 'logs' && playerLogsRef.current) {
@@ -350,7 +309,7 @@ function ChatContent() {
           </div>
 
           {/* Light-Mode Chat Terminal Box */}
-          <div ref={chatContainerRef} className="flex-1 min-h-0 min-w-0 p-1.5 sm:p-4 overflow-y-auto bg-[#f8fafc] flex flex-col space-y-0.5 sm:space-y-1">
+          <div className="flex-1 min-h-0 min-w-0 p-1.5 sm:p-4 overflow-y-auto bg-[#f8fafc] flex flex-col space-y-0.5 sm:space-y-1">
             {filteredLogs.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2">
                 <MessageSquare className="h-10 w-10 stroke-[1.5]" />

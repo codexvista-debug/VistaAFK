@@ -4,37 +4,10 @@ import { SocksProxyAgent } from 'socks-proxy-agent';
 // @ts-ignore
 import nbt from 'prismarine-nbt';
 import { BotConfig, BotTelemetry, ChatMessage, RawChatPacketInfo, ActivityLog, InventoryItem, ItemEnchantment, MinimapPlayer, MinimapMob, TerrainGridData, BotGuiWindow } from './types.js';
-import { sampleTerrainGrid, sampleBedrockTerrainGrid, formatName } from './terrainMapper.js';
+import { sampleTerrainGrid } from './terrainMapper.js';
 import path from 'path';
 
 const BEDROCK_PLAYER_CONTAINERS = new Set(['armor', 'hotbar_and_inventory', 'hotbar', 'inventory', 'offhand']);
-
-const HOSTILE_MOBS = new Set([
-  'zombie', 'skeleton', 'creeper', 'spider', 'cave_spider', 'enderman', 'witch', 'blaze',
-  'ghast', 'warden', 'phantom', 'drowned', 'husk', 'stray', 'silverfish', 'slime',
-  'magma_cube', 'hoglin', 'zoglin', 'piglin_brute', 'pillager', 'ravager', 'vindicator',
-  'evoker', 'vex', 'shulker', 'guardian', 'elder_guardian', 'wither', 'wither_skeleton', 'ender_dragon',
-  'breeze', 'bogged', 'zombie_villager', 'piglin', 'zombified_piglin'
-]);
-
-const IGNORED_ENTITIES = new Set([
-  'item', 'experience_orb', 'arrow', 'spectral_arrow', 'trident',
-  'armor_stand', 'boat', 'chest_boat', 'minecart', 'chest_minecart',
-  'furnace_minecart', 'tnt_minecart', 'hopper_minecart', 'spawner_minecart',
-  'painting', 'item_frame', 'glow_item_frame', 'leash_knot',
-  'area_effect_cloud', 'eye_of_ender', 'end_crystal', 'firework_rocket',
-  'xp_orb', 'falling_block', 'fishing_hook', 'shulker_bullet',
-  'wither_skull', 'dragon_fireball', 'small_fireball', 'fireball',
-  'egg', 'snowball', 'splash_potion', 'lingering_potion', 'ender_pearl'
-]);
-
-function computeFacingFromYaw(yawRad: number): string {
-  const deg = (((180 - (yawRad * 180) / Math.PI) % 360) + 360) % 360;
-  if (deg >= 315 || deg < 45) return 'South';
-  if (deg >= 45 && deg < 135) return 'West';
-  if (deg >= 135 && deg < 225) return 'North';
-  return 'East';
-}
 
 export interface BotInstanceCallbacks {
   onTelemetryUpdate: (telemetry: BotTelemetry) => void;
@@ -498,21 +471,7 @@ export class BotInstance {
   private terrainGridCenter: { x: number; y: number; z: number } | null = null;
   private recordedMaxHealth: number = 0;
   private bedrockClient: any = null;
-  private bedrockRuntimeEntityId: string = '';
-  private bedrockUniqueEntityId: string = '';
   private bedrockPosition: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
-  private bedrockYaw: number = 0;
-  private bedrockPitch: number = 0;
-  private bedrockDimension: string = 'overworld';
-  private bedrockBiome: string = 'Plains';
-  private bedrockTimeOfDay: string = 'Day';
-  private bedrockIsRaining: boolean = false;
-  private bedrockTerrainGridCache: TerrainGridData | null = null;
-  private bedrockTerrainGridSampledAt: number = 0;
-  private bedrockTerrainGridCenter: { x: number; y: number; z: number } | null = null;
-  private bedrockNearbyPlayers = new Map<string, { runtimeId: string; uniqueId: string; username: string; x: number; y: number; z: number; yaw: number }>();
-  private bedrockNearbyMobs = new Map<string, { runtimeId: string; uniqueId: string; id: number; name: string; type: string; x: number; y: number; z: number; isHostile: boolean }>();
-  private bedrockUniqueToRuntime = new Map<string, string>();
   private bedrockHealth: number = 20;
   private bedrockMaxHealth: number = 20;
   private bedrockFood: number = 20;
@@ -879,40 +838,14 @@ export class BotInstance {
 
       client.on('start_game', (packet: any) => {
         this.registerBedrockItemNames(packet?.itemstates);
-        if (packet?.runtime_entity_id != null) {
-          this.bedrockRuntimeEntityId = String(packet.runtime_entity_id);
-        }
-        if (packet?.entity_id != null) {
-          this.bedrockUniqueEntityId = String(packet.entity_id);
-        }
-        if (packet?.dimension != null) {
-          const dimVal = String(packet.dimension).toLowerCase();
-          if (dimVal === '1' || dimVal === 'nether' || dimVal.includes('nether')) {
-            this.bedrockDimension = 'the_nether';
-          } else if (dimVal === '2' || dimVal === 'end' || dimVal.includes('end')) {
-            this.bedrockDimension = 'the_end';
-          } else {
-            this.bedrockDimension = 'overworld';
-          }
-        }
-        if (packet?.biome_name) {
-          this.bedrockBiome = formatName(packet.biome_name);
-        }
         if (packet?.player_position) {
           this.bedrockPosition = {
             x: Math.round(packet.player_position.x * 10) / 10,
             y: Math.round(packet.player_position.y * 10) / 10,
             z: Math.round(packet.player_position.z * 10) / 10,
           };
+          this.emitTelemetry();
         }
-        if (packet?.rotation) {
-          if (typeof packet.rotation.z === 'number') this.bedrockYaw = packet.rotation.z;
-          if (typeof packet.rotation.x === 'number') this.bedrockPitch = packet.rotation.x;
-        }
-        if (packet?.rain_level != null && Number(packet.rain_level) > 0.2) {
-          this.bedrockIsRaining = true;
-        }
-        this.emitTelemetry();
       });
 
       client.on('item_registry', (packet: any) => {
@@ -1087,179 +1020,17 @@ export class BotInstance {
       });
 
       client.on('move_player', (packet: any) => {
-        const myRuntimeId = this.bedrockRuntimeEntityId || String((client as any).entityId || (client as any).startGameData?.runtime_entity_id || '');
-        const packetRuntimeId = String(packet?.runtime_id ?? packet?.runtime_entity_id ?? '');
-
-        if (myRuntimeId && packetRuntimeId === myRuntimeId) {
+        const myId = (client as any).entityId || (client as any).startGameData?.runtime_entity_id;
+        if (packet?.runtime_entity_id === myId || packet?.runtime_id === myId) {
           if (packet?.position) {
             this.bedrockPosition = {
               x: Math.round(packet.position.x * 10) / 10,
               y: Math.round(packet.position.y * 10) / 10,
               z: Math.round(packet.position.z * 10) / 10,
             };
-          }
-          if (typeof packet?.yaw === 'number') this.bedrockYaw = packet.yaw;
-          if (typeof packet?.pitch === 'number') this.bedrockPitch = packet.pitch;
-          this.emitTelemetry();
-        } else if (packetRuntimeId) {
-          const existing = this.bedrockNearbyPlayers.get(packetRuntimeId);
-          if (existing) {
-            if (packet?.position) {
-              existing.x = Math.round(packet.position.x * 10) / 10;
-              existing.y = Math.round(packet.position.y * 10) / 10;
-              existing.z = Math.round(packet.position.z * 10) / 10;
-            }
-            if (typeof packet?.yaw === 'number') existing.yaw = packet.yaw;
+            this.emitTelemetry();
           }
         }
-      });
-
-      client.on('correct_player_move_prediction', (packet: any) => {
-        if (packet?.position) {
-          this.bedrockPosition = {
-            x: Math.round(packet.position.x * 10) / 10,
-            y: Math.round(packet.position.y * 10) / 10,
-            z: Math.round(packet.position.z * 10) / 10,
-          };
-          this.emitTelemetry();
-        }
-      });
-
-      client.on('respawn', (packet: any) => {
-        if (packet?.position) {
-          this.bedrockPosition = {
-            x: Math.round(packet.position.x * 10) / 10,
-            y: Math.round(packet.position.y * 10) / 10,
-            z: Math.round(packet.position.z * 10) / 10,
-          };
-          this.emitTelemetry();
-        }
-      });
-
-      client.on('change_dimension', (packet: any) => {
-        const dim = Number(packet?.dimension);
-        if (dim === 1) this.bedrockDimension = 'the_nether';
-        else if (dim === 2) this.bedrockDimension = 'the_end';
-        else this.bedrockDimension = 'overworld';
-
-        if (packet?.position) {
-          this.bedrockPosition = {
-            x: Math.round(packet.position.x * 10) / 10,
-            y: Math.round(packet.position.y * 10) / 10,
-            z: Math.round(packet.position.z * 10) / 10,
-          };
-        }
-        this.bedrockNearbyPlayers.clear();
-        this.bedrockNearbyMobs.clear();
-        this.bedrockUniqueToRuntime.clear();
-        this.bedrockTerrainGridCache = null;
-        this.emitTelemetry();
-      });
-
-      client.on('set_time', (packet: any) => {
-        const time = Number(packet?.time);
-        if (Number.isFinite(time)) {
-          const t = Math.abs(time) % 24000;
-          if (t >= 0 && t < 12000) {
-            const hour = Math.floor((t / 1000 + 6) % 24);
-            this.bedrockTimeOfDay = `Day (${hour}:00)`;
-          } else if (t >= 12000 && t < 13800) {
-            this.bedrockTimeOfDay = 'Sunset 🌇';
-          } else if (t >= 13800 && t < 22200) {
-            this.bedrockTimeOfDay = 'Night 🌙';
-          } else {
-            this.bedrockTimeOfDay = 'Sunrise 🌅';
-          }
-        }
-      });
-
-      client.on('add_player', (packet: any) => {
-        const runtimeId = String(packet?.runtime_id ?? '');
-        const uniqueId = String(packet?.unique_id ?? '');
-        const rawUsername = String(packet?.username || '').trim();
-        if (!runtimeId || !rawUsername) return;
-
-        const myRuntimeId = this.bedrockRuntimeEntityId || String((client as any).entityId || (client as any).startGameData?.runtime_entity_id || '');
-        const myUsername = this.config.name.toLowerCase();
-        if (runtimeId === myRuntimeId || rawUsername.toLowerCase() === myUsername) return;
-
-        const pos = packet?.position || { x: 0, y: 0, z: 0 };
-        const yaw = Number(packet?.yaw || 0);
-
-        this.bedrockNearbyPlayers.set(runtimeId, {
-          runtimeId,
-          uniqueId,
-          username: rawUsername,
-          x: Math.round(pos.x * 10) / 10,
-          y: Math.round(pos.y * 10) / 10,
-          z: Math.round(pos.z * 10) / 10,
-          yaw,
-        });
-
-        if (uniqueId) {
-          this.bedrockUniqueToRuntime.set(uniqueId, runtimeId);
-        }
-      });
-
-      client.on('add_entity', (packet: any) => {
-        const runtimeId = String(packet?.runtime_id ?? '');
-        const uniqueId = String(packet?.unique_id ?? '');
-        const entityType = String(packet?.entity_type || '').toLowerCase().replace(/^minecraft:/, '');
-        if (!runtimeId || !entityType) return;
-
-        if (IGNORED_ENTITIES.has(entityType)) return;
-
-        const pos = packet?.position || { x: 0, y: 0, z: 0 };
-        const isHostile = HOSTILE_MOBS.has(entityType);
-        const cleanName = formatName(entityType);
-
-        this.bedrockNearbyMobs.set(runtimeId, {
-          runtimeId,
-          uniqueId,
-          id: Number(packet?.runtime_id) || Math.floor(Math.random() * 100000),
-          name: cleanName || 'Mob',
-          type: isHostile ? 'hostile' : 'passive',
-          x: Math.round(pos.x * 10) / 10,
-          y: Math.round(pos.y * 10) / 10,
-          z: Math.round(pos.z * 10) / 10,
-          isHostile,
-        });
-
-        if (uniqueId) {
-          this.bedrockUniqueToRuntime.set(uniqueId, runtimeId);
-        }
-      });
-
-      client.on('move_entity', (packet: any) => {
-        const runtimeId = String(packet?.runtime_entity_id ?? '');
-        const mob = this.bedrockNearbyMobs.get(runtimeId);
-        if (mob && packet?.position) {
-          mob.x = Math.round(packet.position.x * 10) / 10;
-          mob.y = Math.round(packet.position.y * 10) / 10;
-          mob.z = Math.round(packet.position.z * 10) / 10;
-        }
-      });
-
-      client.on('move_entity_delta', (packet: any) => {
-        const runtimeId = String(packet?.runtime_entity_id ?? '');
-        const mob = this.bedrockNearbyMobs.get(runtimeId);
-        if (mob) {
-          if (typeof packet?.x === 'number') mob.x = Math.round((mob.x + packet.x) * 10) / 10;
-          if (typeof packet?.y === 'number') mob.y = Math.round((mob.y + packet.y) * 10) / 10;
-          if (typeof packet?.z === 'number') mob.z = Math.round((mob.z + packet.z) * 10) / 10;
-        }
-      });
-
-      client.on('remove_entity', (packet: any) => {
-        const uniqueId = String(packet?.entity_id_self ?? '');
-        if (!uniqueId) return;
-
-        const runtimeId = this.bedrockUniqueToRuntime.get(uniqueId) || uniqueId;
-        this.bedrockNearbyPlayers.delete(runtimeId);
-        this.bedrockNearbyMobs.delete(runtimeId);
-        this.bedrockNearbyPlayers.delete(uniqueId);
-        this.bedrockNearbyMobs.delete(uniqueId);
-        this.bedrockUniqueToRuntime.delete(uniqueId);
       });
 
       client.on('set_health', (packet: any) => {
@@ -1322,11 +1093,6 @@ export class BotInstance {
         this.bedrockClient = null;
         this.bedrockGuiWindow = null;
         this.bedrockGuiRawSlots = [];
-        this.bedrockNearbyPlayers.clear();
-        this.bedrockNearbyMobs.clear();
-        this.bedrockUniqueToRuntime.clear();
-        this.bedrockTerrainGridCache = null;
-        this.bedrockTerrainGridCenter = null;
         this.emitTelemetry();
         if (!this.isManuallyStopped) {
           // Don't start another OAuth flow while the current device code is
@@ -1366,11 +1132,6 @@ export class BotInstance {
     this.isManuallyStopped = true;
     this.clearTimers();
     this.authCodeInfo = undefined;
-    this.bedrockNearbyPlayers.clear();
-    this.bedrockNearbyMobs.clear();
-    this.bedrockUniqueToRuntime.clear();
-    this.bedrockTerrainGridCache = null;
-    this.bedrockTerrainGridCenter = null;
     if (this.bedrockClient) {
       try {
         if (this.bedrockClient.connection && !(this.bedrockClient.connection as any).raknet) {
@@ -1730,13 +1491,6 @@ export class BotInstance {
       if (this.manualMovementControls.size > 0) return;
       if (this.bedrockClient && this.currentStatus === 'online') {
         try {
-          if (this.config.antiAfk.rotateHead && !this.config.farming?.enabled) {
-            const deltaYaw = (Math.random() - 0.5) * 30;
-            const deltaPitch = (Math.random() - 0.5) * 15;
-            this.bedrockYaw = (this.bedrockYaw + deltaYaw + 360) % 360;
-            this.bedrockPitch = Math.max(-80, Math.min(80, this.bedrockPitch + deltaPitch));
-            this.emitTelemetry();
-          }
           if (this.config.antiAfk.swingArm && Math.random() > 0.3) {
             const eid = (this.bedrockClient as any).entityId || (this.bedrockClient as any).startGameData?.runtime_entity_id || 1n;
             this.bedrockClient.queue('animate', {
@@ -2247,12 +2001,6 @@ export class BotInstance {
   }
 
   public look(yaw: number, pitch: number) {
-    if (this.bedrockClient && this.currentStatus === 'online') {
-      this.bedrockYaw = (yaw * 180) / Math.PI;
-      this.bedrockPitch = (pitch * 180) / Math.PI;
-      this.emitTelemetry();
-      return;
-    }
     if (!this.bot || this.currentStatus !== 'online') return;
     try {
       this.bot.look(yaw, pitch, true);
@@ -2982,80 +2730,6 @@ export class BotInstance {
       const hp = this.bedrockHealth ?? this.bedrockMaxHealth;
       const maxHp = this.bedrockMaxHealth ?? 20;
       const hearts = Math.round((hp / 2) * 10) / 10;
-
-      // Bedrock yaw and pitch are tracked in degrees; convert to radians to match Java and frontend expectations
-      const yawRad = (this.bedrockYaw * Math.PI) / 180;
-      const pitchRad = (this.bedrockPitch * Math.PI) / 180;
-      const facing = computeFacingFromYaw(yawRad);
-
-      // Nearby players in radar range (up to 36 blocks)
-      const nearbyPlayers: MinimapPlayer[] = [];
-      const myUsername = (this.config.name || '').toLowerCase();
-      for (const p of this.bedrockNearbyPlayers.values()) {
-        if (!p.username || p.username.toLowerCase() === myUsername) continue;
-        const dx = p.x - pos.x;
-        const dz = p.z - pos.z;
-        const dist = Math.sqrt(dx * dx + dz * dz);
-        if (dist <= 36) {
-          const playerYawRad = (p.yaw * Math.PI) / 180;
-          nearbyPlayers.push({
-            username: p.username,
-            x: p.x,
-            y: p.y,
-            z: p.z,
-            dx: Math.round(dx * 10) / 10,
-            dz: Math.round(dz * 10) / 10,
-            distance: Math.round(dist * 10) / 10,
-            yaw: Math.round(playerYawRad * 100) / 100,
-            facing: computeFacingFromYaw(playerYawRad),
-          });
-        }
-      }
-      nearbyPlayers.sort((a, b) => a.distance - b.distance);
-
-      // Nearby mobs in radar range (up to 36 blocks)
-      const nearbyMobs: MinimapMob[] = [];
-      for (const m of this.bedrockNearbyMobs.values()) {
-        const dx = m.x - pos.x;
-        const dz = m.z - pos.z;
-        const dist = Math.sqrt(dx * dx + dz * dz);
-        if (dist <= 36) {
-          nearbyMobs.push({
-            id: m.id,
-            name: m.name,
-            type: m.type,
-            distance: Math.round(dist * 10) / 10,
-            x: m.x,
-            y: m.y,
-            z: m.z,
-            dx: Math.round(dx * 10) / 10,
-            dz: Math.round(dz * 10) / 10,
-            isHostile: m.isHostile,
-          });
-        }
-      }
-      nearbyMobs.sort((a, b) => a.distance - b.distance);
-
-      // Terrain grid with caching (updated every 2s or when moved >= 3 blocks)
-      const mapCenter = { x: Math.floor(pos.x), y: Math.floor(pos.y), z: Math.floor(pos.z) };
-      const movedFarEnough = !this.bedrockTerrainGridCenter
-        || Math.abs(mapCenter.x - this.bedrockTerrainGridCenter.x) >= 3
-        || Math.abs(mapCenter.y - this.bedrockTerrainGridCenter.y) >= 3
-        || Math.abs(mapCenter.z - this.bedrockTerrainGridCenter.z) >= 3;
-      if (!this.bedrockTerrainGridCache || Date.now() - this.bedrockTerrainGridSampledAt >= 2000 || movedFarEnough) {
-        this.bedrockTerrainGridCache = sampleBedrockTerrainGrid(
-          pos,
-          this.bedrockBiome || 'Plains',
-          this.bedrockDimension || 'overworld',
-          this.bedrockTimeOfDay,
-          this.bedrockIsRaining ? 'Raining 🌧️' : 'Clear ☀️',
-          24
-        );
-        this.bedrockTerrainGridSampledAt = Date.now();
-        this.bedrockTerrainGridCenter = mapCenter;
-      }
-      const terrainGrid = this.bedrockTerrainGridCache;
-
       return {
         id: this.config.id,
         name: this.config.name,
@@ -3068,7 +2742,7 @@ export class BotInstance {
         maxHearts: Math.round((maxHp / 2) * 10) / 10,
         food: this.bedrockFood,
         coordinates: pos,
-        dimension: this.bedrockDimension || 'overworld',
+        dimension: 'overworld',
         ping: 0,
         gamemode: 'survival',
         uptimeSeconds: this.connectStartTime ? Math.floor((Date.now() - this.connectStartTime) / 1000) : 0,
@@ -3081,16 +2755,16 @@ export class BotInstance {
         }),
         selectedSlot: this.bedrockSelectedSlot,
         openWindow: this.bedrockGuiWindow,
-        facing,
-        yaw: yawRad,
-        pitch: pitchRad,
+        facing: 'North',
+        yaw: 0,
+        pitch: 0,
         targetBlock: null,
         nearbyEntities: [],
-        nearbyPlayers,
-        nearbyMobs,
-        currentBiome: terrainGrid?.currentBiome || this.bedrockBiome || 'Plains',
-        currentLandBlock: terrainGrid?.currentLandBlock || 'Grass Block',
-        terrainGrid,
+        nearbyPlayers: [],
+        nearbyMobs: [],
+        currentBiome: 'Overworld',
+        currentLandBlock: 'Bedrock',
+        terrainGrid: null,
         isPatrolling: false,
         isFarming: false,
         afkRewardsAvailable: this.afkRewardsAvailable,
@@ -3160,6 +2834,12 @@ export class BotInstance {
     const nearbyPlayers: MinimapPlayer[] = [];
     // Nearby mobs in radar range (up to 36 blocks)
     const nearbyMobs: MinimapMob[] = [];
+    const HOSTILE_MOBS = new Set([
+      'zombie', 'skeleton', 'creeper', 'spider', 'cave_spider', 'enderman', 'witch', 'blaze',
+      'ghast', 'warden', 'phantom', 'drowned', 'husk', 'stray', 'silverfish', 'slime',
+      'magma_cube', 'hoglin', 'zoglin', 'piglin_brute', 'pillager', 'ravager', 'vindicator',
+      'evoker', 'vex', 'shulker', 'guardian', 'elder_guardian', 'wither', 'wither_skeleton', 'ender_dragon'
+    ]);
 
     try {
       const myPos = this.bot.entity.position;
