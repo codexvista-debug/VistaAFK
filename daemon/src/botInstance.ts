@@ -61,7 +61,7 @@ function parseEnchantmentsFromLore(lines: string[]): ItemEnchantment[] {
   const found = new Map<string, ItemEnchantment>();
 
   for (const line of lines) {
-    const match = line.replace(/§[0-9a-fk-or]/gi, '').match(/^\s*([\w ]+?)\s+(X|IX|VIII|VII|VI|V|IV|III|II|I|\d+)\s*$/i);
+    const match = line.replace(/§[0-9a-fk-orxghijpqstu]/gi, '').match(/^\s*([\w ]+?)\s+(X|IX|VIII|VII|VI|V|IV|III|II|I|\d+)\s*$/i);
     if (!match) continue;
     const name = match[1].toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
     const rawLevel = match[2].toUpperCase();
@@ -82,7 +82,7 @@ function cleanMinecraftJsonText(raw: any): string {
         return cleanMinecraftJsonText(parsed);
       } catch (e) {}
     }
-    return raw.replace(/§[0-9a-fk-or]/gi, '').trim();
+    return raw.replace(/§[0-9a-fk-orxghijpqstu]/gi, '').trim();
   }
   if (typeof raw === 'object') {
     let out = '';
@@ -96,9 +96,9 @@ function cleanMinecraftJsonText(raw: any): string {
       if (typeof raw.value === 'string') out += raw.value;
       else if (Array.isArray(raw.value)) out += raw.value.map(cleanMinecraftJsonText).join(' ');
     }
-    return out.replace(/§[0-9a-fk-or]/gi, '').trim();
+    return out.replace(/§[0-9a-fk-orxghijpqstu]/gi, '').trim();
   }
-  return String(raw).replace(/§[0-9a-fk-or]/gi, '').trim();
+  return String(raw).replace(/§[0-9a-fk-orxghijpqstu]/gi, '').trim();
 }
 
 function serializeGuiWindow(window: any): BotGuiWindow | null {
@@ -267,31 +267,55 @@ function parseBedrockChatPacket(packet: any, usernameForIdentity?: (xuid: string
   }
 
   // Preserve the actual chat text for regular Bedrock chat/whisper packets.
-  const isPlayerChat = translatedPlayerChat || type === 'chat' || type === 'whisper' || type === 'announcement' || Boolean(xuid);
+  let isPlayerChat = translatedPlayerChat || type === 'chat' || type === 'whisper' || type === 'announcement' || Boolean(xuid);
   if (!message && parameters.length) message = parameters.join(' ');
   if (!message) message = ' '; // Keep an otherwise valid empty chat event visible.
 
   // Some server chat formats send the rank as source_name and the text as
   // message, omitting the actual gamertag from the rendered line. Bedrock's
   // player_list records map that packet XUID back to the player's username.
-  const username = usernameForIdentity?.(xuid, platformChatId);
+  let username = usernameForIdentity?.(xuid, platformChatId);
   const rankPattern = '(?:TITAN|KING|CHAMPION|KNIGHT|EMPEROR|OVERLORD\\+{0,2}|LORD|JESTER|MEMBER|VIP\\+?|MVP\\+?|ADMIN|OWNER|MOD)';
   const rankOnly = new RegExp(`^\\[?${rankPattern}\\]?$`, 'i');
   const rankMessage = new RegExp(`^\\[?(${rankPattern})\\]?\\s*(?:▶|>|:)\\s*(.*)$`, 'i');
+  const rankChatWithPlayerRegex = new RegExp(`^\\[?(${rankPattern})\\]?\\s+([a-zA-Z0-9_]{3,16})(?:\\s+\\[[^\\]]{1,12}\\])?\\s*(?:▶|>|:)\\s*(.*)$`, 'i');
+  const standardPlayerChatRegex = /^<([a-zA-Z0-9_]{3,16})>\s*(.*)$/;
+
   const cleanSender = cleanBedrockFormatting(sender);
   const cleanMessage = cleanBedrockFormatting(message);
-  const knownRank = rankOnly.test(cleanSource) ? cleanSource : (rankOnly.test(cleanSender) ? cleanSender : null);
-  const formattedRankMessage = cleanMessage.match(rankMessage);
-  if (isPlayerChat && username && (knownRank || formattedRankMessage)) {
-    const rank = knownRank || formattedRankMessage?.[1] || '';
-    const body = knownRank ? cleanMessage.replace(/^\s*(?:▶|>|:)\s*/, '') : (formattedRankMessage?.[2] || '');
-    sender = '';
-    message = `${rank} ${username} ▶ ${body}`.trim();
+
+  // Check if message itself contains player chat (e.g. FreshSMP: "MEMBER PlayerName ▶ message")
+  const playerRankMatch = cleanMessage.match(rankChatWithPlayerRegex);
+  const standardMatch = cleanMessage.match(standardPlayerChatRegex);
+
+  if (playerRankMatch) {
+    const extractedUser = playerRankMatch[2];
+    if (!username) username = extractedUser;
+    if (sender === 'Server' || !sender || rankOnly.test(cleanSender)) {
+      sender = extractedUser;
+    }
+    isPlayerChat = true;
+  } else if (standardMatch) {
+    const extractedUser = standardMatch[1];
+    if (!username) username = extractedUser;
+    if (sender === 'Server' || !sender) {
+      sender = extractedUser;
+    }
+    isPlayerChat = true;
+  } else {
+    const knownRank = rankOnly.test(cleanSource) ? cleanSource : (rankOnly.test(cleanSender) ? cleanSender : null);
+    const formattedRankMessage = cleanMessage.match(rankMessage);
+    if (isPlayerChat && username && (knownRank || formattedRankMessage)) {
+      const rank = knownRank || formattedRankMessage?.[1] || '';
+      const body = knownRank ? cleanMessage.replace(/^\s*(?:▶|>|:)\s*/, '') : (formattedRankMessage?.[2] || '');
+      sender = username;
+      message = `${rank} ${username} ▶ ${body}`.trim();
+    }
   }
 
   const raw: RawChatPacketInfo = {
     type,
-    source_name: source || undefined,
+    source_name: source || (username ? username : undefined),
     xuid: xuid || undefined,
     platform_chat_id: platformChatId || undefined,
     raw_message: rawMessage || undefined,
@@ -310,7 +334,8 @@ function parseBedrockChatPacket(packet: any, usernameForIdentity?: (xuid: string
 
 function cleanBedrockFormatting(value: string): string {
   return value
-    .replace(/§[0-9a-fk-orx]/gi, '')
+    .replace(/§[0-9a-fk-orxghijpqstu]/gi, '')
+    .replace(/§/g, '')
     .replace(/[\u200B-\u200D\uFEFF]/g, '')
     .trim();
 }
@@ -943,7 +968,7 @@ export class BotInstance {
       client.on('disconnect', (packet: any) => {
         const rawReason = typeof packet === 'string' ? packet : packet?.message;
         bedrockDisconnectReason = (typeof rawReason === 'string' ? rawReason : JSON.stringify(rawReason || packet || 'Unknown reason'))
-          .replace(/§[0-9a-fk-or]/gi, '')
+          .replace(/§[0-9a-fk-orxghijpqstu]/gi, '')
           .trim();
         this.emitActivity('disconnect', `❌ Server disconnected this Bedrock session: ${bedrockDisconnectReason}`);
         this.callbacks.onNotification('warn', `[${this.config.name}] Server disconnected the Bedrock session: ${bedrockDisconnectReason}`, this.config.id);

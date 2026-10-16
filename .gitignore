@@ -37,3 +37,4 @@ Thumbs.db
 *.tsbuildinfo
 daemon/bin/
 *.err
+.codex-remote-attachments/

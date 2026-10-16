@@ -29,7 +29,7 @@ const LIGHT_RANK_COLORS: Record<string, string> = {
   MOD: '#059669',
 };
 
-// Light-mode Minecraft Color Codes
+// Light-mode Minecraft Color Codes (Standard Java 0-f + Bedrock Material codes g-u)
 const LIGHT_MC_COLORS: Record<string, string> = {
   '0': '#0f172a', // Black -> slate-900
   '1': '#1e3a8a', // Dark Blue
@@ -47,17 +47,30 @@ const LIGHT_MC_COLORS: Record<string, string> = {
   'd': '#c026d3', // Light Purple
   'e': '#ca8a04', // Yellow
   'f': '#0f172a', // White -> dark slate on light mode
+  // Bedrock Edition Material Colors
+  'g': '#ca8a04', // Minecoin Gold
+  'h': '#64748b', // Material Quartz
+  'i': '#475569', // Material Iron (Slate-600)
+  'j': '#334155', // Material Netherite (Slate-700)
+  'm': '#dc2626', // Material Redstone
+  'n': '#ea580c', // Material Copper
+  'p': '#d97706', // Material Gold
+  'q': '#16a34a', // Material Emerald
+  's': '#0284c7', // Material Diamond
+  't': '#1e40af', // Material Lapis
+  'u': '#7c3aed', // Material Amethyst
 };
 
 function parseLightMinecraftColorCodes(text: string): React.ReactNode {
   if (!text.includes('§')) return text;
 
-  const parts = text.split(/(§[0-9a-fk-or])/gi);
+  const parts = text.split(/(§[0-9a-fk-orxghijpqstu])/gi);
   let currentColor = '#0f172a';
   let isBold = false;
   let isItalic = false;
 
   return parts.map((part, index) => {
+    if (!part) return null;
     if (part.startsWith('§')) {
       const code = part.charAt(1).toLowerCase();
       if (LIGHT_MC_COLORS[code]) {
@@ -71,7 +84,25 @@ function parseLightMinecraftColorCodes(text: string): React.ReactNode {
         isBold = false;
         isItalic = false;
       }
-      return null;
+
+      // If token is just the formatting code (length 2), return null as code is consumed
+      if (part.length === 2) return null;
+
+      // Safety: If there is leftover text attached after the § code, render it!
+      const remaining = part.slice(2);
+      if (!remaining) return null;
+      return (
+        <span
+          key={index}
+          style={{
+            color: currentColor,
+            fontWeight: isBold ? 'bold' : 'normal',
+            fontStyle: isItalic ? 'italic' : 'normal',
+          }}
+        >
+          {remaining}
+        </span>
+      );
     }
     return (
       <span
@@ -89,7 +120,11 @@ function parseLightMinecraftColorCodes(text: string): React.ReactNode {
 }
 
 function stripMinecraftFormatting(text: string): string {
-  return text.replace(/§[0-9a-fk-orx]/gi, '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+  return text
+    .replace(/§[0-9a-fk-orxghijpqstu]/gi, '')
+    .replace(/§/g, '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim();
 }
 
 export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
