@@ -435,6 +435,43 @@ function normalizeBedrockIdentity(value: unknown): string {
   return /^\d+$/.test(normalized) ? normalized.replace(/^0+(?=\d)/, '') : normalized;
 }
 
+function pingBedrockJsp(host: string, port: number, timeoutMs = 2500): Promise<{ version?: string; motd?: string } | null> {
+  return new Promise((resolve) => {
+    let resolved = false;
+    let timer: NodeJS.Timeout | null = null;
+    let rakClient: any = null;
+    try {
+      const jspRaknet = (eval('require'))('jsp-raknet');
+      rakClient = new jspRaknet.Client(host, port);
+      timer = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          try { rakClient?.close(); } catch (_) {}
+          resolve(null);
+        }
+      }, timeoutMs);
+      rakClient.ping((data: any) => {
+        if (resolved) return;
+        resolved = true;
+        if (timer) clearTimeout(timer);
+        try { rakClient?.close(); } catch (_) {}
+        try {
+          const str = typeof data === 'string' ? data : (data?.toString?.() || '');
+          const parts = str.split(';');
+          if (parts.length >= 4) {
+            resolve({ motd: parts[1], version: parts[3] });
+            return;
+          }
+        } catch (_) {}
+        resolve(null);
+      });
+    } catch (_) {
+      if (timer) clearTimeout(timer);
+      resolve(null);
+    }
+  });
+}
+
 export class BotInstance {
   public config: BotConfig;
   private bot: Bot | null = null;
@@ -484,6 +521,7 @@ export class BotInstance {
   private bedrockInventorySlots: any[] = Array(46).fill(null);
   private bedrockLastEatAt = 0;
   private bedrockHandshakeTimeout: NodeJS.Timeout | null = null;
+  private bedrockTickSyncInterval: NodeJS.Timeout | null = null;
   private bedrockGuiWindow: BotGuiWindow | null = null;
   private bedrockItemNames = new Map<number, string>();
   private bedrockGuiRawSlots: any[] = [];
@@ -612,6 +650,63 @@ export class BotInstance {
     }
   }
 
+  private applyBedrockRaknetFastPath(client: any) {
+    if (!client) return;
+    try {
+      if (!client._immediateSendPatched) {
+        client._immediateSendPatched = true;
+        const origSendMCPE = client.sendMCPE?.bind(client);
+        if (origSendMCPE) {
+          client.sendMCPE = (buffer: any, immediate?: boolean) => {
+            return origSendMCPE(buffer, true);
+          };
+        }
+      }
+
+      const conn = client.connection;
+      if (conn && !conn._immediateSendReliablePatched) {
+        conn._immediateSendReliablePatched = true;
+        if (typeof conn.plainSendReliable === 'function') {
+          const origPlain = conn.plainSendReliable.bind(conn);
+          conn.plainSendReliable = (buffer: any, immediate?: boolean) => {
+            const res = origPlain(buffer, true);
+            try { conn.raknet?.connection?.sendQueue(); } catch (_) {}
+            return res;
+          };
+          conn.sendReliable = conn.plainSendReliable;
+        }
+      }
+
+      const rakClient = conn?.raknet;
+      const innerConn = rakClient?.connection;
+      if (innerConn && !innerConn._fastQueuePatched) {
+        innerConn._fastQueuePatched = true;
+
+        const origAdd = innerConn.addEncapsulatedToQueue?.bind(innerConn);
+        if (origAdd) {
+          innerConn.addEncapsulatedToQueue = function (pk: any, flags: any) {
+            const res = origAdd(pk, flags);
+            try { innerConn.sendQueue(); } catch (_) {}
+            return res;
+          };
+        }
+
+        const origUpdate = innerConn.update?.bind(innerConn);
+        if (origUpdate) {
+          innerConn.update = function (timestamp: number) {
+            while (innerConn.recvQueue && innerConn.recvQueue.length > 0) {
+              const chunk = innerConn.recvQueue.splice(0, 32);
+              for (const msg of chunk) {
+                try { innerConn.receiveOnline(msg); } catch (_) {}
+              }
+            }
+            return origUpdate(timestamp);
+          };
+        }
+      }
+    } catch (_) {}
+  }
+
   private async startBedrock() {
     this.isManuallyStopped = false;
     this.clearTimers();
@@ -712,6 +807,17 @@ export class BotInstance {
         }
         console.log(`[VistaAFK Mobile] Bedrock RakNet backend: ${mobileRaknetBackend}`);
       }
+
+      if (!targetVersion && isMobileDaemon && mobileRaknetBackend === 'jsp-raknet') {
+        try {
+          const pingRes = await pingBedrockJsp(host, port);
+          if (pingRes?.version) {
+            console.log(`[VistaAFK Mobile] Discovered Bedrock version via JSP ping: ${pingRes.version} (${pingRes.motd || ''})`);
+            targetVersion = pingRes.version;
+          }
+        } catch (_) {}
+      }
+
       const clientOptions: Record<string, unknown> = {
         host,
         port,
@@ -751,6 +857,11 @@ export class BotInstance {
       const client = (bedrock as any).createClient(clientOptions);
 
       this.bedrockClient = client;
+      this.applyBedrockRaknetFastPath(client);
+
+      client.once('connect_allowed', () => {
+        this.applyBedrockRaknetFastPath(client);
+      });
 
       // bedrock-protocol's default helper sends "completed" immediately after
       // resource_packs_info. Bedrock servers expect HAVE_ALL_PACKS at this stage,
@@ -781,6 +892,7 @@ export class BotInstance {
       // the device code here prevents a later server/network error from being
       // mistaken for an OAuth flow that is still waiting for approval.
       client.once('session', () => {
+        this.applyBedrockRaknetFastPath(client);
         if (this.bedrockHandshakeTimeout) clearTimeout(this.bedrockHandshakeTimeout);
         this.bedrockHandshakeTimeout = setTimeout(() => {
           if (this.bedrockClient !== client || this.currentStatus === 'online') return;
@@ -797,6 +909,7 @@ export class BotInstance {
       });
 
       client.on('join', () => {
+        this.applyBedrockRaknetFastPath(client);
         if (this.bedrockHandshakeTimeout) clearTimeout(this.bedrockHandshakeTimeout);
         this.bedrockHandshakeTimeout = null;
         if ((client as any).username && (client as any).username !== this.config.name) {
@@ -813,6 +926,7 @@ export class BotInstance {
       });
 
       client.on('spawn', () => {
+        this.applyBedrockRaknetFastPath(client);
         if (this.bedrockHandshakeTimeout) clearTimeout(this.bedrockHandshakeTimeout);
         this.bedrockHandshakeTimeout = null;
         if ((client as any).username && (client as any).username !== this.config.name) {
@@ -831,6 +945,24 @@ export class BotInstance {
           message: `New Session Started · Connected to ${host}:${port}`,
           isSystem: true,
         });
+
+        // Maintain Bedrock tick synchronization heartbeat so server treats the client as active with zero input latency
+        if (this.bedrockTickSyncInterval) clearInterval(this.bedrockTickSyncInterval);
+        let bedrockClientTick = 0n;
+        this.bedrockTickSyncInterval = setInterval(() => {
+          if (this.bedrockClient !== client || this.currentStatus !== 'online') return;
+          try {
+            client.write('tick_sync', { request_time: bedrockClientTick, response_time: 0n });
+            bedrockClientTick += 10n;
+          } catch (_) {}
+        }, 500);
+
+        client.on('tick_sync', (packet: any) => {
+          if (packet?.response_time) {
+            bedrockClientTick = BigInt(packet.response_time);
+          }
+        });
+
         this.setupTelemetryLoop();
         this.setupAntiAfk();
         this.emitTelemetry();
@@ -1057,6 +1189,45 @@ export class BotInstance {
         });
       });
 
+      client.on('command_output', (packet: any) => {
+        try {
+          const messages = packet?.output_messages || [];
+          for (const msgObj of messages) {
+            let msgText = typeof msgObj?.message === 'string' ? msgObj.message : '';
+            const params = Array.isArray(msgObj?.parameters) ? msgObj.parameters : [];
+            for (let i = 0; i < params.length; i++) {
+              msgText = msgText.replace(`%${i + 1}`, String(params[i]));
+            }
+            const clean = cleanBedrockFormatting(msgText);
+            if (clean) {
+              this.emitActivity('command', `⚡ [Command Output] ${clean}`);
+              this.callbacks.onChatMessage({
+                botId: this.config.id,
+                timestamp: Date.now(),
+                sender: 'Server',
+                message: clean,
+                isSystem: true,
+              });
+            }
+          }
+        } catch (_) {}
+      });
+
+      client.on('set_title', (packet: any) => {
+        try {
+          const text = packet?.text ? cleanBedrockFormatting(String(packet.text)) : '';
+          if (text && (packet.type === 'action_bar' || packet.type === 'title' || packet.type === 'subtitle')) {
+            this.callbacks.onChatMessage({
+              botId: this.config.id,
+              timestamp: Date.now(),
+              sender: 'Server',
+              message: text,
+              isSystem: true,
+            });
+          }
+        } catch (_) {}
+      });
+
       // Boar's transaction watchdog uses negative NetworkStackLatency timestamps
       // as transaction IDs and expects the Bedrock client to echo them. The
       // stock bedrock-protocol helper only echoes packets with needs_response,
@@ -1067,7 +1238,7 @@ export class BotInstance {
           const timestamp = BigInt(packet?.timestamp);
           const isNegativeTransactionId = timestamp > (1n << 63n) - 1n;
           if (isNegativeTransactionId && !packet?.needs_response) {
-            client.queue('network_stack_latency', {
+            client.write('network_stack_latency', {
               timestamp: packet.timestamp,
               needs_response: false,
             });
@@ -1088,6 +1259,10 @@ export class BotInstance {
       });
 
       client.on('close', () => {
+        if (this.bedrockTickSyncInterval) {
+          clearInterval(this.bedrockTickSyncInterval);
+          this.bedrockTickSyncInterval = null;
+        }
         if (this.bedrockHandshakeTimeout) clearTimeout(this.bedrockHandshakeTimeout);
         this.bedrockHandshakeTimeout = null;
         this.bedrockClient = null;
@@ -1161,16 +1336,20 @@ export class BotInstance {
   public sendChat(message: string) {
     if (this.bedrockClient && this.currentStatus === 'online') {
       try {
+        this.applyBedrockRaknetFastPath(this.bedrockClient);
         if (message.startsWith('/')) {
           const uuid = randomUUID();
+          const playerEid = (this.bedrockClient as any).entityId ?? (this.bedrockClient as any).startGameData?.runtime_entity_id ?? 0n;
           const commandOrigin: Record<string, unknown> = {
             type: 'player',
             uuid,
-            request_id: '',
+            request_id: uuid,
           };
           const isModernCommandProtocol = this.bedrockClient.versionGreaterThanOrEqualTo('1.21.130');
           const hasCommandVersion = this.bedrockClient.versionGreaterThanOrEqualTo('1.19.62');
-          if (isModernCommandProtocol) commandOrigin.player_entity_id = 0n;
+          if (isModernCommandProtocol) {
+            commandOrigin.player_entity_id = typeof playerEid === 'bigint' ? playerEid : BigInt(playerEid);
+          }
 
           const commandRequest: Record<string, unknown> = {
             command: message,
@@ -1178,10 +1357,10 @@ export class BotInstance {
             internal: false,
           };
           if (hasCommandVersion) commandRequest.version = isModernCommandProtocol ? 'latest' : 52;
-          this.bedrockClient.queue('command_request', commandRequest);
+          this.bedrockClient.write('command_request', commandRequest);
           this.emitActivity('command', `⚡ Sent Bedrock command: ${message}`);
         } else {
-          this.bedrockClient.queue('text', {
+          this.bedrockClient.write('text', {
             category: 'authored',
             type: 'chat',
             needs_translation: false,
@@ -3126,6 +3305,7 @@ export class BotInstance {
     if (this.farmingInterval) clearInterval(this.farmingInterval);
     if (this.recurringCommandInterval) clearInterval(this.recurringCommandInterval);
     if (this.spawnCommandTimeout) clearTimeout(this.spawnCommandTimeout);
+    if (this.bedrockTickSyncInterval) clearInterval(this.bedrockTickSyncInterval);
     this.clearAntiAfkMovementTimeouts();
     this.clearAssistedJumpTimeouts();
     this.movementTimeouts.forEach((timeout) => clearTimeout(timeout));
@@ -3135,6 +3315,7 @@ export class BotInstance {
     this.manualMovementControls.clear();
     this.reconnectTimeout = null;
     this.bedrockHandshakeTimeout = null;
+    this.bedrockTickSyncInterval = null;
     this.antiAfkInterval = null;
     this.telemetryInterval = null;
     this.patrolInterval = null;
