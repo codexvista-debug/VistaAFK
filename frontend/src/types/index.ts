@@ -199,6 +199,7 @@ export interface BotTelemetry {
   terrainGrid?: TerrainGridData | null;
   isPatrolling?: boolean;
   isFarming?: boolean;
+  afkRewardsAvailable?: number;
 }
 
 export interface RawChatPacketInfo {

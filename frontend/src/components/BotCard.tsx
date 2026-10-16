@@ -20,6 +20,7 @@ import {
   Key,
   ExternalLink,
   Terminal,
+  MessageSquare,
 } from 'lucide-react';
 import { BotConfig, BotTelemetry, ChatMessage, ActivityLog } from '../types';
 
@@ -452,7 +453,7 @@ export const BotCard: React.FC<BotCardProps> = ({
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  Raw Chat ({logs.length})
+                  Chat ({logs.length})
                 </button>
               </div>
               <div className="flex items-center space-x-2">
@@ -569,15 +570,15 @@ export const BotCard: React.FC<BotCardProps> = ({
 
         {/* Player Logs, Control Panel, and Delete */}
         <div className="grid grid-cols-3 sm:flex items-center gap-1.5 w-full sm:w-auto">
-          {/* Raw Bedrock Chat Packet Inspector shortcut button (user-requested position) */}
+          {/* Live Chat Console shortcut button */}
           <Link
-            href={`/chat?bot=${encodeURIComponent(config.id)}&tab=raw_chat`}
-            className="h-10 sm:h-8 px-2 sm:px-2.5 bg-white hover:bg-cyan-50 text-slate-700 hover:text-cyan-700 rounded-xl border border-slate-200 shadow-xs transition flex items-center justify-center gap-1 text-xs font-bold active:scale-95"
-            title="Inspect Raw Bedrock Chat Packets"
-            aria-label={`Inspect raw chat for ${config.name}`}
+            href={`/chat?bot=${encodeURIComponent(config.id)}&tab=chat`}
+            className="h-10 sm:h-8 px-2 sm:px-2.5 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 rounded-xl border border-slate-200 shadow-xs transition flex items-center justify-center gap-1 text-xs font-bold active:scale-95"
+            title="Open Live Chat Console"
+            aria-label={`Open live chat for ${config.name}`}
           >
-            <Terminal className="h-3.5 w-3.5 text-cyan-600 shrink-0" />
-            <span className="text-[11px] font-mono font-bold text-slate-700 hidden sm:inline">Raw</span>
+            <MessageSquare className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+            <span className="text-[11px] font-mono font-bold text-slate-700 hidden sm:inline">Chat</span>
           </Link>
 
           {/* Open the full workspace with settings, logs, chat, map, and inventory. */}

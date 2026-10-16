@@ -32,7 +32,7 @@ import { BotPlayerPov } from '../../components/BotPlayerPov';
 import { AddBotModal } from '../../components/AddBotModal';
 import { BotVisualControlModal } from '../../components/BotVisualControlModal';
 
-type ChatTab = 'settings' | 'logs' | 'chat' | 'raw_chat' | 'pov' | 'movement' | 'inventory';
+type ChatTab = 'settings' | 'logs' | 'chat' | 'pov' | 'movement' | 'inventory';
 
 function ChatContent() {
   const searchParams = useSearchParams();
@@ -62,7 +62,7 @@ function ChatContent() {
   const [inputMessage, setInputMessage] = useState('');
   const [filter, setFilter] = useState<'all' | 'chat' | 'system'>('all');
   const [activeTab, setActiveTab] = useState<ChatTab>(() => {
-    if (tabParam && ['settings', 'logs', 'chat', 'raw_chat', 'pov', 'movement', 'inventory'].includes(tabParam)) {
+    if (tabParam && ['settings', 'logs', 'chat', 'pov', 'movement', 'inventory'].includes(tabParam)) {
       return tabParam;
     }
     return 'chat';
@@ -72,15 +72,8 @@ function ChatContent() {
   const playerLogsRef = useRef<HTMLDivElement | null>(null);
   const [playerLogsAutoScroll, setPlayerLogsAutoScroll] = useState(true);
 
-  const rawPacketsRef = useRef<HTMLDivElement | null>(null);
-  const [rawPacketsAutoScroll, setRawPacketsAutoScroll] = useState(true);
-  const [rawPacketFilter, setRawPacketFilter] = useState<'all' | 'translation' | 'chat' | 'with_xuid' | 'with_source'>('all');
-  const [rawPacketSearch, setRawPacketSearch] = useState('');
-  const [expandedJsonIndices, setExpandedJsonIndices] = useState<Record<number, boolean>>({});
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-
   useEffect(() => {
-    if (tabParam && ['settings', 'logs', 'chat', 'raw_chat', 'pov', 'movement', 'inventory'].includes(tabParam)) {
+    if (tabParam && ['settings', 'logs', 'chat', 'pov', 'movement', 'inventory'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
@@ -137,35 +130,10 @@ function ChatContent() {
   const displayHearts = rawHearts;
   const displayMaxHearts = Math.max(rawHearts, rawMaxHearts || 10);
 
-  useEffect(() => {
-    if (rawPacketsAutoScroll && activeTab === 'raw_chat' && rawPacketsRef.current) {
-      rawPacketsRef.current.scrollTop = rawPacketsRef.current.scrollHeight;
-    }
-  }, [logs, rawPacketsAutoScroll, activeTab]);
-
-  const filteredRawPackets = logs.filter((log) => {
-    const raw = log.raw;
-    if (rawPacketFilter === 'translation' && raw?.type !== 'translation') return false;
-    if (rawPacketFilter === 'chat' && raw?.type !== 'chat') return false;
-    if (rawPacketFilter === 'with_xuid' && !raw?.xuid) return false;
-    if (rawPacketFilter === 'with_source' && !raw?.source_name) return false;
-    if (rawPacketSearch.trim()) {
-      const q = rawPacketSearch.toLowerCase();
-      const matchMsg = (raw?.raw_message || log.message || '').toLowerCase().includes(q);
-      const matchSrc = (raw?.source_name || log.sender || '').toLowerCase().includes(q);
-      const matchXuid = (raw?.xuid || '').toLowerCase().includes(q);
-      const matchUser = (raw?.resolved_username || '').toLowerCase().includes(q);
-      const matchParams = (raw?.parameters || []).some((p) => p.toLowerCase().includes(q));
-      if (!matchMsg && !matchSrc && !matchXuid && !matchUser && !matchParams) return false;
-    }
-    return true;
-  });
-
   const tabs: Array<{ id: ChatTab; label: string; shortLabel: string; icon: React.ReactNode }> = [
     { id: 'settings', label: 'Connection Settings', shortLabel: 'Settings', icon: <Settings2 className="h-4 w-4" /> },
     { id: 'logs', label: 'Player Logs', shortLabel: 'Logs', icon: <Activity className="h-4 w-4" /> },
     { id: 'chat', label: 'Chat', shortLabel: 'Chat', icon: <MessageSquare className="h-4 w-4" /> },
-    { id: 'raw_chat', label: 'Raw Packets', shortLabel: 'Raw', icon: <Terminal className="h-4 w-4" /> },
     { id: 'pov', label: 'POV', shortLabel: 'POV', icon: <Eye className="h-4 w-4" /> },
     { id: 'movement', label: 'Movement', shortLabel: 'Move', icon: <Gamepad2 className="h-4 w-4" /> },
     { id: 'inventory', label: 'Inventory', shortLabel: 'Items', icon: <Package className="h-4 w-4" /> },
@@ -270,7 +238,6 @@ function ChatContent() {
             >
               <span className={`grid h-7 w-7 sm:h-8 sm:w-8 shrink-0 place-items-center rounded-lg transition-colors ${activeTab === tab.id ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-emerald-700'}`}>{tab.icon}</span><span className="whitespace-nowrap"><span className="md:hidden">{tab.shortLabel}</span><span className="hidden md:inline">{tab.label}</span></span>
               {tab.id === 'logs' && playerLogs.length > 0 && <span className={`ml-auto rounded-full px-1.5 py-0.5 text-[9px] ${activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{playerLogs.length}</span>}
-              {tab.id === 'raw_chat' && logs.length > 0 && <span className={`ml-auto rounded-full px-1.5 py-0.5 text-[9px] ${activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{logs.length}</span>}
             </button>
           ))}
           <div className="hidden md:flex items-center gap-2 mt-auto p-3 border-t border-slate-200/70 text-[10px] text-slate-500">
@@ -329,7 +296,7 @@ function ChatContent() {
           {/* Quick Commands */}
           <div className="mobile-scrollbar-hidden px-2.5 sm:px-5 py-1.5 sm:py-2 bg-slate-100/70 border-b border-slate-200 flex items-center space-x-1.5 sm:space-x-2 overflow-x-auto text-xs">
             <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider shrink-0">Quick:</span>
-            {['/afk', '/lifesteal', '/home', '/spawn', '/tpa accept', '/help', '/resourcepack', '/tpahereaccept', '/tpdeny'].map((cmd) => (
+            {['/afk', '/afkrewards', '/lifesteal', '/home', '/spawn', '/tpa accept', '/help', '/resourcepack', '/tpahereaccept', '/tpdeny'].map((cmd) => (
               <button
                 key={cmd}
                 onClick={() => sendQuickCommand(cmd)}
@@ -423,237 +390,6 @@ function ChatContent() {
                     <p className="min-w-0 flex-1 basis-full break-words [overflow-wrap:anywhere] text-xs text-slate-700 sm:basis-auto">{log.message}</p>
                   </article>
                 ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'raw_chat' && (
-            <div className="flex-1 min-h-0 flex flex-col bg-[#f8fafc] text-slate-800">
-              {/* Sub Header */}
-              <div className="px-3 py-2.5 sm:px-5 sm:py-3 border-b border-slate-200 bg-slate-50 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                  <div className="p-2 rounded-xl bg-cyan-50 text-cyan-700 border border-cyan-200">
-                    <Terminal className="h-4 w-4 stroke-[2.5]" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-slate-900 text-xs uppercase tracking-wide">
-                        {currentConfig?.name || 'Bot'} &bull; Raw Bedrock Chat Packets
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">
-                        {logs.length} captured
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 font-mono truncate">
-                      Direct server packet fields: source_name, xuid, parameters, message
-                    </p>
-                  </div>
-                </div>
-
-                {/* Auto-scroll & quick actions */}
-                <div className="flex items-center gap-2 self-start sm:self-auto">
-                  <button
-                    type="button"
-                    onClick={() => setRawPacketsAutoScroll((prev) => !prev)}
-                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-bold font-mono transition ${
-                      rawPacketsAutoScroll
-                        ? 'border-cyan-300 bg-cyan-50 text-cyan-800'
-                        : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <ArrowDown className="h-3 w-3" />
-                    Auto-scroll: {rawPacketsAutoScroll ? 'ON' : 'OFF'}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(JSON.stringify(logs, null, 2));
-                      setCopiedIdx(-1);
-                      setTimeout(() => setCopiedIdx(null), 2000);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 px-2.5 py-1 text-[10px] font-bold font-mono text-slate-700 shadow-2xs transition cursor-pointer"
-                    title="Copy all raw packets as JSON"
-                  >
-                    {copiedIdx === -1 ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3 text-slate-500" />}
-                    <span>{copiedIdx === -1 ? 'Copied All!' : 'Copy All JSON'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Filter and Search Bar */}
-              <div className="px-3 sm:px-5 py-2 bg-slate-100/70 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
-                {/* Filter pills */}
-                <div className="flex items-center gap-1 font-mono text-[10px] flex-wrap">
-                  {(['all', 'translation', 'chat', 'with_xuid', 'with_source'] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      onClick={() => setRawPacketFilter(mode)}
-                      className={`px-2 py-0.5 rounded-md transition font-bold uppercase cursor-pointer ${
-                        rawPacketFilter === mode
-                          ? 'bg-cyan-600 text-white shadow-xs'
-                          : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-300 shadow-2xs'
-                      }`}
-                    >
-                      {mode.replace('_', ' ')}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Search Input */}
-                <div className="relative min-w-[180px] sm:w-64">
-                  <input
-                    type="text"
-                    value={rawPacketSearch}
-                    onChange={(e) => setRawPacketSearch(e.target.value)}
-                    placeholder="Filter by text, xuid, or src…"
-                    className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-[11px] font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-500 shadow-2xs"
-                  />
-                  {rawPacketSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setRawPacketSearch('')}
-                      className="absolute right-2 top-1.5 text-[10px] text-slate-400 hover:text-slate-700"
-                    >
-                      &times;
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Packets Stream */}
-              <div ref={rawPacketsRef} className="flex-1 min-h-0 overflow-y-auto p-2.5 sm:p-5 space-y-2.5 scrollbar-thin bg-[#f8fafc]">
-                {filteredRawPackets.length === 0 ? (
-                  <div className="h-full min-h-48 flex flex-col items-center justify-center text-slate-400 space-y-2 font-mono text-xs">
-                    <Terminal className="h-10 w-10 stroke-[1.5] text-slate-400" />
-                    <p>
-                      {logs.length === 0
-                        ? (isOnline ? 'Waiting for incoming chat packets from the server…' : 'Bot is offline. Connect to start streaming packets.')
-                        : 'No packets match the current filter or search criteria.'}
-                    </p>
-                  </div>
-                ) : (
-                  filteredRawPackets.map((msg, idx) => {
-                    const raw = msg.raw;
-                    const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                    const isExpanded = Boolean(expandedJsonIndices[idx]);
-                    return (
-                      <article
-                        key={idx}
-                        className="bg-white border border-slate-200 rounded-2xl p-3 font-mono text-xs shadow-xs transition hover:border-slate-300 hover:shadow-sm"
-                      >
-                        {/* Header: Timestamp, Type, Source, XUID, Username */}
-                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-slate-400 text-[10px] font-mono">{time}</span>
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border ${
-                              raw?.type === 'translation'
-                                ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
-                                : raw?.type === 'chat'
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                  : 'bg-purple-50 text-purple-700 border-purple-200'
-                            }`}>
-                              type: {raw?.type || 'packet'}
-                            </span>
-
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] border ${
-                              raw?.source_name
-                                ? 'bg-amber-50 text-amber-800 border-amber-200 font-bold'
-                                : 'bg-slate-50 text-slate-400 border-slate-200 italic'
-                            }`}>
-                              source_name: {raw?.source_name ? `"${raw.source_name}"` : '<empty>'}
-                            </span>
-
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] border ${
-                              raw?.xuid
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 font-bold'
-                                : 'bg-slate-50 text-slate-400 border-slate-200'
-                            }`}>
-                              xuid: {raw?.xuid || '<none>'}
-                            </span>
-
-                            {raw?.resolved_username && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-teal-50 text-teal-800 border border-teal-200 font-bold">
-                                user_list: {raw.resolved_username}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(JSON.stringify({
-                                  botId: msg.botId,
-                                  timestamp: msg.timestamp,
-                                  time,
-                                  sender: msg.sender,
-                                  message: msg.message,
-                                  isSystem: msg.isSystem,
-                                  raw: msg.raw,
-                                }, null, 2));
-                                setCopiedIdx(idx);
-                                setTimeout(() => setCopiedIdx(null), 1500);
-                              }}
-                              className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition cursor-pointer"
-                              title="Copy packet JSON"
-                            >
-                              {copiedIdx === idx ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setExpandedJsonIndices((prev) => ({ ...prev, [idx]: !prev[idx] }))}
-                              className="text-[10px] px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer font-bold border border-slate-200"
-                            >
-                              {isExpanded ? 'Hide JSON' : 'JSON'}
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Parameters section if present */}
-                        {raw?.parameters && raw.parameters.length > 0 && (
-                          <div className="mt-2 p-2 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
-                            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                              Parameters ({raw.parameters.length}):
-                            </span>
-                            <div className="space-y-0.5">
-                              {raw.parameters.map((param, pIdx) => (
-                                <div key={pIdx} className="text-[11px] text-cyan-800 flex items-start gap-1">
-                                  <span className="text-slate-400 font-mono select-none">[{pIdx}]:</span>
-                                  <span className="break-words [overflow-wrap:anywhere]">{param}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Raw Message String */}
-                        <div className="mt-2 text-[11px]">
-                          <span className="text-slate-500 font-bold uppercase text-[9px] tracking-wider block">Raw message:</span>
-                          <p className="mt-0.5 text-slate-800 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 break-words [overflow-wrap:anywhere] font-medium">
-                            {raw?.raw_message !== undefined ? raw.raw_message : msg.message}
-                          </p>
-                        </div>
-
-                        {/* Parsed / Rendered Message in Console */}
-                        <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-500">
-                          <span className="font-bold text-slate-400 uppercase tracking-wider">Rendered as:</span>
-                          <span className="text-slate-700 font-bold break-words [overflow-wrap:anywhere]">
-                            {msg.sender ? `[${msg.sender}] ${msg.message}` : msg.message}
-                          </span>
-                        </div>
-
-                        {/* Collapsible JSON View */}
-                        {isExpanded && (
-                          <div className="mt-2 p-2.5 bg-slate-900 text-emerald-400 rounded-xl border border-slate-800 overflow-x-auto text-[10px]">
-                            <pre>{JSON.stringify(raw || msg, null, 2)}</pre>
-                          </div>
-                        )}
-                      </article>
-                    );
-                  })
-                )}
               </div>
             </div>
           )}

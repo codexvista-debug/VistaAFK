@@ -1,6 +1,8 @@
 import mineflayer, { Bot } from 'mineflayer';
 import { randomUUID } from 'node:crypto';
 import { SocksProxyAgent } from 'socks-proxy-agent';
+// @ts-ignore
+import nbt from 'prismarine-nbt';
 import { BotConfig, BotTelemetry, ChatMessage, RawChatPacketInfo, ActivityLog, InventoryItem, ItemEnchantment, MinimapPlayer, MinimapMob, TerrainGridData, BotGuiWindow } from './types.js';
 import { sampleTerrainGrid } from './terrainMapper.js';
 import path from 'path';
@@ -99,6 +101,93 @@ function cleanMinecraftJsonText(raw: any): string {
     return out.replace(/§[0-9a-fk-orxghijpqstu]/gi, '').trim();
   }
   return String(raw).replace(/§[0-9a-fk-orxghijpqstu]/gi, '').trim();
+}
+
+function extractBedrockItemData(item: any): { customName?: string; lore?: string[] } {
+  if (!item) return {};
+
+  let customName: string | undefined;
+  let lore: string[] = [];
+
+  const candidates = [
+    item.extra?.nbt?.nbt,
+    item.extra?.nbt,
+    item.extra?.value,
+    item.extra,
+    item.nbt?.nbt,
+    item.nbt,
+  ];
+
+  for (const c of candidates) {
+    if (c && typeof c === 'object') {
+      let simplified: any = null;
+      if (c.type === 'compound') {
+        try {
+          simplified = nbt.simplify(c);
+        } catch (e) {}
+      } else if (c.value && typeof c.value === 'object') {
+        try {
+          simplified = nbt.simplify(c);
+        } catch (e) {
+          try {
+            simplified = nbt.simplify({ type: 'compound', value: c.value });
+          } catch (e2) {
+            simplified = c.value;
+          }
+        }
+      } else if (c.display || c.Name || c.Lore || c.display_name) {
+        simplified = c;
+      }
+
+      if (simplified && typeof simplified === 'object') {
+        const display = simplified.display || simplified;
+        const rawName = display.Name || display.name || simplified.display_name || simplified.custom_name;
+        if (rawName && !customName) {
+          const nameVal = typeof rawName === 'object' && rawName.value ? rawName.value : rawName;
+          const cleaned = cleanMinecraftJsonText(nameVal);
+          if (cleaned) customName = cleaned;
+        }
+
+        const rawLore = display.Lore || display.lore;
+        const loreList = Array.isArray(rawLore)
+          ? rawLore
+          : (rawLore && typeof rawLore === 'object' && Array.isArray(rawLore.value) ? rawLore.value : []);
+
+        if (loreList.length > 0 && lore.length === 0) {
+          lore = loreList
+            .map((line: any) => {
+              const lineVal = typeof line === 'object' && line.value !== undefined ? line.value : line;
+              return cleanMinecraftJsonText(lineVal);
+            })
+            .filter(Boolean);
+        }
+      }
+    }
+  }
+
+  // Fallback for raw prismarine structures
+  if (!customName || lore.length === 0) {
+    const rawExtra = item?.extra?.value || item?.extra || {};
+    const displayVal = rawExtra?.display?.value || rawExtra?.display || {};
+    if (!customName) {
+      const nameVal = displayVal?.Name?.value || displayVal?.Name || rawExtra?.display_name;
+      if (nameVal) {
+        const cleaned = cleanMinecraftJsonText(nameVal);
+        if (cleaned) customName = cleaned;
+      }
+    }
+    if (lore.length === 0) {
+      const loreVal = displayVal?.Lore?.value?.value || displayVal?.Lore?.value || displayVal?.Lore;
+      if (Array.isArray(loreVal)) {
+        lore = loreVal.map((line: any) => cleanMinecraftJsonText(line)).filter(Boolean);
+      }
+    }
+  }
+
+  return {
+    customName: customName || undefined,
+    lore: lore.length ? lore : undefined,
+  };
 }
 
 function serializeGuiWindow(window: any): BotGuiWindow | null {
@@ -401,6 +490,7 @@ export class BotInstance {
   private bedrockGuiContainer: { container_id: string; dynamic_container_id?: number } = { container_id: 'container' };
   private bedrockGuiRequestId = 0;
   private tokenFolder: string;
+  private afkRewardsAvailable: number = 0;
 
   constructor(config: BotConfig, callbacks: BotInstanceCallbacks, tokenFolder?: string) {
     this.config = config;
@@ -869,9 +959,25 @@ export class BotInstance {
             ...(dynamicContainerId !== undefined && dynamicContainerId !== null && Number.isInteger(Number(dynamicContainerId)) ? { dynamic_container_id: Number(dynamicContainerId) } : {}),
           };
         }
+        let detectedAfkRewards: number | undefined;
+        const slots = items.map((item: any, slot: number) => {
+          const serialized = this.serializeBedrockItem(item, slot);
+          if (serialized?.lore) {
+            for (const line of serialized.lore) {
+              const match = line.match(/(\d+)\s*afk reward/i);
+              if (match && Number.isInteger(Number(match[1]))) {
+                detectedAfkRewards = Number(match[1]);
+              }
+            }
+          }
+          return serialized;
+        });
+        if (detectedAfkRewards !== undefined) {
+          this.afkRewardsAvailable = detectedAfkRewards;
+        }
         this.bedrockGuiWindow = {
           ...this.bedrockGuiWindow,
-          slots: items.map((item: any, slot: number) => this.serializeBedrockItem(item, slot)),
+          slots,
         };
         this.emitTelemetry();
       });
@@ -2445,18 +2551,32 @@ export class BotInstance {
     const networkId = Number(item?.network_id);
     if (!Number.isInteger(networkId) || networkId === 0 || Number(item?.count) <= 0) return null;
     const name = this.bedrockItemNames.get(networkId) || `unknown_item_${Math.abs(networkId)}`;
-    const displayName = name.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
-    const extra = item?.extra?.value || item?.extra || {};
-    const customName = cleanMinecraftJsonText(extra?.display?.value?.Name?.value || extra?.display_name || '');
-    const rawLore = extra?.display?.value?.Lore?.value;
-    const lore = Array.isArray(rawLore) ? rawLore.map((line: any) => cleanMinecraftJsonText(line)).filter(Boolean) : [];
+    const cleanName = name.replace(/^minecraft:/, '');
+    const isGeyserCustom = cleanName.toLowerCase().startsWith('geyser_custom:');
+
+    let displayName = cleanName
+      .replace(/^geyser_custom:/i, '')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+
+    if (isGeyserCustom && (cleanName.includes('cash') || cleanName.includes('reward') || cleanName.includes('fresh'))) {
+      displayName = 'AFK Cash';
+    }
+
+    const { customName, lore } = extractBedrockItemData(item);
+
+    // If item is bell in AFK menu and name is default, give it the proper title
+    if (cleanName === 'bell' && !customName && lore && lore.some((l) => /afk reward/i.test(l))) {
+      displayName = 'CLAIM AFK REWARD';
+    }
+
     return {
       slot,
       name,
       displayName: customName || displayName,
       count: Number(item.count) || 1,
       customName: customName || undefined,
-      lore: lore.length ? lore : undefined,
+      lore: lore && lore.length ? lore : undefined,
     };
   }
 
@@ -2647,6 +2767,7 @@ export class BotInstance {
         terrainGrid: null,
         isPatrolling: false,
         isFarming: false,
+        afkRewardsAvailable: this.afkRewardsAvailable,
       };
     }
 
@@ -2680,6 +2801,7 @@ export class BotInstance {
         currentLandBlock: undefined,
         terrainGrid: null,
         isPatrolling: false,
+        afkRewardsAvailable: this.afkRewardsAvailable,
       };
     }
 
@@ -2985,6 +3107,7 @@ export class BotInstance {
       terrainGrid,
       isPatrolling: this.isPatrolling,
       isFarming: Boolean(this.config.farming?.enabled && this.currentStatus === 'online'),
+      afkRewardsAvailable: this.afkRewardsAvailable,
     };
   }
 
