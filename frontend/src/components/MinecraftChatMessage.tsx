@@ -6,6 +6,7 @@ import { ChatMessage } from '../types';
 interface MinecraftChatMessageProps {
   message: ChatMessage;
   showTimestamp?: boolean;
+  compact?: boolean;
 }
 
 // Light-mode optimized high-contrast Minecraft Rank colors
@@ -19,6 +20,7 @@ const LIGHT_RANK_COLORS: Record<string, string> = {
   OVERLORD: '#7c3aed',
   LORD: '#7c3aed',
   JESTER: '#c026d3',
+  'JESTER+': '#c026d3',
   MEMBER: '#475569',    // Slate 600
   VIP: '#059669',       // Emerald 600
   'VIP+': '#059669',
@@ -130,6 +132,7 @@ function stripMinecraftFormatting(text: string): string {
 export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   message,
   showTimestamp = true,
+  compact = false,
 }) => {
   let rawText = message.message || '';
 
@@ -152,11 +155,11 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
 
   if (isSessionDivider) {
     return (
-      <div className="w-full my-3 sm:my-4 flex items-center gap-2 sm:gap-3 select-none">
+      <div className={`w-full ${compact ? 'my-1.5' : 'my-3 sm:my-4'} flex items-center gap-2 sm:gap-3 select-none`}>
         <div className="flex-1 h-[1.5px] bg-gradient-to-r from-transparent via-slate-300 to-slate-400" />
-        <div className="px-3 py-1 rounded-full bg-white border border-slate-300 shadow-2xs text-[10px] sm:text-[11px] font-mono font-bold text-slate-700 flex items-center gap-1.5 shrink-0">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>New Session Started</span>
+        <div className={`px-2.5 py-0.5 rounded-full bg-white border border-slate-300 shadow-2xs ${compact ? 'text-[9px]' : 'text-[10px] sm:text-[11px]'} font-mono font-bold text-slate-700 flex items-center gap-1.5 shrink-0`}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span>New Session</span>
           <span className="text-slate-400 font-normal">•</span>
           <span className="text-emerald-700 font-semibold">{timeFull || timeShort}</span>
         </div>
@@ -166,13 +169,14 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   }
 
   // 1. Matches rank + player username + message (e.g. "MEMBER _StarWings9451 ▶ ay un kit inicial")
-  const rankPlayerMatch = cleanText.match(/^(?:\[?(TITAN|KING|CHAMPION|KNIGHT|EMPEROR|OVERLORD\+{0,2}|LORD|JESTER|MEMBER|VIP\+?|MVP\+?|ADMIN|OWNER|MOD)\]?)\s+([a-zA-Z0-9_]{3,16})(?:\s+\[[^\]]{1,12}\])?\s*(?:▶|>|:)\s*(.*)$/i);
+  const rankPlayerMatch = cleanText.match(/^(?:\[?(TITAN\+*|KING\+*|CHAMPION\+*|KNIGHT\+*|EMPEROR\+*|OVERLORD\+*|LORD\+*|JESTER\+*|MEMBER\+*|VIP\+*|MVP\+*|ADMIN|OWNER|MOD)\]?)\s+([a-zA-Z0-9_]{3,16})(?:\s+\[[^\]]{1,12}\])?\s*(?:▶|>|:)\s*(.*)$/i);
 
   if (rankPlayerMatch) {
     const rank = rankPlayerMatch[1].toUpperCase();
     const username = rankPlayerMatch[2];
     const cleanBody = rankPlayerMatch[3];
-    const rankColor = LIGHT_RANK_COLORS[rank] || '#475569';
+    const baseRank = rank.replace(/\+/g, '');
+    const rankColor = LIGHT_RANK_COLORS[rank] || LIGHT_RANK_COLORS[baseRank] || '#475569';
 
     // Extract color-coded message body from rawText if available
     let rawBody = cleanBody;
@@ -182,20 +186,20 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
     }
 
     return (
-      <div className="group min-w-0 max-w-full flex items-start gap-1.5 py-1 px-1.5 sm:px-2 hover:bg-slate-100/80 rounded-lg transition-colors">
+      <div className={`group min-w-0 max-w-full flex items-start gap-1.5 ${compact ? 'py-0.5 px-1 sm:px-1.5' : 'py-1 px-1.5 sm:px-2'} hover:bg-slate-100/80 rounded-lg transition-colors`}>
         {showTimestamp && (
           <time
-            className="text-[9.5px] sm:text-[10px] text-slate-400 font-mono shrink-0 select-none pt-0.5 leading-none tabular-nums"
+            className={`${compact ? 'text-[8.5px] sm:text-[9px]' : 'text-[9.5px] sm:text-[10px]'} text-slate-400 font-mono shrink-0 select-none pt-0.5 leading-none tabular-nums`}
             title={timeFull}
           >
             <span className="sm:hidden">{timeShort}</span>
             <span className="hidden sm:inline">{timeFull}</span>
           </time>
         )}
-        <div className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text text-xs leading-relaxed font-sans">
+        <div className={`min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text ${compact ? 'text-[11px] leading-snug' : 'text-xs leading-relaxed'} font-sans`}>
           {/* Rank Badge */}
           <span
-            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider mr-1.5 shrink-0 align-baseline select-none shadow-2xs font-mono"
+            className={`inline-flex items-center ${compact ? 'px-1 py-0.2 text-[8.5px]' : 'px-1.5 py-0.5 text-[10px]'} font-black uppercase tracking-wider mr-1.5 shrink-0 align-baseline select-none shadow-2xs font-mono`}
             style={{
               color: rankColor,
               backgroundColor: `${rankColor}14`,

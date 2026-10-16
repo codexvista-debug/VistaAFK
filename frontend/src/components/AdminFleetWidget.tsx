@@ -19,6 +19,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { ChatMessage } from '../types';
+import { MinecraftChatMessage } from './MinecraftChatMessage';
 
 export interface FleetBotInfo {
   id: string;
@@ -89,25 +90,6 @@ function formatChatTime(timestamp?: number): string {
   if (!timestamp) return '';
   const date = new Date(timestamp);
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-}
-
-function cleanMinecraftChat(text?: string): string {
-  if (!text) return '';
-  return text.replace(/§[0-9a-fk-or]/gi, '').trim();
-}
-
-function formatChatLine(chat: ChatMessage) {
-  const cleanMsg = cleanMinecraftChat(chat.message);
-  const sender = chat.sender ? chat.sender.trim() : '';
-  const hasEmbeddedSender = /^[<\[*]/.test(cleanMsg);
-  const isSys = chat.isSystem || !sender;
-
-  return {
-    cleanMsg,
-    sender,
-    isSys,
-    hasEmbeddedSender,
-  };
 }
 
 export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
@@ -693,73 +675,53 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
                             </div>
                           </div>
 
-                          {/* Row 3: Live In-Game Server Chat Feed (3-4 chats) */}
+                          {/* Row 3: Live In-Game Server Chat Feed (3-4 chats matching Chat tab style) */}
                           {(() => {
                             const botChats = getBotChats(bot);
                             const displayChats = botChats.slice(-4);
 
                             return (
                               <div className="pt-2 border-t border-slate-100">
-                                <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 font-mono shadow-inner space-y-1.5">
+                                <div className="bg-[#f8fafc] border border-slate-200/90 rounded-xl overflow-hidden shadow-2xs">
                                   {/* Chat Box Header */}
-                                  <div className="flex items-center justify-between text-[9px] font-sans pb-1.5 border-b border-slate-800/80">
-                                    <div className="flex items-center space-x-1.5 text-slate-300 font-bold uppercase tracking-wider">
-                                      <MessageSquare className="h-3 w-3 text-emerald-400 shrink-0" />
-                                      <span>Live Server Chat</span>
+                                  <div className="flex items-center justify-between px-2.5 py-1.5 bg-slate-100/90 border-b border-slate-200/80">
+                                    <div className="flex items-center space-x-1.5 text-slate-700 font-bold">
+                                      <MessageSquare className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                                      <span className="uppercase text-[9px] font-black tracking-wider text-slate-600 font-mono">
+                                        Live In-Game Chat
+                                      </span>
                                     </div>
                                     {isOnline ? (
-                                      <span className="inline-flex items-center space-x-1 text-[8px] text-emerald-400 font-semibold uppercase tracking-wider bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/60">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                      <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[8.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                         <span>Live Verified</span>
                                       </span>
                                     ) : (
-                                      <span className="text-[8px] text-slate-500 font-medium font-sans">
+                                      <span className="px-1.5 py-0.5 rounded text-[8.5px] font-medium bg-slate-200/70 text-slate-500">
                                         Offline
                                       </span>
                                     )}
                                   </div>
 
-                                  {/* Chat Messages List (last 3-4) */}
-                                  {displayChats.length > 0 ? (
-                                    <div className="space-y-1">
-                                      {displayChats.map((chat, idx) => {
-                                        const { cleanMsg, sender, isSys, hasEmbeddedSender } = formatChatLine(chat);
-                                        return (
-                                          <div
-                                            key={chat.timestamp ? `${chat.timestamp}-${idx}` : idx}
-                                            className="flex items-start space-x-1.5 leading-snug break-words text-[9.5px]"
-                                          >
-                                            <span className="text-slate-500 shrink-0 font-mono text-[8px] select-none pt-0.5">
-                                              {formatChatTime(chat.timestamp)}
-                                            </span>
-                                            <div className="min-w-0 flex-1">
-                                              {sender && !hasEmbeddedSender ? (
-                                                <span className="text-cyan-300 font-bold mr-1 select-text">
-                                                  &lt;{sender}&gt;
-                                                </span>
-                                              ) : isSys && !hasEmbeddedSender ? (
-                                                <span className="text-amber-400/90 font-semibold mr-1 select-text">
-                                                  [Server]
-                                                </span>
-                                              ) : null}
-                                              <span className="text-slate-200 select-text font-sans">
-                                                {cleanMsg}
-                                              </span>
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  ) : isOnline ? (
-                                    <div className="py-2 text-center text-slate-400 italic text-[9px] flex items-center justify-center space-x-1.5 font-sans">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 animate-pulse"></span>
-                                      <span>Awaiting in-game chat messages...</span>
-                                    </div>
-                                  ) : (
-                                    <div className="py-1 text-center text-slate-500 italic text-[9px] font-sans">
-                                      Bot offline (no chat stream)
-                                    </div>
-                                  )}
+                                  {/* Chat Messages rendered with identical MinecraftChatMessage component */}
+                                  <div className="p-1 sm:p-1.5 flex flex-col space-y-0.5 divide-y divide-slate-100/80">
+                                    {displayChats.length > 0 ? (
+                                      displayChats.map((chat, idx) => (
+                                        <div key={chat.timestamp ? `${chat.timestamp}-${idx}` : idx} className="pt-0.5 first:pt-0">
+                                          <MinecraftChatMessage message={chat} showTimestamp={true} compact={true} />
+                                        </div>
+                                      ))
+                                    ) : isOnline ? (
+                                      <div className="py-2.5 text-center text-slate-400 italic text-[10px] flex items-center justify-center space-x-1.5 font-sans">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                        <span>Awaiting in-game chat messages...</span>
+                                      </div>
+                                    ) : (
+                                      <div className="py-2 text-center text-slate-400 italic text-[10px] font-sans">
+                                        Bot offline (no chat stream)
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             );
