@@ -530,6 +530,7 @@ class BotInstance {
     bedrockGuiRequestId = 0;
     tokenFolder;
     afkRewardsAvailable = 0;
+    bedrockHeartbeatInterval = null;
     constructor(config, callbacks, tokenFolder) {
         this.config = config;
         this.callbacks = callbacks;
@@ -764,6 +765,36 @@ class BotInstance {
                 clientOptions.version = targetVersion;
             const client = bedrock.createClient(clientOptions);
             this.bedrockClient = client;
+            // Force immediate, unbuffered packet transmission over RakNet so slash commands,
+            // chat messages, and form actions are dispatched immediately without sitting in RakNet's
+            // internal MEDIUM_PRIORITY queue or waiting for MTU buffer coalescing.
+            if (typeof client.sendMCPE === 'function') {
+                const origSendMCPE = client.sendMCPE.bind(client);
+                client.sendMCPE = (buffer, immediate) => {
+                    return origSendMCPE(buffer, immediate !== false);
+                };
+            }
+            if (typeof client.onEncryptedPacket === 'function') {
+                client.onEncryptedPacket = (buf) => {
+                    const packet = client.batchHeader ? Buffer.concat([Buffer.from([client.batchHeader]), buf]) : buf;
+                    client.sendMCPE(packet, true);
+                };
+            }
+            const patchConnectionImmediate = () => {
+                if (client.connection && typeof client.connection.sendReliable === 'function') {
+                    const conn = client.connection;
+                    if (!conn._immediatePatched) {
+                        conn._immediatePatched = true;
+                        const origSendReliable = conn.sendReliable.bind(conn);
+                        conn.sendReliable = (buffer, immediate) => {
+                            return origSendReliable(buffer, immediate !== false);
+                        };
+                    }
+                }
+            };
+            patchConnectionImmediate();
+            client.on('connect_allowed', patchConnectionImmediate);
+            client.once('session', patchConnectionImmediate);
             // bedrock-protocol's default helper sends "completed" immediately after
             // resource_packs_info. Bedrock servers expect HAVE_ALL_PACKS at this stage,
             // then COMPLETED after resource_pack_stack. The helper has no pack-downloader,
@@ -845,6 +876,23 @@ class BotInstance {
                 });
                 this.setupTelemetryLoop();
                 this.setupAntiAfk();
+                if (client?.versionGreaterThan?.('1.20.80')) {
+                    if (this.bedrockHeartbeatInterval)
+                        clearInterval(this.bedrockHeartbeatInterval);
+                    let tickCount = 0n;
+                    this.bedrockHeartbeatInterval = setInterval(() => {
+                        if (this.bedrockClient && this.currentStatus === 'online') {
+                            try {
+                                this.bedrockClient.write('tick_sync', {
+                                    request_time: tickCount,
+                                    response_time: 0n,
+                                });
+                                tickCount += 40n;
+                            }
+                            catch (e) { }
+                        }
+                    }, 2000);
+                }
                 this.emitTelemetry();
             });
             client.on('start_game', (packet) => {
@@ -1287,6 +1335,9 @@ class BotInstance {
                 if (this.bedrockHandshakeTimeout)
                     clearTimeout(this.bedrockHandshakeTimeout);
                 this.bedrockHandshakeTimeout = null;
+                if (this.bedrockHeartbeatInterval)
+                    clearInterval(this.bedrockHeartbeatInterval);
+                this.bedrockHeartbeatInterval = null;
                 this.bedrockClient = null;
                 this.bedrockGuiWindow = null;
                 this.bedrockGuiRawSlots = [];
@@ -1371,16 +1422,18 @@ class BotInstance {
         if (this.bedrockClient && this.currentStatus === 'online') {
             try {
                 if (message.startsWith('/')) {
-                    const uuid = (0, node_crypto_1.randomUUID)();
+                    const profileUuid = this.bedrockClient.profile?.uuid;
+                    const uuid = profileUuid && typeof profileUuid === 'string' && profileUuid.length > 8 ? profileUuid : (0, node_crypto_1.randomUUID)();
                     const commandOrigin = {
                         type: 'player',
                         uuid,
-                        request_id: '',
+                        request_id: uuid,
                     };
                     const isModernCommandProtocol = this.bedrockClient.versionGreaterThanOrEqualTo('1.21.130');
                     const hasCommandVersion = this.bedrockClient.versionGreaterThanOrEqualTo('1.19.62');
+                    const playerEid = BigInt(this.bedrockClient.entityId || this.bedrockClient.startGameData?.runtime_entity_id || 0);
                     if (isModernCommandProtocol)
-                        commandOrigin.player_entity_id = 0n;
+                        commandOrigin.player_entity_id = playerEid;
                     const commandRequest = {
                         command: message,
                         origin: commandOrigin,
@@ -1388,11 +1441,12 @@ class BotInstance {
                     };
                     if (hasCommandVersion)
                         commandRequest.version = isModernCommandProtocol ? 'latest' : 52;
-                    this.bedrockClient.queue('command_request', commandRequest);
+                    // Send immediately over socket via write (bypassing sendQ batching queues)
+                    this.bedrockClient.write('command_request', commandRequest);
                     this.emitActivity('command', `⚡ Sent Bedrock command: ${message}`);
                 }
                 else {
-                    this.bedrockClient.queue('text', {
+                    this.bedrockClient.write('text', {
                         category: 'authored',
                         type: 'chat',
                         needs_translation: false,
@@ -2820,7 +2874,7 @@ class BotInstance {
         if (window.formType === 'custom' && (!Array.isArray(response) || response.length !== (window.formElements?.length || 0)))
             return;
         try {
-            this.bedrockClient.queue('modal_form_response', {
+            this.bedrockClient.write('modal_form_response', {
                 form_id: window.id,
                 has_response_data: true,
                 data: JSON.stringify(response),
@@ -2842,7 +2896,7 @@ class BotInstance {
                 return;
             try {
                 if (window.kind === 'form') {
-                    this.bedrockClient.queue('modal_form_response', {
+                    this.bedrockClient.write('modal_form_response', {
                         form_id: window.id,
                         has_response_data: false,
                         has_cancel_reason: true,
@@ -2850,7 +2904,7 @@ class BotInstance {
                     });
                 }
                 else {
-                    this.bedrockClient.queue('container_close', {
+                    this.bedrockClient.write('container_close', {
                         window_id: window.id,
                         window_type: window.type || 'container',
                         server: false,
@@ -3417,6 +3471,8 @@ class BotInstance {
             clearTimeout(this.reconnectTimeout);
         if (this.bedrockHandshakeTimeout)
             clearTimeout(this.bedrockHandshakeTimeout);
+        if (this.bedrockHeartbeatInterval)
+            clearInterval(this.bedrockHeartbeatInterval);
         if (this.antiAfkInterval)
             clearInterval(this.antiAfkInterval);
         if (this.telemetryInterval)
@@ -3438,6 +3494,7 @@ class BotInstance {
         this.manualMovementControls.clear();
         this.reconnectTimeout = null;
         this.bedrockHandshakeTimeout = null;
+        this.bedrockHeartbeatInterval = null;
         this.antiAfkInterval = null;
         this.telemetryInterval = null;
         this.patrolInterval = null;

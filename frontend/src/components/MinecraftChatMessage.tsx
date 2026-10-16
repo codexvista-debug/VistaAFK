@@ -277,7 +277,30 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
     );
   }
 
-  // 3. Death & Combat Messages (Rose background with skull icon)
+  // 3. VistaAFK / System Bot Events (Emerald Green Pill)
+  if (message.sender === 'VistaAFK' || message.sender === 'AutoCommand') {
+    return (
+      <div className="min-w-0 max-w-full flex items-start gap-1.5 py-1 px-1.5 sm:px-2 hover:bg-emerald-50/70 rounded-lg transition-colors text-emerald-800 bg-emerald-50/40 border border-emerald-100/80">
+        {showTimestamp && (
+          <time
+            className="text-[9.5px] sm:text-[10px] text-emerald-500/70 font-mono shrink-0 select-none pt-0.5 leading-none tabular-nums"
+            title={timeFull}
+          >
+            <span className="sm:hidden">{timeShort}</span>
+            <span className="hidden sm:inline">{timeFull}</span>
+          </time>
+        )}
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white shrink-0 select-none shadow-2xs font-mono">
+          {message.sender}
+        </span>
+        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text font-mono text-xs font-bold leading-relaxed text-emerald-950">
+          {cleanText}
+        </span>
+      </div>
+    );
+  }
+
+  // 4. Death & Combat Messages (Rose background with skull icon)
   const deathKeywords = [
     'was slain by',
     'was obliterated',
@@ -316,7 +339,7 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
     );
   }
 
-  // 4. Economy & Orders (Green with dollar icon)
+  // 5. Economy & Orders (Green with dollar icon)
   const isEconomy = /You sold|has ordered|ordered|balance|\$[0-9,]+/i.test(cleanText);
   if (isEconomy) {
     return (
@@ -338,7 +361,7 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
     );
   }
 
-  // 5. Vault & Teleport Actions (Amber/Gold)
+  // 6. Vault & Teleport Actions (Amber/Gold)
   const isVault = /Successfully (?:opened|closed) vault|teleported|warp/i.test(cleanText);
   if (isVault) {
     return (
@@ -354,29 +377,6 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
         )}
         <span className="mr-0.5 select-none text-[11px] leading-tight">📦</span>
         <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text font-sans text-xs font-semibold leading-relaxed">
-          {cleanText}
-        </span>
-      </div>
-    );
-  }
-
-  // 6. VistaAFK / System Bot Events (Emerald Green Pill)
-  if (message.sender === 'VistaAFK' || message.sender === 'AutoCommand') {
-    return (
-      <div className="min-w-0 max-w-full flex items-start gap-1.5 py-1 px-1.5 sm:px-2 hover:bg-emerald-50/70 rounded-lg transition-colors text-emerald-800 bg-emerald-50/40 border border-emerald-100/80">
-        {showTimestamp && (
-          <time
-            className="text-[9.5px] sm:text-[10px] text-emerald-500/70 font-mono shrink-0 select-none pt-0.5 leading-none tabular-nums"
-            title={timeFull}
-          >
-            <span className="sm:hidden">{timeShort}</span>
-            <span className="hidden sm:inline">{timeFull}</span>
-          </time>
-        )}
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white shrink-0 select-none shadow-2xs font-mono">
-          {message.sender}
-        </span>
-        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text font-mono text-xs font-bold leading-relaxed text-emerald-950">
           {cleanText}
         </span>
       </div>
