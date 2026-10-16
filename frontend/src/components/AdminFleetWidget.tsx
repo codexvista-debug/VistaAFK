@@ -16,7 +16,9 @@ import {
   Settings,
   AlertCircle,
   ExternalLink,
+  MessageSquare,
 } from 'lucide-react';
+import { ChatMessage } from '../types';
 
 export interface FleetBotInfo {
   id: string;
@@ -31,6 +33,7 @@ export interface FleetBotInfo {
   uptimeSeconds?: number;
   lastSeen?: number;
   dimension?: string;
+  recentChats?: ChatMessage[];
 }
 
 export interface FleetAccountInfo {
@@ -82,6 +85,31 @@ function formatUptime(seconds?: number): string {
   return `${s}s`;
 }
 
+function formatChatTime(timestamp?: number): string {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
+
+function cleanMinecraftChat(text?: string): string {
+  if (!text) return '';
+  return text.replace(/§[0-9a-fk-or]/gi, '').trim();
+}
+
+function formatChatLine(chat: ChatMessage) {
+  const cleanMsg = cleanMinecraftChat(chat.message);
+  const sender = chat.sender ? chat.sender.trim() : '';
+  const hasEmbeddedSender = /^[<\[*]/.test(cleanMsg);
+  const isSys = chat.isSystem || !sender;
+
+  return {
+    cleanMsg,
+    sender,
+    isSys,
+    hasEmbeddedSender,
+  };
+}
+
 export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
   token,
   currentUser,
@@ -94,6 +122,7 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [liveBotTelemetry, setLiveBotTelemetry] = useState<Record<string, any>>({});
   const [liveDaemonStatus, setLiveDaemonStatus] = useState<Record<string, boolean>>({});
+  const [liveChatLogs, setLiveChatLogs] = useState<Record<string, ChatMessage[]>>({});
   const daemonSocketsRef = useRef<Map<string, { ws: WebSocket; pingTimer?: any; targetUrl: string }>>(new Map());
 
   const fetchFleet = useCallback(async (manual = false) => {
@@ -223,7 +252,42 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
                   return updated;
                 });
               }
+              if (msg.payload?.chatLogs && typeof msg.payload.chatLogs === 'object') {
+                const logsMap = msg.payload.chatLogs;
+                setLiveChatLogs((prev) => {
+                  const updated = { ...prev };
+                  for (const [id, list] of Object.entries(logsMap) as [string, ChatMessage[]][]) {
+                    if (Array.isArray(list)) {
+                      updated[id] = list.slice(-20);
+                      const botCfg = u.bots.find((b) => b.id === id);
+                      if (botCfg?.name) {
+                        updated[botCfg.name] = list.slice(-20);
+                        updated[botCfg.name.toLowerCase()] = list.slice(-20);
+                      }
+                    }
+                  }
+                  return updated;
+                });
+              }
               setLiveDaemonStatus((prev) => ({ ...prev, [userKey]: true }));
+            } else if (msg.type === 'CHAT_MESSAGE' && msg.payload) {
+              const chat: ChatMessage = msg.payload;
+              if (chat.botId) {
+                setLiveChatLogs((prev) => {
+                  const cur = prev[chat.botId] || [];
+                  const updated = [...cur.slice(-19), chat];
+                  const res: Record<string, ChatMessage[]> = {
+                    ...prev,
+                    [chat.botId]: updated,
+                  };
+                  const botCfg = u.bots.find((b) => b.id === chat.botId);
+                  if (botCfg?.name) {
+                    res[botCfg.name] = updated;
+                    res[botCfg.name.toLowerCase()] = updated;
+                  }
+                  return res;
+                });
+              }
             } else if (msg.type === 'TELEMETRY_UPDATE' && msg.payload) {
               const item = msg.payload;
               if (item.id) {
@@ -366,6 +430,28 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
       bots: mergedBots,
     };
   });
+
+  const getBotChats = (bot: FleetBotInfo): ChatMessage[] => {
+    const live =
+      liveChatLogs[bot.id] ||
+      liveChatLogs[bot.name] ||
+      liveChatLogs[bot.name?.toLowerCase()] ||
+      [];
+    const initial = bot.recentChats || [];
+    if (live.length === 0) return initial;
+    if (initial.length === 0) return live;
+
+    const seen = new Set<string>();
+    const combined: ChatMessage[] = [];
+    for (const item of [...initial, ...live]) {
+      const key = `${item.timestamp}_${item.sender}_${item.message}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        combined.push(item);
+      }
+    }
+    return combined.sort((a, b) => a.timestamp - b.timestamp);
+  };
 
   const totalBots = mergedUsers.reduce((sum, u) => sum + u.bots.length, 0);
   const onlineBots = mergedUsers.reduce(
@@ -606,6 +692,78 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
                               <span>{isOnline ? formatUptime(bot.uptimeSeconds) : 'Idle'}</span>
                             </div>
                           </div>
+
+                          {/* Row 3: Live In-Game Server Chat Feed (3-4 chats) */}
+                          {(() => {
+                            const botChats = getBotChats(bot);
+                            const displayChats = botChats.slice(-4);
+
+                            return (
+                              <div className="pt-2 border-t border-slate-100">
+                                <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 font-mono shadow-inner space-y-1.5">
+                                  {/* Chat Box Header */}
+                                  <div className="flex items-center justify-between text-[9px] font-sans pb-1.5 border-b border-slate-800/80">
+                                    <div className="flex items-center space-x-1.5 text-slate-300 font-bold uppercase tracking-wider">
+                                      <MessageSquare className="h-3 w-3 text-emerald-400 shrink-0" />
+                                      <span>Live Server Chat</span>
+                                    </div>
+                                    {isOnline ? (
+                                      <span className="inline-flex items-center space-x-1 text-[8px] text-emerald-400 font-semibold uppercase tracking-wider bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/60">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                        <span>Live Verified</span>
+                                      </span>
+                                    ) : (
+                                      <span className="text-[8px] text-slate-500 font-medium font-sans">
+                                        Offline
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Chat Messages List (last 3-4) */}
+                                  {displayChats.length > 0 ? (
+                                    <div className="space-y-1">
+                                      {displayChats.map((chat, idx) => {
+                                        const { cleanMsg, sender, isSys, hasEmbeddedSender } = formatChatLine(chat);
+                                        return (
+                                          <div
+                                            key={chat.timestamp ? `${chat.timestamp}-${idx}` : idx}
+                                            className="flex items-start space-x-1.5 leading-snug break-words text-[9.5px]"
+                                          >
+                                            <span className="text-slate-500 shrink-0 font-mono text-[8px] select-none pt-0.5">
+                                              {formatChatTime(chat.timestamp)}
+                                            </span>
+                                            <div className="min-w-0 flex-1">
+                                              {sender && !hasEmbeddedSender ? (
+                                                <span className="text-cyan-300 font-bold mr-1 select-text">
+                                                  &lt;{sender}&gt;
+                                                </span>
+                                              ) : isSys && !hasEmbeddedSender ? (
+                                                <span className="text-amber-400/90 font-semibold mr-1 select-text">
+                                                  [Server]
+                                                </span>
+                                              ) : null}
+                                              <span className="text-slate-200 select-text font-sans">
+                                                {cleanMsg}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : isOnline ? (
+                                    <div className="py-2 text-center text-slate-400 italic text-[9px] flex items-center justify-center space-x-1.5 font-sans">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 animate-pulse"></span>
+                                      <span>Awaiting in-game chat messages...</span>
+                                    </div>
+                                  ) : (
+                                    <div className="py-1 text-center text-slate-500 italic text-[9px] font-sans">
+                                      Bot offline (no chat stream)
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}

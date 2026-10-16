@@ -349,6 +349,13 @@ async function sendCloudHeartbeat() {
             targetCloudUrls.add(clean);
     }
     targetCloudUrls.add('https://vista-afk.vercel.app');
+    const allChats = botManager.getAllChatLogs();
+    const recentChats = {};
+    for (const [botId, logs] of Object.entries(allChats)) {
+        if (Array.isArray(logs) && logs.length > 0) {
+            recentChats[botId] = logs.slice(-8);
+        }
+    }
     for (const cloudUrl of targetCloudUrls) {
         try {
             const res = await fetch(`${cloudUrl}/api/daemon/heartbeat`, {
@@ -364,6 +371,7 @@ async function sendCloudHeartbeat() {
                     deviceLabel: system.deviceLabel,
                     bots: botManager.getAllConfigs(),
                     telemetry: botManager.getAllTelemetry(),
+                    recentChats,
                 }),
             });
             if (res.ok) {

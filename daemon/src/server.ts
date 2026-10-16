@@ -3,7 +3,7 @@ import path from 'path';
 import os from 'os';
 import { WebSocketServer, WebSocket } from 'ws';
 import { BotManager } from './botManager.js';
-import { ClientMessage, ServerMessage, DaemonSystemInfo } from './types.js';
+import { ClientMessage, ServerMessage, DaemonSystemInfo, ChatMessage } from './types.js';
 import { discoverMicrosoftProfiles } from './accountDiscovery.js';
 
 export const DAEMON_VERSION = 'v1.2.21';
@@ -371,6 +371,14 @@ async function sendCloudHeartbeat() {
   }
   targetCloudUrls.add('https://vista-afk.vercel.app');
 
+  const allChats = botManager.getAllChatLogs();
+  const recentChats: Record<string, ChatMessage[]> = {};
+  for (const [botId, logs] of Object.entries(allChats)) {
+    if (Array.isArray(logs) && logs.length > 0) {
+      recentChats[botId] = logs.slice(-8);
+    }
+  }
+
   for (const cloudUrl of targetCloudUrls) {
     try {
       const res = await fetch(`${cloudUrl}/api/daemon/heartbeat`, {
@@ -386,6 +394,7 @@ async function sendCloudHeartbeat() {
           deviceLabel: system.deviceLabel,
           bots: botManager.getAllConfigs(),
           telemetry: botManager.getAllTelemetry(),
+          recentChats,
         }),
       });
 

@@ -40,6 +40,7 @@ export interface FleetBotInfo {
   uptimeSeconds?: number;
   lastSeen?: number;
   dimension?: string;
+  recentChats?: any[];
 }
 
 export interface FleetAccountInfo {
@@ -517,6 +518,7 @@ export async function getAllFleetUsers(): Promise<FleetUserInfo[]> {
         uptimeSeconds: telem.uptimeSeconds || (isOnline ? Math.max(1, Math.floor((now - (bot.onlineSince || bot.createdAt || u.lastHeartbeat || now)) / 1000)) : 0),
         lastSeen: u.lastHeartbeat,
         dimension,
+        recentChats: (u as any).recentChats?.[bot.id] || (u as any).recentChats?.[bot.name] || bot.recentChats || [],
       };
     });
 

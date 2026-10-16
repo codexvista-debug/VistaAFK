@@ -14,7 +14,7 @@ import {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { username, password, token, daemonUrl, secretToken, accounts, bots, telemetry, deviceType, deviceLabel } = body;
+    const { username, password, token, daemonUrl, secretToken, accounts, bots, telemetry, deviceType, deviceLabel, recentChats } = body;
 
     const uVal = validateUsername(username);
     if (!uVal.valid) {
@@ -130,10 +130,12 @@ export async function POST(req: Request) {
       user.botConfigs = bots.map((b: any) => {
         const prev = configMap.get(b.id);
         const onlineSince = prev?.onlineSince || b.onlineSince || b.createdAt || Date.now();
+        const botChats = (recentChats && recentChats[b.id]) || b.recentChats || prev?.recentChats || undefined;
         return {
           ...b,
           onlineSince,
           lastTelemetry: (telemetry && typeof telemetry === 'object' && telemetry[b.id]) || b.lastTelemetry || prev?.lastTelemetry || undefined,
+          recentChats: botChats,
           deviceType: user.daemonDeviceType || b.deviceType || prev?.deviceType || undefined,
           deviceLabel: user.daemonDeviceLabel || b.deviceLabel || prev?.deviceLabel || undefined,
         };
@@ -144,10 +146,27 @@ export async function POST(req: Request) {
           ...telemetry,
         };
       }
+      if (recentChats && typeof recentChats === 'object') {
+        (user as any).recentChats = {
+          ...((user as any).recentChats || {}),
+          ...recentChats,
+        };
+      }
     } else if (telemetry && typeof telemetry === 'object') {
       (user as any).botTelemetry = {
         ...((user as any).botTelemetry || {}),
         ...telemetry,
+      };
+      if (recentChats && typeof recentChats === 'object') {
+        (user as any).recentChats = {
+          ...((user as any).recentChats || {}),
+          ...recentChats,
+        };
+      }
+    } else if (recentChats && typeof recentChats === 'object') {
+      (user as any).recentChats = {
+        ...((user as any).recentChats || {}),
+        ...recentChats,
       };
     }
 
