@@ -6,7 +6,7 @@ import { BotManager } from './botManager.js';
 import { ClientMessage, ServerMessage, DaemonSystemInfo } from './types.js';
 import { discoverMicrosoftProfiles } from './accountDiscovery.js';
 
-export const DAEMON_VERSION = 'v1.2.20';
+export const DAEMON_VERSION = 'v1.2.21';
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const SECRET = process.env.VISTAAFK_SECRET || '';
@@ -321,6 +321,7 @@ function sendInitialState(ws: WebSocket) {
       configs: botManager.getAllConfigs(),
       telemetry: botManager.getAllTelemetry(),
       activityLogs: botManager.getAllActivityLogs(),
+      chatLogs: botManager.getAllChatLogs(),
       system,
     };
     ws.send(JSON.stringify({ type: 'INIT_STATE', payload } as ServerMessage));

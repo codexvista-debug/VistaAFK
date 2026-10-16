@@ -290,10 +290,21 @@ function parseBedrockChatPacket(packet, usernameForIdentity) {
         sender = '';
         message = `${rank} ${username} ▶ ${body}`.trim();
     }
+    const raw = {
+        type,
+        source_name: source || undefined,
+        xuid: xuid || undefined,
+        platform_chat_id: platformChatId || undefined,
+        raw_message: rawMessage || undefined,
+        parameters: parameters.length ? parameters : undefined,
+        resolved_username: username || undefined,
+        filtered_message: typeof packet?.filtered_message === 'string' ? packet.filtered_message : undefined,
+    };
     return {
         sender: sender || 'Server',
         message,
         isSystem: !isPlayerChat,
+        raw,
     };
 }
 function cleanBedrockFormatting(value) {
@@ -1104,6 +1115,12 @@ class BotInstance {
                 sender: username,
                 message,
                 isSystem: false,
+                raw: {
+                    type: 'chat',
+                    source_name: username,
+                    raw_message: message,
+                    resolved_username: username,
+                },
             });
             // Notify if whispered
             if (message.toLowerCase().includes('whisper') || message.toLowerCase().includes('-> me')) {
@@ -1125,6 +1142,10 @@ class BotInstance {
                     sender: 'Server',
                     message: cleanMsg,
                     isSystem: true,
+                    raw: {
+                        type: position || 'system',
+                        raw_message: cleanMsg,
+                    },
                 });
             }
         });

@@ -11,6 +11,7 @@ class BotManager {
     bots = new Map();
     configs = new Map();
     activityLogs = new Map();
+    chatLogs = new Map();
     storageFile = '';
     tokenFolder = '';
     currentUser = '';
@@ -114,7 +115,11 @@ class BotManager {
         }
         const instance = new botInstance_js_1.BotInstance(config, {
             onTelemetryUpdate: (t) => this.callbacks.onTelemetryUpdate(t),
-            onChatMessage: (m) => this.callbacks.onChatMessage(m),
+            onChatMessage: (m) => {
+                const cur = this.chatLogs.get(m.botId) || [];
+                this.chatLogs.set(m.botId, [...cur.slice(-99), m]);
+                this.callbacks.onChatMessage(m);
+            },
             onActivityLog: (log) => {
                 const cur = this.activityLogs.get(log.botId) || [];
                 const last = cur[cur.length - 1];
@@ -264,6 +269,13 @@ class BotManager {
     getAllActivityLogs() {
         const res = {};
         for (const [id, logs] of this.activityLogs.entries()) {
+            res[id] = logs;
+        }
+        return res;
+    }
+    getAllChatLogs() {
+        const res = {};
+        for (const [id, logs] of this.chatLogs.entries()) {
             res[id] = logs;
         }
         return res;

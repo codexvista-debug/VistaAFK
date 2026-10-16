@@ -19,6 +19,7 @@ import {
   Swords,
   Key,
   ExternalLink,
+  Terminal,
 } from 'lucide-react';
 import { BotConfig, BotTelemetry, ChatMessage, ActivityLog } from '../types';
 
@@ -49,6 +50,7 @@ export const BotCard: React.FC<BotCardProps> = ({
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [isLogsExpanded, setIsLogsExpanded] = useState(true);
+  const [cardLogTab, setCardLogTab] = useState<'activity' | 'raw_chat'>('activity');
 
   const rawStatus = telemetry?.status || 'offline';
   const isOnline = isDaemonConnected && rawStatus === 'online';
@@ -167,12 +169,19 @@ export const BotCard: React.FC<BotCardProps> = ({
 
   const recentActivities = displayLogs.slice(-50);
   const logsContainerRef = useRef<HTMLDivElement | null>(null);
+  const rawChatContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (isLogsExpanded && logsContainerRef.current) {
+    if (isLogsExpanded && cardLogTab === 'activity' && logsContainerRef.current) {
       logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
     }
-  }, [displayLogs, isLogsExpanded]);
+  }, [displayLogs, isLogsExpanded, cardLogTab]);
+
+  useEffect(() => {
+    if (isLogsExpanded && cardLogTab === 'raw_chat' && rawChatContainerRef.current) {
+      rawChatContainerRef.current.scrollTop = rawChatContainerRef.current.scrollHeight;
+    }
+  }, [logs, isLogsExpanded, cardLogTab]);
 
   const isBedrock = config.edition === 'bedrock' || config.port === 19132 || config.id.includes('bedrock');
 
@@ -418,15 +427,33 @@ export const BotCard: React.FC<BotCardProps> = ({
             )}
           </div>
 
-          {/* In-Card Live Player Activity Logs */}
+          {/* In-Card Live Player Activity Logs & Raw Bedrock Chat */}
           <div className="mt-3 bg-[#0a0f1d] border-2 border-slate-800 rounded-2xl p-3 text-xs shadow-inner">
             <div className="flex items-center justify-between pb-1.5 border-b border-slate-800/80">
               <div className="flex items-center space-x-1.5">
-                <span className={`h-2 w-2 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-                <span className="text-emerald-400 font-mono font-bold text-[10px] tracking-wider uppercase">
-                  Player Logs & Activity
-                </span>
-                <span className="text-[10px] text-slate-500 font-mono">({displayLogs.length})</span>
+                <span className={`h-2 w-2 rounded-full mr-0.5 ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+                <button
+                  type="button"
+                  onClick={() => setCardLogTab('activity')}
+                  className={`px-2 py-0.5 rounded-md font-mono font-bold text-[10px] tracking-wider uppercase transition cursor-pointer ${
+                    cardLogTab === 'activity'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Activity ({displayLogs.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCardLogTab('raw_chat')}
+                  className={`px-2 py-0.5 rounded-md font-mono font-bold text-[10px] tracking-wider uppercase transition cursor-pointer ${
+                    cardLogTab === 'raw_chat'
+                      ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-500/40'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Raw Chat ({logs.length})
+                </button>
               </div>
               <div className="flex items-center space-x-2">
                 <button
@@ -440,27 +467,78 @@ export const BotCard: React.FC<BotCardProps> = ({
               </div>
             </div>
 
-            {/* Activity Stream Messages */}
+            {/* Terminal Stream Content */}
             {isLogsExpanded && (
-              <div
-                ref={logsContainerRef}
-                className="mt-2 space-y-1.5 max-h-36 overflow-y-auto font-mono text-[11px] leading-tight pr-1 scrollbar-thin scroll-smooth"
-              >
-                {recentActivities.length === 0 ? (
-                  <div className="text-slate-500 py-2 text-center text-[10px] italic">
-                    {isOnline ? 'Bot is active in world. Waiting for next player activity...' : 'Bot is offline. Connect to start streaming logs.'}
-                  </div>
-                ) : (
-                  recentActivities.map((act) => (
-                    <div key={act.id} className="flex min-w-0 items-start gap-1.5 text-slate-300">
-                      <span className="text-slate-500 shrink-0 text-[10px]">
-                        {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                      </span>
-                      <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] text-slate-200">{act.message}</span>
+              cardLogTab === 'activity' ? (
+                <div
+                  ref={logsContainerRef}
+                  className="mt-2 space-y-1.5 max-h-36 overflow-y-auto font-mono text-[11px] leading-tight pr-1 scrollbar-thin scroll-smooth"
+                >
+                  {recentActivities.length === 0 ? (
+                    <div className="text-slate-500 py-2 text-center text-[10px] italic">
+                      {isOnline ? 'Bot is active in world. Waiting for next player activity...' : 'Bot is offline. Connect to start streaming logs.'}
                     </div>
-                  ))
-                )}
-              </div>
+                  ) : (
+                    recentActivities.map((act) => (
+                      <div key={act.id} className="flex min-w-0 items-start gap-1.5 text-slate-300">
+                        <span className="text-slate-500 shrink-0 text-[10px]">
+                          {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                        <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] text-slate-200">{act.message}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div
+                  ref={rawChatContainerRef}
+                  className="mt-2 space-y-1.5 max-h-36 overflow-y-auto font-mono text-[10px] leading-tight pr-1 scrollbar-thin scroll-smooth"
+                >
+                  {logs.length === 0 ? (
+                    <div className="text-slate-500 py-2 text-center text-[10px] italic">
+                      {isOnline ? 'Waiting for raw chat packets from Bedrock server...' : 'Bot is offline. Connect to stream raw packets.'}
+                    </div>
+                  ) : (
+                    logs.slice(-50).map((msg, idx) => {
+                      const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                      const raw = msg.raw;
+                      return (
+                        <div key={idx} className="pb-1 border-b border-slate-800/40 last:border-b-0 space-y-0.5">
+                          <div className="flex items-center gap-1.5 flex-wrap text-[9px]">
+                            <span className="text-slate-500">{time}</span>
+                            {raw?.type && (
+                              <span className="px-1 py-0.2 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/70 font-bold uppercase">
+                                {raw.type}
+                              </span>
+                            )}
+                            <span className={raw?.source_name ? 'text-amber-300 font-bold' : 'text-slate-500 italic'}>
+                              src:{raw?.source_name ? `"${raw.source_name}"` : 'none'}
+                            </span>
+                            {raw?.xuid && (
+                              <span className="text-emerald-300 font-mono">
+                                xuid:{raw.xuid}
+                              </span>
+                            )}
+                            {raw?.resolved_username && (
+                              <span className="text-teal-300 font-bold">
+                                user:{raw.resolved_username}
+                              </span>
+                            )}
+                          </div>
+                          {raw?.parameters && raw.parameters.length > 0 && (
+                            <div className="text-cyan-200/90 text-[9px] break-words [overflow-wrap:anywhere]">
+                              params: {JSON.stringify(raw.parameters)}
+                            </div>
+                          )}
+                          <div className="text-slate-200 break-words [overflow-wrap:anywhere]">
+                            {raw?.raw_message !== undefined ? raw.raw_message : msg.message}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )
             )}
           </div>
         </div>
@@ -490,7 +568,18 @@ export const BotCard: React.FC<BotCardProps> = ({
         </div>
 
         {/* Player Logs, Control Panel, and Delete */}
-        <div className="grid grid-cols-2 sm:flex items-center gap-1.5 w-full sm:w-auto">
+        <div className="grid grid-cols-3 sm:flex items-center gap-1.5 w-full sm:w-auto">
+          {/* Raw Bedrock Chat Packet Inspector shortcut button (user-requested position) */}
+          <Link
+            href={`/chat?bot=${encodeURIComponent(config.id)}&tab=raw_chat`}
+            className="h-10 sm:h-8 px-2 sm:px-2.5 bg-white hover:bg-cyan-50 text-slate-700 hover:text-cyan-700 rounded-xl border border-slate-200 shadow-xs transition flex items-center justify-center gap-1 text-xs font-bold active:scale-95"
+            title="Inspect Raw Bedrock Chat Packets"
+            aria-label={`Inspect raw chat for ${config.name}`}
+          >
+            <Terminal className="h-3.5 w-3.5 text-cyan-600 shrink-0" />
+            <span className="text-[11px] font-mono font-bold text-slate-700 hidden sm:inline">Raw</span>
+          </Link>
+
           {/* Open the full workspace with settings, logs, chat, map, and inventory. */}
           <Link
             href={`/chat?bot=${encodeURIComponent(config.id)}`}

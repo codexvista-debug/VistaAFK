@@ -201,12 +201,25 @@ export interface BotTelemetry {
   isFarming?: boolean;
 }
 
+export interface RawChatPacketInfo {
+  type?: string;
+  source_name?: string;
+  xuid?: string;
+  platform_chat_id?: string;
+  raw_message?: string;
+  parameters?: string[];
+  resolved_username?: string;
+  filtered_message?: string;
+  extra?: Record<string, any>;
+}
+
 export interface ChatMessage {
   botId: string;
   timestamp: number;
   sender: string;
   message: string;
   isSystem: boolean;
+  raw?: RawChatPacketInfo;
 }
 
 export interface ActivityLog {

@@ -625,6 +625,9 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
               if (msg.payload.activityLogs) {
                 setActivityLogs(msg.payload.activityLogs);
               }
+              if (msg.payload.chatLogs) {
+                setChatLogs(msg.payload.chatLogs);
+              }
               if (msg.payload.system) {
                 setDaemonSystemInfo(msg.payload.system);
               }

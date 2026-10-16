@@ -17,6 +17,7 @@ export class BotManager {
   private bots: Map<string, BotInstance> = new Map();
   private configs: Map<string, BotConfig> = new Map();
   private activityLogs: Map<string, ActivityLog[]> = new Map();
+  private chatLogs: Map<string, ChatMessage[]> = new Map();
   private storageFile: string = '';
   private tokenFolder: string = '';
   private currentUser: string = '';
@@ -127,7 +128,11 @@ export class BotManager {
     }
     const instance = new BotInstance(config, {
       onTelemetryUpdate: (t) => this.callbacks.onTelemetryUpdate(t),
-      onChatMessage: (m) => this.callbacks.onChatMessage(m),
+      onChatMessage: (m) => {
+        const cur = this.chatLogs.get(m.botId) || [];
+        this.chatLogs.set(m.botId, [...cur.slice(-99), m]);
+        this.callbacks.onChatMessage(m);
+      },
       onActivityLog: (log) => {
         const cur = this.activityLogs.get(log.botId) || [];
         const last = cur[cur.length - 1];
@@ -296,6 +301,14 @@ export class BotManager {
   public getAllActivityLogs(): Record<string, ActivityLog[]> {
     const res: Record<string, ActivityLog[]> = {};
     for (const [id, logs] of this.activityLogs.entries()) {
+      res[id] = logs;
+    }
+    return res;
+  }
+
+  public getAllChatLogs(): Record<string, ChatMessage[]> {
+    const res: Record<string, ChatMessage[]> = {};
+    for (const [id, logs] of this.chatLogs.entries()) {
       res[id] = logs;
     }
     return res;

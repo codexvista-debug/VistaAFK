@@ -1,7 +1,7 @@
 import mineflayer, { Bot } from 'mineflayer';
 import { randomUUID } from 'node:crypto';
 import { SocksProxyAgent } from 'socks-proxy-agent';
-import { BotConfig, BotTelemetry, ChatMessage, ActivityLog, InventoryItem, ItemEnchantment, MinimapPlayer, MinimapMob, TerrainGridData, BotGuiWindow } from './types.js';
+import { BotConfig, BotTelemetry, ChatMessage, RawChatPacketInfo, ActivityLog, InventoryItem, ItemEnchantment, MinimapPlayer, MinimapMob, TerrainGridData, BotGuiWindow } from './types.js';
 import { sampleTerrainGrid } from './terrainMapper.js';
 import path from 'path';
 
@@ -231,7 +231,7 @@ function parseMinecraftChat(raw: any): string {
   return typeof raw === 'object' ? JSON.stringify(raw) : String(raw);
 }
 
-function parseBedrockChatPacket(packet: any, usernameForIdentity?: (xuid: string, platformChatId: string) => string | undefined): Pick<ChatMessage, 'sender' | 'message' | 'isSystem'> {
+function parseBedrockChatPacket(packet: any, usernameForIdentity?: (xuid: string, platformChatId: string) => string | undefined): Pick<ChatMessage, 'sender' | 'message' | 'isSystem' | 'raw'> {
   const type = String(packet?.type || 'system');
   const source = typeof packet?.source_name === 'string' ? packet.source_name.trim() : '';
   const cleanSource = cleanBedrockFormatting(source);
@@ -289,10 +289,22 @@ function parseBedrockChatPacket(packet: any, usernameForIdentity?: (xuid: string
     message = `${rank} ${username} ▶ ${body}`.trim();
   }
 
+  const raw: RawChatPacketInfo = {
+    type,
+    source_name: source || undefined,
+    xuid: xuid || undefined,
+    platform_chat_id: platformChatId || undefined,
+    raw_message: rawMessage || undefined,
+    parameters: parameters.length ? parameters : undefined,
+    resolved_username: username || undefined,
+    filtered_message: typeof packet?.filtered_message === 'string' ? packet.filtered_message : undefined,
+  };
+
   return {
     sender: sender || 'Server',
     message,
     isSystem: !isPlayerChat,
+    raw,
   };
 }
 
@@ -1138,6 +1150,12 @@ export class BotInstance {
         sender: username,
         message,
         isSystem: false,
+        raw: {
+          type: 'chat',
+          source_name: username,
+          raw_message: message,
+          resolved_username: username,
+        },
       });
 
       // Notify if whispered
@@ -1162,6 +1180,10 @@ export class BotInstance {
           sender: 'Server',
           message: cleanMsg,
           isSystem: true,
+          raw: {
+            type: position || 'system',
+            raw_message: cleanMsg,
+          },
         });
       }
     });
