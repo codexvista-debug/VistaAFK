@@ -17,6 +17,8 @@ import {
   AlertCircle,
   ExternalLink,
   MessageSquare,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { MinecraftChatMessage } from './MinecraftChatMessage';
@@ -105,6 +107,8 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
   const [liveBotTelemetry, setLiveBotTelemetry] = useState<Record<string, any>>({});
   const [liveDaemonStatus, setLiveDaemonStatus] = useState<Record<string, boolean>>({});
   const [liveChatLogs, setLiveChatLogs] = useState<Record<string, ChatMessage[]>>({});
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
+  const [userToggledCollapse, setUserToggledCollapse] = useState<boolean>(false);
   const daemonSocketsRef = useRef<Map<string, { ws: WebSocket; pingTimer?: any; targetUrl: string }>>(new Map());
 
   const fetchFleet = useCallback(async (manual = false) => {
@@ -442,6 +446,12 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
   );
   const activeDaemons = mergedUsers.filter((u) => u.isDaemonOnline).length;
 
+  useEffect(() => {
+    if (!userToggledCollapse) {
+      setIsCollapsed(activeDaemons === 0);
+    }
+  }, [activeDaemons, userToggledCollapse]);
+
   return (
     <div className="bg-white border-2 border-slate-200 rounded-3xl shadow-sm overflow-hidden flex flex-col">
       {/* Widget Header */}
@@ -467,6 +477,16 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
           </div>
 
           <div className="flex items-center space-x-1 shrink-0">
+            <button
+              onClick={() => {
+                setIsCollapsed((prev) => !prev);
+                setUserToggledCollapse(true);
+              }}
+              title={isCollapsed ? 'Expand Fleet Monitor' : 'Collapse Fleet Monitor'}
+              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition border border-slate-200 active:scale-95"
+            >
+              {isCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+            </button>
             <button
               onClick={() => fetchFleet(true)}
               disabled={isRefreshing}
@@ -502,8 +522,30 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
         </div>
       </div>
 
-      {/* Widget Content Body */}
-      <div className="p-3 sm:p-4 space-y-4 max-h-[640px] overflow-y-auto">
+      {/* Widget Content Body or Collapsed Banner */}
+      {isCollapsed ? (
+        <div className="p-3 bg-slate-50/70 border-t border-slate-200/80 flex items-center justify-between">
+          <div className="flex items-center space-x-2 text-xs text-slate-500">
+            <span className={`w-2 h-2 rounded-full ${activeDaemons > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+            <span className="font-medium">
+              {activeDaemons === 0
+                ? `All daemons offline (${mergedUsers.length} user${mergedUsers.length === 1 ? '' : 's'} collapsed)`
+                : `Fleet monitor collapsed (${mergedUsers.length} user${mergedUsers.length === 1 ? '' : 's'}, ${activeDaemons} live)`}
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setIsCollapsed(false);
+              setUserToggledCollapse(true);
+            }}
+            className="inline-flex items-center space-x-1 px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg shadow-2xs transition active:scale-95"
+          >
+            <span>Expand Fleet</span>
+            <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
+          </button>
+        </div>
+      ) : (
+        <div className="p-3 sm:p-4 space-y-4 max-h-[640px] overflow-y-auto">
         {isLoading && mergedUsers.length === 0 ? (
           <div className="py-10 flex flex-col items-center justify-center text-slate-400 space-y-2 text-xs">
             <RefreshCw className="h-5 w-5 animate-spin text-emerald-600" />
@@ -777,6 +819,7 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
           })
         )}
       </div>
+      )}
 
       {/* Widget Footer */}
       <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500">

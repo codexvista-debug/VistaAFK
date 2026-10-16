@@ -23,6 +23,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { BotConfig, BotTelemetry, ChatMessage, ActivityLog } from '../types';
+import { MinecraftChatMessage } from './MinecraftChatMessage';
 
 interface BotCardProps {
   config: BotConfig;
@@ -51,7 +52,7 @@ export const BotCard: React.FC<BotCardProps> = ({
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [isLogsExpanded, setIsLogsExpanded] = useState(true);
-  const [cardLogTab, setCardLogTab] = useState<'activity' | 'raw_chat'>('activity');
+  const [cardLogTab, setCardLogTab] = useState<'activity' | 'chat'>('activity');
 
   const rawStatus = telemetry?.status || 'offline';
   const isOnline = isDaemonConnected && rawStatus === 'online';
@@ -179,7 +180,7 @@ export const BotCard: React.FC<BotCardProps> = ({
   }, [displayLogs, isLogsExpanded, cardLogTab]);
 
   useEffect(() => {
-    if (isLogsExpanded && cardLogTab === 'raw_chat' && rawChatContainerRef.current) {
+    if (isLogsExpanded && cardLogTab === 'chat' && rawChatContainerRef.current) {
       rawChatContainerRef.current.scrollTop = rawChatContainerRef.current.scrollHeight;
     }
   }, [logs, isLogsExpanded, cardLogTab]);
@@ -446,14 +447,15 @@ export const BotCard: React.FC<BotCardProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCardLogTab('raw_chat')}
-                  className={`px-2 py-0.5 rounded-md font-mono font-bold text-[10px] tracking-wider uppercase transition cursor-pointer ${
-                    cardLogTab === 'raw_chat'
+                  onClick={() => setCardLogTab('chat')}
+                  className={`px-2 py-0.5 rounded-md font-mono font-bold text-[10px] tracking-wider uppercase transition cursor-pointer flex items-center space-x-1 ${
+                    cardLogTab === 'chat'
                       ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-500/40'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  Chat ({logs.length})
+                  <MessageSquare className="h-3 w-3 inline" />
+                  <span>Chat ({logs.length})</span>
                 </button>
               </div>
               <div className="flex items-center space-x-2">
@@ -493,50 +495,18 @@ export const BotCard: React.FC<BotCardProps> = ({
               ) : (
                 <div
                   ref={rawChatContainerRef}
-                  className="mt-2 space-y-1.5 max-h-36 overflow-y-auto font-mono text-[10px] leading-tight pr-1 scrollbar-thin scroll-smooth"
+                  className="mt-2 p-1.5 sm:p-2 bg-white border border-slate-200/90 rounded-xl max-h-40 overflow-y-auto space-y-0.5 divide-y divide-slate-100/80 scrollbar-thin scroll-smooth font-sans text-xs shadow-inner"
                 >
                   {logs.length === 0 ? (
-                    <div className="text-slate-500 py-2 text-center text-[10px] italic">
-                      {isOnline ? 'Waiting for raw chat packets from Bedrock server...' : 'Bot is offline. Connect to stream raw packets.'}
+                    <div className="text-slate-400 py-3 text-center text-[10px] italic font-sans">
+                      {isOnline ? 'Awaiting in-game chat messages...' : 'Bot is offline. Connect to stream chat.'}
                     </div>
                   ) : (
-                    logs.slice(-50).map((msg, idx) => {
-                      const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                      const raw = msg.raw;
-                      return (
-                        <div key={idx} className="pb-1 border-b border-slate-800/40 last:border-b-0 space-y-0.5">
-                          <div className="flex items-center gap-1.5 flex-wrap text-[9px]">
-                            <span className="text-slate-500">{time}</span>
-                            {raw?.type && (
-                              <span className="px-1 py-0.2 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/70 font-bold uppercase">
-                                {raw.type}
-                              </span>
-                            )}
-                            <span className={raw?.source_name ? 'text-amber-300 font-bold' : 'text-slate-500 italic'}>
-                              src:{raw?.source_name ? `"${raw.source_name}"` : 'none'}
-                            </span>
-                            {raw?.xuid && (
-                              <span className="text-emerald-300 font-mono">
-                                xuid:{raw.xuid}
-                              </span>
-                            )}
-                            {raw?.resolved_username && (
-                              <span className="text-teal-300 font-bold">
-                                user:{raw.resolved_username}
-                              </span>
-                            )}
-                          </div>
-                          {raw?.parameters && raw.parameters.length > 0 && (
-                            <div className="text-cyan-200/90 text-[9px] break-words [overflow-wrap:anywhere]">
-                              params: {JSON.stringify(raw.parameters)}
-                            </div>
-                          )}
-                          <div className="text-slate-200 break-words [overflow-wrap:anywhere]">
-                            {raw?.raw_message !== undefined ? raw.raw_message : msg.message}
-                          </div>
-                        </div>
-                      );
-                    })
+                    logs.slice(-50).map((msg, idx) => (
+                      <div key={msg.timestamp ? `${msg.timestamp}-${idx}` : idx} className="pt-0.5 first:pt-0">
+                        <MinecraftChatMessage message={msg} showTimestamp={true} compact={true} />
+                      </div>
+                    ))
                   )}
                 </div>
               )
