@@ -54,11 +54,16 @@ function getDetectedTunnelUrl(): string | null {
   return null;
 }
 
+const isQuiet = Boolean(process.env.VISTAAFK_QUIET);
 const wss = new WebSocketServer({ port: PORT, host: HOST });
-console.log(`\n=============================================`);
-console.log(`   🟢 VistaAFK Daemon ${DAEMON_VERSION}`);
-console.log(`   🚀 WebSocket: ws://${HOST}:${PORT}`);
-console.log(`=============================================\n`);
+if (!isQuiet) {
+  console.log(`\n╔═════════════════════════════════════════════════╗`);
+  console.log(`║          ⚡ VistaAFK Daemon ${DAEMON_VERSION}           ║`);
+  console.log(`║     WebSocket listening on ws://${HOST}:${PORT}        ║`);
+  console.log(`╚═════════════════════════════════════════════════╝\n`);
+} else {
+  console.log(`[VistaAFK Daemon] Engine online (listening on ws://${HOST}:${PORT})`);
+}
 
 const clients = new Set<WebSocket>();
 
@@ -174,7 +179,6 @@ wss.on('connection', (ws) => {
           botManager.sendChat(msg.payload.botId, msg.payload.message);
           break;
         case 'MOVE_BOT':
-          console.log(`[VistaAFK Server] MOVE_BOT payload:`, msg.payload);
           botManager.moveBot(msg.payload.botId, msg.payload.control, msg.payload.state, msg.payload.durationMs);
           break;
         case 'TOGGLE_PATROL':
@@ -271,7 +275,7 @@ wss.on('connection', (ws) => {
     }
   });
 
-  console.log('[VistaAFK Daemon] Dashboard client connected!');
+  console.log('[VistaAFK Daemon] 🌐 Dashboard client connected');
 
   ws.on('error', (err) => {
     console.error('[VistaAFK Daemon] Client WebSocket error:', err.message);
@@ -279,7 +283,7 @@ wss.on('connection', (ws) => {
 
   ws.on('close', (code, reason) => {
     clients.delete(ws);
-    console.log(`[VistaAFK Daemon] Dashboard client disconnected (code: ${code}, reason: "${reason.toString()}")`);
+    console.log(`[VistaAFK Daemon] 🔌 Dashboard client disconnected`);
   });
 
   if (authenticated) {
@@ -352,6 +356,9 @@ function sendInitialState(ws: WebSocket) {
   }
 }
 
+let hasReportedCloudSync = false;
+let lastReportedTunnelUrl = '';
+
 async function sendCloudHeartbeat() {
   const creds = getAuthCredentials();
   if (!creds || !creds.username || (!creds.password && !creds.token)) return;
@@ -399,7 +406,16 @@ async function sendCloudHeartbeat() {
       });
 
       if (res.ok) {
-        console.log(`[Cloud Sync] ☁️ Heartbeat synced with ${cloudUrl} for "${creds.username}" [${system.deviceLabel}] (URL: ${tunnelUrl})`);
+        const data = await res.json().catch(() => ({}));
+        if (!hasReportedCloudSync || lastReportedTunnelUrl !== tunnelUrl) {
+          hasReportedCloudSync = true;
+          lastReportedTunnelUrl = tunnelUrl;
+          if (data && data.daemonUrl === tunnelUrl) {
+            console.log(`[Cloud Sync] 🔒 Verified: Cloud account @${creds.username} bound to tunnel (${tunnelUrl})`);
+          } else {
+            console.log(`[Cloud Sync] ☁️ Heartbeat synced with ${cloudUrl} for "${creds.username}" [${system.deviceLabel}]`);
+          }
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         console.warn(`[Cloud Sync] ⚠️ Cloud heartbeat warning from ${cloudUrl}: ${err.error || res.statusText}`);

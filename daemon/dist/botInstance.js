@@ -1057,8 +1057,6 @@ class BotInstance {
                 const playerInventoryUpdated = this.updateBedrockPlayerInventory(containerId, items, windowId);
                 if (playerInventoryUpdated && !this.bedrockInventoryDiagnosticsLogged) {
                     this.bedrockInventoryDiagnosticsLogged = true;
-                    const nonEmpty = items.filter((item) => Number(item?.network_id) !== 0 && Number(item?.count) > 0).length;
-                    console.log(`[VistaAFK Bedrock] Inventory snapshot for ${this.config.name}: container=${String(containerId ?? 'unknown')}, window=${String(packet?.window_id ?? 'unknown')}, slots=${items.length}, non-empty=${nonEmpty}`);
                 }
                 if (this.bedrockGuiWindow?.kind !== 'container' || this.bedrockGuiWindow.id !== windowId) {
                     if (playerInventoryUpdated)
@@ -1103,7 +1101,6 @@ class BotInstance {
                 const playerInventoryUpdated = this.updateBedrockPlayerInventorySlot(containerId, slot, packet?.item, windowId);
                 if (playerInventoryUpdated && !this.bedrockInventoryDiagnosticsLogged) {
                     this.bedrockInventoryDiagnosticsLogged = true;
-                    console.log(`[VistaAFK Bedrock] Inventory slot update for ${this.config.name}: container=${String(containerId ?? 'unknown')}, window=${String(packet?.window_id ?? 'unknown')}, slot=${String(packet?.slot ?? 'unknown')}, item=${String(packet?.item?.network_id ?? 'unknown')}x${String(packet?.item?.count ?? 0)}`);
                 }
                 if (this.bedrockGuiWindow?.kind !== 'container' || this.bedrockGuiWindow.id !== windowId || !Number.isInteger(slot) || slot < 0) {
                     if (playerInventoryUpdated)
@@ -1949,9 +1946,6 @@ class BotInstance {
         const now = Date.now();
         if (now - this.bedrockChatStatsLastLoggedAt < 30000)
             return;
-        const elapsedSeconds = Math.max(1, Math.round((now - this.bedrockChatStatsLastLoggedAt) / 1000));
-        const { text, player, system } = this.bedrockChatPacketStats;
-        console.log(`[VistaAFK Bedrock] Chat events for ${this.config.name} (last ${elapsedSeconds}s): text=${text}, player=${player}, system=${system}`);
         this.bedrockChatPacketStats = { text: 0, player: 0, system: 0 };
         this.bedrockChatStatsLastLoggedAt = now;
     }
@@ -2010,7 +2004,6 @@ class BotInstance {
             return;
         }
         try {
-            console.log(`[VistaAFK Bot ${this.config.name}] Manual move: control=${control}, state=${state}, duration=${durationMs}ms`);
             const wasManualControlActive = this.manualMovementControls.has(control);
             const clearMovementTimers = (target) => {
                 const timeout = this.movementTimeouts.get(target);

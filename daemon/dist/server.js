@@ -56,11 +56,17 @@ function getDetectedTunnelUrl() {
     }
     return null;
 }
+const isQuiet = Boolean(process.env.VISTAAFK_QUIET);
 const wss = new ws_1.WebSocketServer({ port: PORT, host: HOST });
-console.log(`\n=============================================`);
-console.log(`   🟢 VistaAFK Daemon ${exports.DAEMON_VERSION}`);
-console.log(`   🚀 WebSocket: ws://${HOST}:${PORT}`);
-console.log(`=============================================\n`);
+if (!isQuiet) {
+    console.log(`\n╔═════════════════════════════════════════════════╗`);
+    console.log(`║          ⚡ VistaAFK Daemon ${exports.DAEMON_VERSION}           ║`);
+    console.log(`║     WebSocket listening on ws://${HOST}:${PORT}        ║`);
+    console.log(`╚═════════════════════════════════════════════════╝\n`);
+}
+else {
+    console.log(`[VistaAFK Daemon] Engine online (listening on ws://${HOST}:${PORT})`);
+}
 const clients = new Set();
 function broadcast(msg) {
     const data = JSON.stringify(msg);
@@ -169,7 +175,6 @@ wss.on('connection', (ws) => {
                     botManager.sendChat(msg.payload.botId, msg.payload.message);
                     break;
                 case 'MOVE_BOT':
-                    console.log(`[VistaAFK Server] MOVE_BOT payload:`, msg.payload);
                     botManager.moveBot(msg.payload.botId, msg.payload.control, msg.payload.state, msg.payload.durationMs);
                     break;
                 case 'TOGGLE_PATROL':
@@ -260,13 +265,13 @@ wss.on('connection', (ws) => {
             console.error('[VistaAFK Daemon] Error processing message:', err.message);
         }
     });
-    console.log('[VistaAFK Daemon] Dashboard client connected!');
+    console.log('[VistaAFK Daemon] 🌐 Dashboard client connected');
     ws.on('error', (err) => {
         console.error('[VistaAFK Daemon] Client WebSocket error:', err.message);
     });
     ws.on('close', (code, reason) => {
         clients.delete(ws);
-        console.log(`[VistaAFK Daemon] Dashboard client disconnected (code: ${code}, reason: "${reason.toString()}")`);
+        console.log(`[VistaAFK Daemon] 🔌 Dashboard client disconnected`);
     });
     if (authenticated) {
         sendInitialState(ws);
@@ -330,6 +335,8 @@ function sendInitialState(ws) {
         }
     }
 }
+let hasReportedCloudSync = false;
+let lastReportedTunnelUrl = '';
 async function sendCloudHeartbeat() {
     const creds = getAuthCredentials();
     if (!creds || !creds.username || (!creds.password && !creds.token))
@@ -375,7 +382,17 @@ async function sendCloudHeartbeat() {
                 }),
             });
             if (res.ok) {
-                console.log(`[Cloud Sync] ☁️ Heartbeat synced with ${cloudUrl} for "${creds.username}" [${system.deviceLabel}] (URL: ${tunnelUrl})`);
+                const data = await res.json().catch(() => ({}));
+                if (!hasReportedCloudSync || lastReportedTunnelUrl !== tunnelUrl) {
+                    hasReportedCloudSync = true;
+                    lastReportedTunnelUrl = tunnelUrl;
+                    if (data && data.daemonUrl === tunnelUrl) {
+                        console.log(`[Cloud Sync] 🔒 Verified: Cloud account @${creds.username} bound to tunnel (${tunnelUrl})`);
+                    }
+                    else {
+                        console.log(`[Cloud Sync] ☁️ Heartbeat synced with ${cloudUrl} for "${creds.username}" [${system.deviceLabel}]`);
+                    }
+                }
             }
             else {
                 const err = await res.json().catch(() => ({}));
