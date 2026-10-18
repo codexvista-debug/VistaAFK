@@ -5,8 +5,9 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { BotManager } from './botManager.js';
 import { ClientMessage, ServerMessage, DaemonSystemInfo, ChatMessage } from './types.js';
 import { discoverMicrosoftProfiles } from './accountDiscovery.js';
+import { updateTermuxNotification, removeTermuxNotification, startNotificationTicker, NotificationBotInfo } from './systemNotification.js';
 
-export const DAEMON_VERSION = 'v1.2.21';
+export const DAEMON_VERSION = 'v1.2.23';
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const SECRET = process.env.VISTAAFK_SECRET || '';
@@ -90,9 +91,23 @@ setInterval(() => {
 }, 5000);
 
 const initialCreds = getAuthCredentials();
+
+function getBotsNotificationInfo(): NotificationBotInfo[] {
+  const configs = botManager.getAllConfigs();
+  const telemetry = botManager.getAllTelemetry();
+  return configs.map((c) => ({
+    name: c.name,
+    host: c.host,
+    port: c.port,
+    status: telemetry[c.id]?.status || 'offline',
+    uptimeSeconds: telemetry[c.id]?.uptimeSeconds,
+  }));
+}
+
 const botManager = new BotManager({
   onTelemetryUpdate: (telemetry) => {
     broadcast({ type: 'TELEMETRY_UPDATE', payload: telemetry });
+    updateTermuxNotification(getBotsNotificationInfo());
   },
   onChatMessage: (chat) => {
     broadcast({ type: 'CHAT_MESSAGE', payload: chat });
@@ -105,14 +120,19 @@ const botManager = new BotManager({
   },
   onConfigAdded: (config) => {
     broadcast({ type: 'BOT_CONFIG_ADDED', payload: config });
+    updateTermuxNotification(getBotsNotificationInfo());
   },
   onConfigUpdated: (config) => {
     broadcast({ type: 'BOT_CONFIG_UPDATED', payload: config });
+    updateTermuxNotification(getBotsNotificationInfo());
   },
   onConfigRemoved: (botId) => {
     broadcast({ type: 'BOT_CONFIG_REMOVED', payload: { botId } });
+    updateTermuxNotification(getBotsNotificationInfo());
   },
 }, initialCreds?.username);
+
+startNotificationTicker(getBotsNotificationInfo);
 
 let activeDiscoveryCode: { userCode: string; verificationUri: string; expiresIn: number } | null = null;
 let lastDiscoveredProfiles: any = null;
@@ -434,11 +454,13 @@ setInterval(sendCloudHeartbeat, 18000);
 
 process.on('SIGINT', () => {
   console.log('\n[VistaAFK Daemon] Stopping all bots and shutting down gracefully...');
+  removeTermuxNotification();
   botManager.stopAll();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
+  removeTermuxNotification();
   botManager.stopAll();
   process.exit(0);
 });

@@ -276,11 +276,32 @@ function parseBedrockForm(packet: any): BotGuiWindow | null {
 function parseMinecraftChat(raw: any): string {
   if (!raw) return 'Unknown reason';
   if (typeof raw === 'string') {
-    try {
-      const parsed = JSON.parse(raw);
-      return parseMinecraftChat(parsed);
-    } catch {
-      return raw;
+    if (raw.trim().startsWith('{') || raw.trim().startsWith('[')) {
+      try {
+        const parsed = JSON.parse(raw);
+        return parseMinecraftChat(parsed);
+      } catch {
+        return raw;
+      }
+    }
+    return raw;
+  }
+  // Check Bedrock rawtext format
+  if (Array.isArray(raw.rawtext)) {
+    let text = '';
+    for (const part of raw.rawtext) {
+      if (typeof part === 'string') {
+        text += part;
+      } else if (part && typeof part === 'object') {
+        if (part.text) text += part.text;
+        else if (part.translate) {
+          text += part.translate;
+          if (Array.isArray(part.with)) text += ' ' + part.with.join(' ');
+        }
+      }
+    }
+    if (text.trim()) {
+      return text.replace(/\n+/g, ' ').trim();
     }
   }
   // Check NBT compound format
@@ -331,27 +352,45 @@ function parseBedrockChatPacket(packet: any, usernameForIdentity?: (xuid: string
     ? packet.parameters.map((value: unknown) => String(value ?? ''))
     : [];
 
-  // Bedrock servers commonly encode player chat as a translation packet rather
-  // than a `chat` packet. Decode those known keys so it appears as player chat
-  // instead of a server/system line containing the untranslated key.
   let sender = source || 'Server';
   let message = rawMessage;
   let translatedPlayerChat = false;
-  if (type === 'translation' && parameters.length >= 2) {
-    if (rawMessage === 'chat.type.text' || rawMessage === 'chat.type.emote') {
+
+  // Bedrock servers often send JSON components (rawtext) in the message field
+  if (rawMessage.startsWith('{') || rawMessage.startsWith('[') || type.startsWith('json')) {
+    try {
+      const extracted = parseMinecraftChat(rawMessage);
+      if (extracted && extracted !== 'Unknown reason') {
+        message = extracted;
+      }
+    } catch (_) {}
+  }
+
+  // Bedrock servers commonly encode player chat as a translation packet
+  if (type === 'translation' && parameters.length > 0) {
+    if ((rawMessage === 'chat.type.text' || rawMessage === 'chat.type.emote') && parameters.length >= 2) {
       sender = parameters[0] || sender;
       message = parameters.slice(1).join(' ');
       translatedPlayerChat = true;
-    } else if (rawMessage === 'commands.message.display.incoming') {
+    } else if (rawMessage === 'commands.message.display.incoming' && parameters.length >= 2) {
       sender = parameters[0] || sender;
       message = `whispers to you: ${parameters.slice(1).join(' ')}`;
       translatedPlayerChat = true;
-    } else if (rawMessage === 'commands.message.display.outgoing') {
+    } else if (rawMessage === 'commands.message.display.outgoing' && parameters.length >= 2) {
       sender = 'You';
       message = `whisper to ${parameters[0]}: ${parameters.slice(1).join(' ')}`;
       translatedPlayerChat = true;
-    } else if (parameters.length) {
-      message = `${rawMessage}: ${parameters.join(' ')}`.trim();
+    } else {
+      let formatted = rawMessage;
+      for (let i = 0; i < parameters.length; i++) {
+        formatted = formatted.replace(new RegExp(`%${i + 1}\\$s|%${i + 1}`, 'g'), parameters[i]);
+        formatted = formatted.replace('%s', parameters[i]);
+      }
+      if (formatted !== rawMessage) {
+        message = formatted;
+      } else {
+        message = `${rawMessage}: ${parameters.join(' ')}`.trim();
+      }
     }
   }
 
@@ -887,6 +926,27 @@ export class BotInstance {
         return writeBedrockPacket(packetName, params);
       };
 
+      // Always accept server resource packs (both initially and on world/server transfer)
+      client.on('resource_packs_info', () => {
+        try {
+          writeBedrockPacket('resource_pack_client_response', {
+            response_status: 'have_all_packs',
+            response_status_name: 'downloadingfinished',
+            resourcepackids: [],
+          });
+        } catch (_) {}
+      });
+
+      client.on('resource_pack_stack', () => {
+        try {
+          writeBedrockPacket('resource_pack_client_response', {
+            response_status: 'completed',
+            response_status_name: 'resourcepackstackfinished',
+            resourcepackids: [],
+          });
+        } catch (_) {}
+      });
+
       // bedrock-protocol emits `session` once Microsoft/Xbox authentication has
       // completed and it is ready to negotiate with the game server. Clearing
       // the device code here prevents a later server/network error from being
@@ -1146,6 +1206,44 @@ export class BotInstance {
         if (!form) return;
         this.bedrockGuiWindow = form;
         this.emitTelemetry();
+
+        // Check if server is prompting to accept/download a resource pack or texture pack
+        const titleAndBody = `${form.title} ${form.formContent || ''}`.toLowerCase();
+        const isResourcePrompt = (
+          (titleAndBody.includes('resource') && titleAndBody.includes('pack')) ||
+          (titleAndBody.includes('texture') && titleAndBody.includes('pack')) ||
+          titleAndBody.includes('server pack') ||
+          Boolean(form.formButtons?.some((b: any) => /accept|download|enable/i.test(b.text)))
+        );
+
+        if (isResourcePrompt) {
+          if (form.formType === 'modal') {
+            this.emitActivity('status', `📦 Automatically accepted Bedrock resource-pack prompt: ${form.title}`);
+            setTimeout(() => this.respondGuiForm(true), 200);
+          } else if (form.formType === 'simple' && form.formButtons && form.formButtons.length > 0) {
+            let targetIdx = form.formButtons.findIndex((b: any) => /accept|download|enable|yes/i.test(b.text));
+            if (targetIdx < 0) {
+              targetIdx = form.formButtons.findIndex((b: any) => !/decline|cancel|no/i.test(b.text));
+            }
+            if (targetIdx < 0) targetIdx = 0;
+            this.emitActivity('status', `📦 Automatically accepted Bedrock resource-pack prompt: ${form.formButtons[targetIdx].text}`);
+            setTimeout(() => this.respondGuiForm(targetIdx), 200);
+          }
+        }
+      });
+
+      client.on('transfer', (packet: any) => {
+        const address = packet?.server_address;
+        const port = Number(packet?.port) || 19132;
+        if (address) {
+          this.emitActivity('status', `🔄 Server transferred bot to ${address}:${port}`);
+          this.config.host = address;
+          this.config.port = port;
+          setTimeout(() => {
+            this.stop();
+            setTimeout(() => this.start(), 800);
+          }, 500);
+        }
       });
 
       client.on('move_player', (packet: any) => {
@@ -1546,7 +1644,7 @@ export class BotInstance {
     (this.bot as any)._client?.on('update_attributes', handleAttrPacket);
 
     // Auto accept resource packs (critical for SMP sub-servers like Lifesteal with custom packs)
-    (this.bot as any).on('resourcePack', (url: string, hash: string) => {
+    const acceptJavaPack = () => {
       try {
         this.bot?.acceptResourcePack();
         this.emitActivity('status', '📦 Accepted server custom resource pack');
@@ -1560,7 +1658,10 @@ export class BotInstance {
       } catch (e) {
         // ignore
       }
-    });
+    };
+    (this.bot as any).on('resourcePack', acceptJavaPack);
+    (this.bot as any)._client?.on('resource_pack_send', acceptJavaPack);
+    (this.bot as any)._client?.on('add_resource_pack', acceptJavaPack);
 
     this.bot.on('respawn', () => {
       this.setupAntiAfk();
