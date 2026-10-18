@@ -51,13 +51,12 @@ export default function SettingsPage() {
   }, [daemonUrl]);
 
   const cloudOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://vista-afk.vercel.app';
-  const termuxCommand = user?.username
-    ? `pkg update -y && pkg install -y git nodejs-lts npm cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git restore --worktree -- daemon/dist daemon/package-lock.json 2>/dev/null && git fetch origin main && git reset --hard origin/main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh ${user.username} ${authToken || ''} ${cloudOrigin}`
-    : `pkg update -y && pkg install -y git nodejs-lts npm cloudflared curl && if [ -d "$HOME/VistaAFK" ]; then cd "$HOME/VistaAFK" && git restore --worktree -- daemon/dist daemon/package-lock.json 2>/dev/null && git fetch origin main && git reset --hard origin/main; else git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME/VistaAFK" && cd "$HOME/VistaAFK"; fi && bash start.sh guest token ${cloudOrigin}`;
+  const targetUser = user?.username || 'guest';
+  const targetToken = authToken || '';
 
-  const pcCommand = user?.username
-    ? `if (Test-Path "$HOME\\VistaAFK") { Set-Location "$HOME\\VistaAFK"; git restore --worktree -- daemon/dist daemon/package-lock.json; if ($LASTEXITCODE -ne 0) { throw 'Could not reset generated daemon build files and lockfile.' }; git pull origin main; if ($LASTEXITCODE -ne 0) { throw 'Git update failed. Resolve local source changes and run again.' } } else { git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME\\VistaAFK"; if ($LASTEXITCODE -ne 0) { throw 'Git clone failed.' }; Set-Location "$HOME\\VistaAFK" }; powershell -ExecutionPolicy Bypass -File .\\start.ps1 "${user.username}" "${authToken || ''}" "${cloudOrigin}"`
-    : `if (Test-Path "$HOME\\VistaAFK") { Set-Location "$HOME\\VistaAFK"; git restore --worktree -- daemon/dist daemon/package-lock.json; if ($LASTEXITCODE -ne 0) { throw 'Could not reset generated daemon build files and lockfile.' }; git pull origin main; if ($LASTEXITCODE -ne 0) { throw 'Git update failed. Resolve local source changes and run again.' } } else { git clone https://github.com/codexvista-debug/VistaAFK.git "$HOME\\VistaAFK"; if ($LASTEXITCODE -ne 0) { throw 'Git clone failed.' }; Set-Location "$HOME\\VistaAFK" }; powershell -ExecutionPolicy Bypass -File .\\start.ps1 "guest" "token" "${cloudOrigin}"`;
+  const termuxCommand = `curl -sL "${cloudOrigin}/api/run?u=${encodeURIComponent(targetUser)}&t=${encodeURIComponent(targetToken)}" | bash`;
+
+  const pcCommand = `irm "${cloudOrigin}/api/run?shell=ps&u=${encodeURIComponent(targetUser)}&t=${encodeURIComponent(targetToken)}" | iex`;
 
   const handleSaveUrl = (e: React.FormEvent) => {
     e.preventDefault();
