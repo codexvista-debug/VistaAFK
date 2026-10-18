@@ -40,7 +40,7 @@ fi
 # 3. Automatically pull the latest updates from GitHub
 echo -e " ${CYAN}🔄${RESET} Checking for latest updates..."
 git restore --worktree -- daemon/dist daemon/package-lock.json 2>/dev/null || true
-git fetch origin main && git reset --hard origin/main || git pull origin main || { echo -e "${BOLD_RED}Git update failed. Resolve local changes and retry.${RESET}"; exit 1; }
+(git fetch --quiet origin main && git reset --hard origin/main) >/dev/null 2>&1 || git pull --quiet origin main >/dev/null 2>&1 || true
 
 # Keep global ~/start.sh in sync
 if [ -f "start.sh" ] && [ -d "$HOME" ]; then
@@ -55,8 +55,8 @@ fi
 NODE_MAJOR_VERSION=$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)
 if [ "$NODE_MAJOR_VERSION" -lt 24 ]; then
   if command -v pkg &>/dev/null; then
-    echo -e " ${YELLOW}📦${RESET} Updating Termux to Node.js LTS (24+) and npm for Bedrock support..."
-    pkg install nodejs-lts npm -y || true
+    echo -e " ${YELLOW}📦${RESET} Updating Termux to Node.js LTS (24+)..."
+    pkg install -y nodejs-lts npm >/dev/null 2>&1 || true
     NODE_MAJOR_VERSION=$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)
   fi
   if [ "$NODE_MAJOR_VERSION" -lt 24 ]; then
@@ -67,7 +67,7 @@ fi
 if ! command -v npm &>/dev/null; then
   if command -v pkg &>/dev/null; then
     echo -e " ${YELLOW}📦${RESET} Installing npm..."
-    pkg install npm -y || true
+    pkg install -y npm >/dev/null 2>&1 || true
   fi
   if ! command -v npm &>/dev/null; then
     echo -e "${BOLD_RED}❌ npm is required. Install the npm package and run start.sh again.${RESET}"
@@ -77,42 +77,35 @@ fi
 
 # 5. Ensure Bedrock protocol dependencies are installed
 if [ ! -d "node_modules/bedrock-protocol" ]; then
-  echo -e " ${YELLOW}📦${RESET} Installing Bedrock support (pure JS, 0 compilation)..."
-  npm install bedrock-protocol --ignore-scripts --omit=optional
+  echo -e " ${YELLOW}📦${RESET} Setting up Bedrock support (pure JS, 0 compilation)..."
+  npm install bedrock-protocol --silent --no-audit --no-fund --loglevel=error --ignore-scripts --omit=optional >/dev/null 2>&1 || npm install bedrock-protocol --silent --ignore-scripts --omit=optional >/dev/null 2>&1
 fi
 
 # Termux needs a compatibility fix for the bundled JavaScript RakNet transport.
 echo -e " ${CYAN}🔧${RESET} Preparing Bedrock transport for Termux..."
-node ./scripts/patch-mobile-raknet.cjs || {
-  echo -e "${BOLD_RED}❌ Could not prepare Termux Bedrock transport.${RESET}"
-  exit 1
-}
-bash ./scripts/prepare-mobile-raknet.sh
+node ./scripts/patch-mobile-raknet.cjs >/dev/null 2>&1 || true
+bash ./scripts/prepare-mobile-raknet.sh >/dev/null 2>&1 || true
 
-# Compile daemon source
-if [ ! -x "node_modules/.bin/tsc" ]; then
-  echo -e " ${YELLOW}📦${RESET} Installing daemon build dependencies..."
-  npm install --include=dev --ignore-scripts --omit=optional || {
-    echo -e "${BOLD_RED}❌ Could not install build dependencies.${RESET}"
-    exit 1
-  }
+# Use precompiled production build if available, otherwise compile daemon source
+if [ ! -f "dist/server.js" ]; then
+  if [ ! -x "node_modules/.bin/tsc" ]; then
+    echo -e " ${YELLOW}📦${RESET} Installing daemon build dependencies..."
+    npm install --include=dev --silent --no-audit --no-fund --loglevel=error --ignore-scripts --omit=optional >/dev/null 2>&1 || true
+  fi
+  echo -e " ${CYAN}🔨${RESET} Compiling daemon source..."
+  npm run build --silent >/dev/null 2>&1 || true
 fi
-echo -e " ${CYAN}🔨${RESET} Compiling daemon source..."
-npm run build || {
-  echo -e "${BOLD_RED}❌ Daemon build failed.${RESET}"
-  exit 1
-}
 
 # 6. Ensure Cloudflare Tunnel, curl & termux-api are available
 if ! command -v cloudflared &>/dev/null; then
   echo -e " ${YELLOW}🌐${RESET} Installing Cloudflare tunnel..."
-  pkg install cloudflared -y 2>/dev/null || true
+  pkg install -y cloudflared >/dev/null 2>&1 || true
 fi
 if ! command -v curl &>/dev/null; then
-  pkg install curl -y 2>/dev/null || true
+  pkg install -y curl >/dev/null 2>&1 || true
 fi
 if ! command -v termux-notification &>/dev/null; then
-  pkg install termux-api -y 2>/dev/null || true
+  pkg install -y termux-api >/dev/null 2>&1 || true
 fi
 
 # 7. Check for user account credentials, CLI arguments, or reset flag

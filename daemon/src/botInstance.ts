@@ -926,25 +926,9 @@ export class BotInstance {
         return writeBedrockPacket(packetName, params);
       };
 
-      // Always accept server resource packs (both initially and on world/server transfer)
+      // Reset pack state on new pack offers (e.g. world or server transfer)
       client.on('resource_packs_info', () => {
-        try {
-          writeBedrockPacket('resource_pack_client_response', {
-            response_status: 'have_all_packs',
-            response_status_name: 'downloadingfinished',
-            resourcepackids: [],
-          });
-        } catch (_) {}
-      });
-
-      client.on('resource_pack_stack', () => {
-        try {
-          writeBedrockPacket('resource_pack_client_response', {
-            response_status: 'completed',
-            response_status_name: 'resourcepackstackfinished',
-            resourcepackids: [],
-          });
-        } catch (_) {}
+        initialPackOfferHandled = false;
       });
 
       // bedrock-protocol emits `session` once Microsoft/Xbox authentication has

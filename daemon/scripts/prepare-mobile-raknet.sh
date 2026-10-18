@@ -11,13 +11,17 @@ case "${PREFIX:-}" in
 esac
 
 if node -e "require('raknet-native')" >/dev/null 2>&1; then
-  echo "✅ Native RakNet binding is ready for Termux."
   exit 0
 fi
 
-echo "📦 Preparing the native RakNet backend used by the PC daemon..."
+# Mobile Termux uses the pure JavaScript JSP RakNet engine by default.
+# It requires 0 native C++ compilation, installs in seconds, and doesn't download 200MB+ clang/cmake tools.
+if [ "${VISTAAFK_BUILD_NATIVE:-false}" != "true" ]; then
+  exit 0
+fi
+
+echo "📦 Preparing native RakNet backend for Termux..."
 if ! command -v pkg >/dev/null 2>&1; then
-  echo "⚠️ Termux package manager is unavailable; the daemon will use the JSP RakNet fallback."
   exit 0
 fi
 
