@@ -504,7 +504,7 @@ export const BotCard: React.FC<BotCardProps> = ({
                   ) : (
                     logs.slice(-50).map((msg, idx) => (
                       <div key={msg.timestamp ? `${msg.timestamp}-${idx}` : idx} className="pt-0.5 first:pt-0">
-                        <MinecraftChatMessage message={msg} showTimestamp={true} compact={true} />
+                        <MinecraftChatMessage message={msg} showTimestamp={true} compact={true} currentBotName={config.name} />
                       </div>
                     ))
                   )}

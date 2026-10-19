@@ -318,7 +318,7 @@ function ChatContent() {
               </div>
             ) : (
               filteredLogs.map((msg, idx) => (
-                <MinecraftChatMessage key={idx} message={msg} />
+                <MinecraftChatMessage key={idx} message={msg} currentBotName={currentConfig?.name} />
               ))
             )}
             <div ref={messagesEndRef} />

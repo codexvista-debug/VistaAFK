@@ -366,8 +366,8 @@ function parseBedrockChatPacket(packet: any, usernameForIdentity?: (xuid: string
     } catch (_) {}
   }
 
-  // Bedrock servers commonly encode player chat as a translation packet
-  if (type === 'translation' && parameters.length > 0) {
+  // Bedrock servers commonly encode player chat or popups with translation/parameter arrays
+  if (parameters.length > 0) {
     if ((rawMessage === 'chat.type.text' || rawMessage === 'chat.type.emote') && parameters.length >= 2) {
       sender = parameters[0] || sender;
       message = parameters.slice(1).join(' ');
@@ -388,14 +388,18 @@ function parseBedrockChatPacket(packet: any, usernameForIdentity?: (xuid: string
       }
       if (formatted !== rawMessage) {
         message = formatted;
-      } else {
+      } else if (rawMessage) {
         message = `${rawMessage}: ${parameters.join(' ')}`.trim();
+      } else {
+        message = parameters.join(' ').trim();
       }
     }
   }
 
   // Preserve the actual chat text for regular Bedrock chat/whisper packets.
-  let isPlayerChat = translatedPlayerChat || type === 'chat' || type === 'whisper' || type === 'announcement' || Boolean(xuid);
+  const isPopupOrTip = type === 'popup' || type === 'tip' || type === 'jukebox_popup';
+  let isPlayerChat = !isPopupOrTip && (translatedPlayerChat || type === 'chat' || type === 'whisper' || type === 'announcement' || Boolean(xuid));
+  if (isPopupOrTip && (!sender || sender === source)) sender = 'Server';
   if (!message && parameters.length) message = parameters.join(' ');
   if (!message) message = ' '; // Keep an otherwise valid empty chat event visible.
 
@@ -568,6 +572,30 @@ export class BotInstance {
   private bedrockGuiRequestId = 0;
   private tokenFolder: string;
   private afkRewardsAvailable: number = 0;
+  private recentSentMessages: Array<{ text: string; time: number }> = [];
+
+  private recordSentChatMessage(text: string) {
+    const clean = cleanBedrockFormatting(text).trim().toLowerCase();
+    if (!clean) return;
+    const now = Date.now();
+    this.recentSentMessages = this.recentSentMessages.filter(m => now - m.time < 5000);
+    this.recentSentMessages.push({ text: clean, time: now });
+  }
+
+  private isDuplicateSentMessage(sender: string, message: string): boolean {
+    const clean = cleanBedrockFormatting(message).trim().toLowerCase();
+    const cleanSender = cleanBedrockFormatting(sender).trim().toLowerCase();
+    const myName = (this.config.name || '').trim().toLowerCase();
+    if (!clean || (cleanSender !== myName && cleanSender !== 'you')) return false;
+    const now = Date.now();
+    this.recentSentMessages = this.recentSentMessages.filter(m => now - m.time < 5000);
+    const index = this.recentSentMessages.findIndex(m => m.text === clean);
+    if (index >= 0) {
+      this.recentSentMessages.splice(index, 1);
+      return true;
+    }
+    return false;
+  }
 
   constructor(config: BotConfig, callbacks: BotInstanceCallbacks, tokenFolder?: string) {
     this.config = config;
@@ -1258,6 +1286,9 @@ export class BotInstance {
           (xuid ? this.bedrockXuidToUsername.get(xuid) : undefined)
           || (platformChatId ? this.bedrockPlatformChatIdToUsername.get(platformChatId) : undefined)
         );
+        if (!parsed.isSystem && this.isDuplicateSentMessage(parsed.sender, parsed.message)) {
+          return;
+        }
         this.bedrockChatPacketStats.text++;
         if (parsed.isSystem) this.bedrockChatPacketStats.system++;
         else this.bedrockChatPacketStats.player++;
@@ -1274,8 +1305,18 @@ export class BotInstance {
           for (const msgObj of messages) {
             let msgText = typeof msgObj?.message === 'string' ? msgObj.message : '';
             const params = Array.isArray(msgObj?.parameters) ? msgObj.parameters : [];
+            if (msgText.trim().startsWith('{') || msgText.trim().startsWith('[')) {
+              try {
+                const extracted = parseMinecraftChat(msgText);
+                if (extracted && extracted !== 'Unknown reason') msgText = extracted;
+              } catch (_) {}
+            }
             for (let i = 0; i < params.length; i++) {
-              msgText = msgText.replace(`%${i + 1}`, String(params[i]));
+              msgText = msgText.replace(new RegExp(`%${i + 1}\\$s|%${i + 1}`, 'g'), String(params[i]));
+              msgText = msgText.replace('%s', String(params[i]));
+            }
+            if (params.length > 0 && !msgText.includes(String(params[0]))) {
+              msgText = `${msgText} ${params.join(' ')}`.trim();
             }
             const clean = cleanBedrockFormatting(msgText);
             if (clean) {
@@ -1294,8 +1335,24 @@ export class BotInstance {
 
       client.on('set_title', (packet: any) => {
         try {
-          const text = packet?.text ? cleanBedrockFormatting(String(packet.text)) : '';
-          if (text && (packet.type === 'action_bar' || packet.type === 'title' || packet.type === 'subtitle')) {
+          const type = String(packet?.type ?? '');
+          const isTitleOrActionbar = (
+            type.includes('action_bar') ||
+            type.includes('title') ||
+            type.includes('subtitle') ||
+            type === '2' || type === '3' || type === '4' || type === '6' || type === '7' || type === '8'
+          );
+          if (!isTitleOrActionbar) return;
+
+          let rawText = typeof packet?.text === 'string' ? packet.text : '';
+          if (rawText.trim().startsWith('{') || rawText.trim().startsWith('[')) {
+            try {
+              const extracted = parseMinecraftChat(rawText);
+              if (extracted && extracted !== 'Unknown reason') rawText = extracted;
+            } catch (_) {}
+          }
+          const text = cleanBedrockFormatting(rawText);
+          if (text) {
             this.callbacks.onChatMessage({
               botId: this.config.id,
               timestamp: Date.now(),
@@ -1303,6 +1360,45 @@ export class BotInstance {
               message: text,
               isSystem: true,
             });
+          }
+        } catch (_) {}
+      });
+
+      client.on('toast_request', (packet: any) => {
+        try {
+          const rawTitle = typeof packet?.title === 'string' ? packet.title : '';
+          const rawMsg = typeof packet?.message === 'string' ? packet.message : '';
+          const title = cleanBedrockFormatting(rawTitle.trim().startsWith('{') ? parseMinecraftChat(rawTitle) : rawTitle);
+          const msg = cleanBedrockFormatting(rawMsg.trim().startsWith('{') ? parseMinecraftChat(rawMsg) : rawMsg);
+          const text = title && msg ? `${title}: ${msg}` : (msg || title);
+          if (text) {
+            this.callbacks.onChatMessage({
+              botId: this.config.id,
+              timestamp: Date.now(),
+              sender: 'Server',
+              message: text,
+              isSystem: true,
+            });
+          }
+        } catch (_) {}
+      });
+
+      client.on('boss_event', (packet: any) => {
+        try {
+          const type = String(packet?.type ?? '');
+          if (type === 'show_bar' || type === 'set_bar_title' || type === '0' || type === '5') {
+            const rawTitle = typeof packet?.title === 'string' ? packet.title : '';
+            if (!rawTitle) return;
+            const title = cleanBedrockFormatting(rawTitle.trim().startsWith('{') ? parseMinecraftChat(rawTitle) : rawTitle);
+            if (title && (/teleport|countdown|afk|warp|seconds|in \d/i.test(title))) {
+              this.callbacks.onChatMessage({
+                botId: this.config.id,
+                timestamp: Date.now(),
+                sender: 'Server',
+                message: title,
+                isSystem: true,
+              });
+            }
           }
         } catch (_) {}
       });
@@ -1451,6 +1547,14 @@ export class BotInstance {
             filtered_message: '',
           });
           this.emitActivity('chat', `💬 Sent chat: "${message}"`);
+          this.recordSentChatMessage(message);
+          this.callbacks.onChatMessage({
+            botId: this.config.id,
+            timestamp: Date.now(),
+            sender: this.config.name,
+            message,
+            isSystem: false,
+          });
         }
         if (message.startsWith('/')) {
           this.callbacks.onChatMessage({
@@ -1477,8 +1581,23 @@ export class BotInstance {
       if (message.startsWith('/')) {
         this.emitActivity('command', `⚡ Executed command: ${message}`);
         this.sendDiscordAlert(`⚡ **${this.config.name}** typed command: \`${message}\``);
+        this.callbacks.onChatMessage({
+          botId: this.config.id,
+          timestamp: Date.now(),
+          sender: 'VistaAFK',
+          message: `⚡ Sent command: ${message}`,
+          isSystem: true,
+        });
       } else {
         this.emitActivity('chat', `💬 Sent chat: "${message}"`);
+        this.recordSentChatMessage(message);
+        this.callbacks.onChatMessage({
+          botId: this.config.id,
+          timestamp: Date.now(),
+          sender: this.config.name,
+          message,
+          isSystem: false,
+        });
       }
     } catch (err: any) {
       this.callbacks.onNotification('error', `Failed to send chat: ${err.message}`, this.config.id);
@@ -1498,6 +1617,38 @@ export class BotInstance {
       this.emitTelemetry();
     });
     this.bot.on('windowClose', () => this.emitTelemetry());
+
+    this.bot.on('actionBar' as any, (jsonMsg: any) => {
+      try {
+        const raw = typeof jsonMsg === 'string' ? jsonMsg : (jsonMsg?.toString?.() || parseMinecraftChat(jsonMsg));
+        const text = cleanBedrockFormatting(raw);
+        if (text) {
+          this.callbacks.onChatMessage({
+            botId: this.config.id,
+            timestamp: Date.now(),
+            sender: 'Server',
+            message: text,
+            isSystem: true,
+          });
+        }
+      } catch (_) {}
+    });
+
+    this.bot.on('title' as any, (text: any) => {
+      try {
+        const raw = typeof text === 'string' ? text : (text?.toString?.() || '');
+        const clean = cleanBedrockFormatting(raw);
+        if (clean) {
+          this.callbacks.onChatMessage({
+            botId: this.config.id,
+            timestamp: Date.now(),
+            sender: 'Server',
+            message: clean,
+            isSystem: true,
+          });
+        }
+      } catch (_) {}
+    });
 
     this.bot.once('spawn', () => {
       if (this.bot?.username && this.bot.username !== this.config.name) {
@@ -1531,6 +1682,7 @@ export class BotInstance {
     });
 
     this.bot.on('chat', (username: string, message: string) => {
+      if (this.isDuplicateSentMessage(username, message)) return;
       if (username === this.bot?.username) return;
 
       const cleanMsg = message.trim();

@@ -151,7 +151,7 @@ export const LiveChatTerminal: React.FC<LiveChatTerminalProps> = ({
             </div>
           ) : (
             filteredLogs.map((msg, idx) => (
-              <MinecraftChatMessage key={idx} message={msg} />
+              <MinecraftChatMessage key={idx} message={msg} currentBotName={botConfig.name} />
             ))
           )}
           <div ref={messagesEndRef} />

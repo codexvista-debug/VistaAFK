@@ -7,6 +7,7 @@ interface MinecraftChatMessageProps {
   message: ChatMessage;
   showTimestamp?: boolean;
   compact?: boolean;
+  currentBotName?: string;
 }
 
 // Light-mode optimized high-contrast Minecraft Rank colors
@@ -133,6 +134,7 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   message,
   showTimestamp = true,
   compact = false,
+  currentBotName,
 }) => {
   let rawText = message.message || '';
 
@@ -140,6 +142,10 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
   rawText = rawText.replace(/[\uFFFD\u25C6\u25C7]/g, '').trim();
   const cleanText = stripMinecraftFormatting(rawText);
   const cleanSender = stripMinecraftFormatting(message.sender || '');
+  const isMe = Boolean(
+    cleanSender.toLowerCase() === 'you' ||
+    (currentBotName && cleanSender.toLowerCase() === currentBotName.toLowerCase())
+  );
 
   // Compact timestamp for mobile screens (e.g. 02:06) vs full seconds on desktop (02:06:44)
   const date = new Date(message.timestamp);
@@ -214,6 +220,7 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
           {/* Gamertag */}
           <span className="font-bold text-slate-900 mr-1 tracking-tight">
             {username}
+            {isMe && <span className="ml-1 text-[9px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.2 rounded border border-emerald-300 font-mono">YOU</span>}
           </span>
 
           {/* Separator */}
@@ -267,7 +274,10 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
           >
             {rank}
           </span>
-          <span className="mr-1 font-bold text-slate-900 tracking-tight">{cleanSender}</span>
+          <span className="mr-1 font-bold text-slate-900 tracking-tight">
+            {cleanSender}
+            {isMe && <span className="ml-1 text-[9px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.2 rounded border border-emerald-300 font-mono">YOU</span>}
+          </span>
           <span className="text-slate-400 mr-1.5 font-bold select-none text-[10px]">▶</span>
           <span className="font-medium text-slate-800">
             {parseLightMinecraftColorCodes(rankPrefixMatch[2])}
@@ -338,21 +348,23 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
     );
   }
 
-  // 5. Vault & Teleport Actions (Amber/Gold)
-  const isVault = /Successfully (?:opened|closed) vault|teleported|warp/i.test(cleanText);
-  if (isVault) {
+  // 5. Teleport, Warp, Countdown & Vault Actions (Amber styling with teleport / box icon)
+  const isTeleportOrCountdown = /teleport(?:ing|ed)?|being teleported|warp|in \d+\s*(?:s|sec|seconds?)|don't move/i.test(cleanText);
+  const isVault = /Successfully (?:opened|closed) vault/i.test(cleanText);
+  if (isTeleportOrCountdown || isVault) {
+    const icon = isTeleportOrCountdown ? '🌀' : '📦';
     return (
-      <div className="min-w-0 max-w-full flex items-start gap-1.5 py-1 px-1.5 sm:px-2 hover:bg-amber-50/70 rounded-lg transition-colors text-amber-800 bg-amber-50/35 border border-amber-100/80">
+      <div className="min-w-0 max-w-full flex items-start gap-1.5 py-1 px-1.5 sm:px-2 hover:bg-amber-50/70 rounded-lg transition-colors text-amber-900 bg-amber-50/45 border border-amber-200/80 shadow-2xs">
         {showTimestamp && (
           <time
-            className="text-[9.5px] sm:text-[10px] text-amber-500/70 font-mono shrink-0 select-none pt-0.5 leading-none tabular-nums"
+            className="text-[9.5px] sm:text-[10px] text-amber-600/70 font-mono shrink-0 select-none pt-0.5 leading-none tabular-nums"
             title={timeFull}
           >
             <span className="sm:hidden">{timeShort}</span>
             <span className="hidden sm:inline">{timeFull}</span>
           </time>
         )}
-        <span className="mr-0.5 select-none text-[11px] leading-tight">📦</span>
+        <span className="mr-0.5 select-none text-[12px] leading-tight">{icon}</span>
         <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text font-sans text-xs font-semibold leading-relaxed">
           {cleanText}
         </span>
@@ -398,7 +410,10 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
         )}
         <div className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text text-xs leading-relaxed font-sans">
           {showPlayerSender && (
-            <span className="mr-1.5 font-bold text-sky-700 font-sans">&lt;{cleanSender}&gt;</span>
+            <span className="mr-1.5 font-bold text-sky-700 font-sans">
+              &lt;{cleanSender}&gt;
+              {isMe && <span className="ml-1 text-[9px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.2 rounded border border-emerald-300 font-mono">YOU</span>}
+            </span>
           )}
           {parseLightMinecraftColorCodes(rawText)}
         </div>
@@ -425,6 +440,7 @@ export const MinecraftChatMessage: React.FC<MinecraftChatMessageProps> = ({
         {message.sender && (
           <span className="font-bold mr-1.5 font-sans" style={{ color: senderColor }}>
             {message.isSystem ? `[${message.sender}]` : `<${message.sender}>`}
+            {isMe && <span className="ml-1 text-[9px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.2 rounded border border-emerald-300 font-mono">YOU</span>}
           </span>
         )}
         <span className="font-medium text-slate-800">{cleanText}</span>
