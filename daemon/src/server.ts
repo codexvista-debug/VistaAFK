@@ -139,6 +139,9 @@ let lastDiscoveredProfiles: any = null;
 let lastDiscoveryTimestamp = 0;
 
 wss.on('connection', (ws) => {
+  try {
+    (ws as any)._socket?.setNoDelay(true);
+  } catch (_) {}
   clients.add(ws);
   let authenticated = !SECRET; // If no secret configured, allow right away
 

@@ -812,9 +812,30 @@ export class BotInstance {
         }
       }
 
+      if (!client._encryptedImmediatePatched) {
+        client._encryptedImmediatePatched = true;
+        const origOnEncrypted = client.onEncryptedPacket;
+        if (typeof origOnEncrypted === 'function') {
+          client.onEncryptedPacket = (buf: any) => {
+            const packet = client.batchHeader ? Buffer.concat([Buffer.from([client.batchHeader]), buf]) : buf;
+            client.sendMCPE(packet, true);
+          };
+          if (client.cipher) {
+            client.cipher.removeListener('data', origOnEncrypted);
+            client.cipher.on('data', client.onEncryptedPacket);
+          }
+        }
+      }
+
       const conn = client.connection;
       if (conn && !conn._immediateSendReliablePatched) {
         conn._immediateSendReliablePatched = true;
+        if (typeof conn.sendReliable === 'function') {
+          const origSend = conn.sendReliable.bind(conn);
+          conn.sendReliable = (buffer: any, immediate?: boolean) => {
+            return origSend(buffer, true);
+          };
+        }
         if (typeof conn.plainSendReliable === 'function') {
           const origPlain = conn.plainSendReliable.bind(conn);
           conn.plainSendReliable = (buffer: any, immediate?: boolean) => {
@@ -822,7 +843,6 @@ export class BotInstance {
             try { conn.raknet?.connection?.sendQueue(); } catch (_) {}
             return res;
           };
-          conn.sendReliable = conn.plainSendReliable;
         }
       }
 
@@ -1613,8 +1633,15 @@ export class BotInstance {
       try {
         this.applyBedrockRaknetFastPath(this.bedrockClient);
         if (message.startsWith('/')) {
+          let playerEid: bigint = 0n;
+          try {
+            const rawEid = (this.bedrockClient as any).startGameData?.runtime_entity_id ?? (this.bedrockClient as any).entityId;
+            if (rawEid !== undefined && rawEid !== null) {
+              playerEid = typeof rawEid === 'bigint' ? rawEid : BigInt(rawEid);
+            }
+          } catch (_) {}
+
           const uuid = randomUUID();
-          const playerEid = (this.bedrockClient as any).entityId ?? (this.bedrockClient as any).startGameData?.runtime_entity_id ?? 0n;
           const commandOrigin: Record<string, unknown> = {
             type: 'player',
             uuid,
@@ -1623,7 +1650,7 @@ export class BotInstance {
           const isModernCommandProtocol = this.bedrockClient.versionGreaterThanOrEqualTo('1.21.130');
           const hasCommandVersion = this.bedrockClient.versionGreaterThanOrEqualTo('1.19.62');
           if (isModernCommandProtocol) {
-            commandOrigin.player_entity_id = typeof playerEid === 'bigint' ? playerEid : BigInt(playerEid);
+            commandOrigin.player_entity_id = playerEid;
           }
 
           const commandRequest: Record<string, unknown> = {
