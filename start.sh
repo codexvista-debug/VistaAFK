@@ -77,14 +77,14 @@ fi
 
 # 5. Ensure Bedrock protocol dependencies are installed
 if [ ! -d "node_modules/bedrock-protocol" ]; then
-  echo -e " ${YELLOW}📦${RESET} Setting up Bedrock support (pure JS, 0 compilation)..."
+  echo -e " ${YELLOW}📦${RESET} Setting up Bedrock support..."
   npm install bedrock-protocol --silent --no-audit --no-fund --loglevel=error --ignore-scripts --omit=optional >/dev/null 2>&1 || npm install bedrock-protocol --silent --ignore-scripts --omit=optional >/dev/null 2>&1
 fi
 
-# Termux needs a compatibility fix for the bundled JavaScript RakNet transport.
+# Termux Bedrock transport setup (native RakNet with full FreshSMP/Bedrock protocol support)
 echo -e " ${CYAN}🔧${RESET} Preparing Bedrock transport for Termux..."
 node ./scripts/patch-mobile-raknet.cjs >/dev/null 2>&1 || true
-bash ./scripts/prepare-mobile-raknet.sh >/dev/null 2>&1 || true
+bash ./scripts/prepare-mobile-raknet.sh || true
 
 # Use precompiled production build if available, otherwise compile daemon source
 if [ ! -f "dist/server.js" ]; then

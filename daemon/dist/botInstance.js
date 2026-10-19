@@ -873,6 +873,15 @@ class BotInstance {
             port = 19132;
         }
         this.emitActivity('connect', `Connecting to Bedrock server ${host}:${port}...`);
+        // Pre-resolve hostname to IPv4 address to avoid mobile UDP socket DNS lookup delays/failures
+        try {
+            const dns = (eval('require'))('dns').promises;
+            const lookupRes = await dns.lookup(host, { family: 4 });
+            if (lookupRes?.address) {
+                host = lookupRes.address;
+            }
+        }
+        catch (_) { }
         const tokenFolder = this.tokenFolder;
         try {
             let bedrock = null;

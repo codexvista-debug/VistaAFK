@@ -11,16 +11,18 @@ case "${PREFIX:-}" in
 esac
 
 if node -e "require('raknet-native')" >/dev/null 2>&1; then
+  echo "✅ Native RakNet backend is ready for Termux."
   exit 0
 fi
 
-# Mobile Termux uses the pure JavaScript JSP RakNet engine by default.
-# It requires 0 native C++ compilation, installs in seconds, and doesn't download 200MB+ clang/cmake tools.
-if [ "${VISTAAFK_BUILD_NATIVE:-false}" != "true" ]; then
+# Native RakNet backend provides full RakNet 11 + security cookie + MTU negotiation support for Bedrock servers (e.g. FreshSMP, DonutSMP).
+# Enabled by default on Termux; set VISTAAFK_BUILD_NATIVE=false to opt out.
+if [ "${VISTAAFK_BUILD_NATIVE:-true}" = "false" ]; then
+  echo "ℹ️ VISTAAFK_BUILD_NATIVE is false; using pure JavaScript RakNet fallback."
   exit 0
 fi
 
-echo "📦 Preparing native RakNet backend for Termux..."
+echo "📦 Preparing native RakNet backend for Termux (one-time build for FreshSMP/Bedrock)..."
 if ! command -v pkg >/dev/null 2>&1; then
   exit 0
 fi
@@ -33,6 +35,7 @@ pkg install -y cmake clang make git || {
 # The daemon installs dependencies with lifecycle scripts disabled for Android.
 # Install the native package if a lockfile/install variation left it out.
 if [ ! -f "node_modules/raknet-native/buildChecks.js" ]; then
+  echo "📦 Installing raknet-native package..."
   npm install --no-save --package-lock=false --ignore-scripts raknet-native@1.2.3 || {
     echo "⚠️ Could not install raknet-native; the daemon will use the JSP RakNet fallback."
     exit 0
@@ -49,30 +52,45 @@ node ./scripts/patch-termux-node-addon-api.cjs || {
   exit 0
 }
 
+CMAKE_JS_BIN=""
 if [ -f "node_modules/cmake-js/bin/cmake-js" ]; then
   CMAKE_JS_BIN="$PWD/node_modules/cmake-js/bin/cmake-js"
 elif [ -f "node_modules/raknet-native/node_modules/cmake-js/bin/cmake-js" ]; then
   CMAKE_JS_BIN="$PWD/node_modules/raknet-native/node_modules/cmake-js/bin/cmake-js"
-else
+elif command -v cmake-js >/dev/null 2>&1; then
+  CMAKE_JS_BIN="$(command -v cmake-js)"
+fi
+
+if [ -z "$CMAKE_JS_BIN" ]; then
+  echo "📦 Installing cmake-js build helper..."
+  npm install --no-save --package-lock=false cmake-js >/dev/null 2>&1 || true
+  if [ -f "node_modules/cmake-js/bin/cmake-js" ]; then
+    CMAKE_JS_BIN="$PWD/node_modules/cmake-js/bin/cmake-js"
+  fi
+fi
+
+if [ -z "$CMAKE_JS_BIN" ]; then
   echo "⚠️ cmake-js is unavailable; the daemon will use the JSP RakNet fallback."
   exit 0
 fi
 
 if [ ! -d "node_modules/raknet-native/raknet/Source" ]; then
   echo "📥 Fetching RakNet native source for the Android build..."
+  rm -rf node_modules/raknet-native/raknet 2>/dev/null || true
   git clone --depth 1 https://github.com/extremeheat/fb-raknet node_modules/raknet-native/raknet || {
     echo "⚠️ Could not fetch RakNet native source; the daemon will use the JSP RakNet fallback."
     exit 0
   }
 fi
 
+echo "⚙️ Compiling native RakNet for Termux..."
 (cd node_modules/raknet-native && node "$CMAKE_JS_BIN" compile) || {
   echo "⚠️ Native RakNet build failed; the daemon will use the JSP RakNet fallback."
   exit 0
 }
 
 if node -e "require('raknet-native')" >/dev/null 2>&1; then
-  echo "✅ Native RakNet compiled and is ready for Termux."
+  echo "✅ Native RakNet compiled successfully and is ready for Termux."
 else
   echo "⚠️ Native RakNet did not load after compilation; the daemon will use the JSP RakNet fallback."
 fi

@@ -1,12 +1,13 @@
 const fs = require('node:fs')
 const path = require('node:path')
 
-const packageDir = path.resolve(__dirname, '..', 'node_modules/node-addon-api')
-const headerPath = path.join(packageDir, 'napi.h')
-const inlinePath = path.join(packageDir, 'napi-inl.h')
+const candidateDirs = [
+  path.resolve(__dirname, '..', 'node_modules/node-addon-api'),
+  path.resolve(__dirname, '..', 'node_modules/raknet-native/node_modules/node-addon-api')
+].filter(dir => fs.existsSync(path.join(dir, 'napi.h')) && fs.existsSync(path.join(dir, 'napi-inl.h')))
 
-if (!fs.existsSync(headerPath) || !fs.existsSync(inlinePath)) {
-  throw new Error(`node-addon-api headers are missing from ${packageDir}`)
+if (candidateDirs.length === 0) {
+  throw new Error('node-addon-api headers are missing from node_modules')
 }
 
 function replaceOnce(filePath, before, after, label) {
@@ -22,12 +23,16 @@ function replaceOnce(filePath, before, after, label) {
 }
 
 const changed = []
-if (replaceOnce(
-  headerPath,
-  '    static const napi_typedarray_type unknown_array_type = static_cast<napi_typedarray_type>(-1);',
-  '    // Termux-safe: avoid an out-of-range enum constant rejected by Clang.',
-  'invalid enum sentinel removal'
-)) changed.push('napi.h sentinel')
+for (const packageDir of candidateDirs) {
+  const headerPath = path.join(packageDir, 'napi.h')
+  const inlinePath = path.join(packageDir, 'napi-inl.h')
+
+  if (replaceOnce(
+    headerPath,
+    '    static const napi_typedarray_type unknown_array_type = static_cast<napi_typedarray_type>(-1);',
+    '    // Termux-safe: avoid an out-of-range enum constant rejected by Clang.',
+    'invalid enum sentinel removal'
+  )) changed.push(`${path.basename(path.dirname(packageDir))}/napi.h sentinel`)
 
 if (replaceOnce(
   headerPath,
@@ -90,9 +95,9 @@ inline napi_typedarray_type TypedArray::TypedArrayType() const {
   'TypedArray metadata initialization'
 )) changed.push('napi-inl.h initialization')
 
-if (replaceOnce(
-  inlinePath,
-  `inline size_t TypedArray::ElementLength() const {
+  if (replaceOnce(
+    inlinePath,
+    `inline size_t TypedArray::ElementLength() const {
   if (_type == TypedArray::unknown_array_type) {
     napi_status status = napi_get_typedarray_info(_env, _value,
       &const_cast<TypedArray*>(this)->_type, &const_cast<TypedArray*>(this)->_length,
@@ -102,11 +107,12 @@ if (replaceOnce(
 
   return _length;
 }`,
-  `inline size_t TypedArray::ElementLength() const {
+    `inline size_t TypedArray::ElementLength() const {
   return _length;
 }`,
-  'TypedArray length lookup'
-)) changed.push('napi-inl.h length lookup')
+    'TypedArray length lookup'
+  )) changed.push(`${path.basename(path.dirname(packageDir))}/napi-inl.h length lookup`)
+}
 
 console.log(changed.length
   ? `[VistaAFK Mobile] Applied node-addon-api Termux compatibility fixes (${changed.join(', ')}).`

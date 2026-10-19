@@ -86,6 +86,14 @@ try {
     'options.version = "1.26.51"',
     'Bedrock 26.52 protocol alias fallback'
   )
+
+  patchFile(
+    'node_modules/jsp-raknet/js/protocol/Packet.js',
+    "        address.address.split('.', 4).forEach(b => this.writeByte(-b - 1));",
+    "        const parts = String(address.address || '0.0.0.0').split('.'); for (let i = 0; i < 4; i++) { const num = parseInt(parts[i], 10); this.writeByte(Number.isFinite(num) ? (-num - 1) : 255); }",
+    'Number.isFinite(num) ? (-num - 1) : 255',
+    'safe IPv4 address packet encoding'
+  )
 } catch (error) {
   console.error(`[VistaAFK Mobile] Could not patch the Bedrock transport: ${error.message}`)
   process.exitCode = 1
