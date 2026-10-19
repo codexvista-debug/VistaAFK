@@ -513,7 +513,7 @@ function pingBedrockJsp(host, port, timeoutMs = 2500) {
                     const str = typeof data === 'string' ? data : (data?.toString?.() || '');
                     const parts = str.split(';');
                     if (parts.length >= 4) {
-                        resolve({ motd: parts[1], version: parts[3] });
+                        resolve({ motd: parts[1], protocol: parts[2], version: parts[3] });
                         return;
                     }
                 }
@@ -527,6 +527,77 @@ function pingBedrockJsp(host, port, timeoutMs = 2500) {
             resolve(null);
         }
     });
+}
+function getBedrockSupportedVersions() {
+    try {
+        const opts = (eval('require'))('bedrock-protocol/src/options');
+        if (opts && opts.Versions && opts.CURRENT_VERSION) {
+            return { versions: opts.Versions, currentVersion: opts.CURRENT_VERSION };
+        }
+    }
+    catch (_) { }
+    try {
+        const mcData = (eval('require'))('minecraft-data');
+        const versions = Object.fromEntries((mcData.versions?.bedrock || [])
+            .filter((e) => e.releaseType === 'release')
+            .map((e) => [e.minecraftVersion, e.version]));
+        return { versions, currentVersion: Object.keys(versions)[0] || '1.26.51' };
+    }
+    catch (_) { }
+    return { versions: { '1.26.51': 2193 }, currentVersion: '1.26.51' };
+}
+function resolveBedrockTargetVersion(userVersion, pingProtocol, pingVersion) {
+    const { versions, currentVersion } = getBedrockSupportedVersions();
+    const trimmed = userVersion?.trim();
+    const isAuto = !trimmed || trimmed.toLowerCase() === 'auto' || trimmed.toLowerCase() === 'default';
+    // 1. If user explicitly specified a version
+    if (!isAuto && trimmed) {
+        let candidate = trimmed;
+        if (candidate.startsWith('26.')) {
+            candidate = `1.${candidate}`;
+        }
+        if (versions[candidate]) {
+            return { version: candidate, isFallback: false };
+        }
+        if (versions[trimmed]) {
+            return { version: trimmed, isFallback: false };
+        }
+        // Explicit override not supported by library; fall back safely rather than crash with "Unsupported version"
+        return {
+            version: currentVersion,
+            isFallback: true,
+            note: `Version "${trimmed}" is not directly supported by the Bedrock library; automatically using best verified working version ${currentVersion}.`,
+        };
+    }
+    // 2. Auto-negotiation via server protocol number (e.g. 2193 -> '1.26.51')
+    if (pingProtocol != null) {
+        const protoNum = Number(pingProtocol);
+        if (Number.isFinite(protoNum)) {
+            const match = Object.keys(versions).find((v) => versions[v] === protoNum);
+            if (match) {
+                return { version: match, isFallback: false, note: `Auto-negotiated protocol ${protoNum} -> ${match}` };
+            }
+        }
+    }
+    // 3. Auto-negotiation via server version string
+    if (pingVersion) {
+        let candidate = pingVersion.trim();
+        if (candidate.startsWith('26.')) {
+            candidate = `1.${candidate}`;
+        }
+        if (versions[candidate]) {
+            return { version: candidate, isFallback: false, note: `Auto-negotiated version string ${candidate}` };
+        }
+        if (versions[pingVersion]) {
+            return { version: pingVersion, isFallback: false, note: `Auto-negotiated version string ${pingVersion}` };
+        }
+    }
+    // 4. Default / Fallback to best working version (currentVersion, currently 1.26.51)
+    return {
+        version: currentVersion,
+        isFallback: false,
+        note: `Using best working Bedrock version (${currentVersion})`,
+    };
 }
 class BotInstance {
     config;
@@ -826,12 +897,6 @@ class BotInstance {
                 this.callbacks.onNotification('error', `[${this.config.name}] Bedrock package missing: ${reason}`, this.config.id);
                 return;
             }
-            // Leave the version unset by default so bedrock-protocol can negotiate the
-            // server's advertised Bedrock protocol. Only honor an explicit user override.
-            let targetVersion = this.config.version?.trim();
-            if (targetVersion?.startsWith('26.')) {
-                targetVersion = `1.${targetVersion}`;
-            }
             // Defensively clean up any previous client
             if (this.bedrockClient) {
                 try {
@@ -872,15 +937,24 @@ class BotInstance {
                 }
                 console.log(`[VistaAFK Mobile] Bedrock RakNet backend: ${mobileRaknetBackend}`);
             }
-            if (!targetVersion && isMobileDaemon && mobileRaknetBackend === 'jsp-raknet') {
+            // Safe Bedrock protocol version resolution (auto best-working + ping probe fallback)
+            let pingRes = null;
+            const rawUserVersion = this.config.version?.trim();
+            const isAutoVersion = !rawUserVersion || rawUserVersion.toLowerCase() === 'auto' || rawUserVersion.toLowerCase() === 'default';
+            if (isAutoVersion) {
                 try {
-                    const pingRes = await pingBedrockJsp(host, port);
-                    if (pingRes?.version) {
-                        console.log(`[VistaAFK Mobile] Discovered Bedrock version via JSP ping: ${pingRes.version} (${pingRes.motd || ''})`);
-                        targetVersion = pingRes.version;
+                    pingRes = await pingBedrockJsp(host, port, 2500);
+                    if (pingRes) {
+                        console.log(`[VistaAFK Bedrock] Server ping response from ${host}:${port}: protocol=${pingRes.protocol}, version=${pingRes.version}, motd=${pingRes.motd}`);
                     }
                 }
                 catch (_) { }
+            }
+            const resolved = resolveBedrockTargetVersion(rawUserVersion, pingRes?.protocol, pingRes?.version);
+            const targetVersion = resolved.version;
+            if (resolved.note) {
+                console.log(`[VistaAFK Bedrock] ${resolved.note}`);
+                this.emitActivity('status', `ℹ️ Bedrock version: ${targetVersion} (${resolved.note})`);
             }
             const clientOptions = {
                 host,
@@ -888,6 +962,7 @@ class BotInstance {
                 username: this.config.name,
                 offline: this.config.authType === 'offline',
                 transport: 'raknet',
+                version: targetVersion,
                 // Termux prefers the native backend to match the desktop transport.
                 // When unavailable, use the launcher's protocol-fixed JSP fallback and
                 // skip discovery because bedrock-protocol hard-wires ping to native.
@@ -912,8 +987,6 @@ class BotInstance {
                     this.emitTelemetry();
                 },
             };
-            if (targetVersion)
-                clientOptions.version = targetVersion;
             const client = bedrock.createClient(clientOptions);
             this.bedrockClient = client;
             this.applyBedrockRaknetFastPath(client);

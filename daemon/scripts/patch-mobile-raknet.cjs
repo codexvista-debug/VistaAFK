@@ -78,6 +78,14 @@ try {
     'protocolVersion: this.options.raknetProtocolVersion',
     'RakNet handshake listener ordering'
   )
+
+  patchFile(
+    'node_modules/bedrock-protocol/src/options.js',
+    'function validateOptions (options) {',
+    'function validateOptions (options) {\n  if (options && (options.version === "26.52" || options.version === "1.26.52" || (typeof options.version === "string" && options.version.startsWith("26.")))) { options.version = "1.26.51"; }',
+    'options.version = "1.26.51"',
+    'Bedrock 26.52 protocol alias fallback'
+  )
 } catch (error) {
   console.error(`[VistaAFK Mobile] Could not patch the Bedrock transport: ${error.message}`)
   process.exitCode = 1

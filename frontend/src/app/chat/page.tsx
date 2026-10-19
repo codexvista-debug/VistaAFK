@@ -24,6 +24,9 @@ import {
   ArrowDown,
   Copy,
   Check,
+  Layers,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 import { MinecraftChatMessage } from '../../components/MinecraftChatMessage';
@@ -92,6 +95,38 @@ function ChatContent() {
   const logs = selectedBotId ? chatLogs[selectedBotId] || [] : [];
   const playerLogs = selectedBotId ? activityLogs[selectedBotId] || [] : [];
   const isConnecting = ['connecting', 'authenticating', 'reconnecting'].includes(currentTelemetry?.status || '');
+
+  const isBedrock = currentConfig ? (currentConfig.edition === 'bedrock' || currentConfig.port === 19132) : false;
+  const [customVersionInput, setCustomVersionInput] = useState('');
+  const [versionSavedNotice, setVersionSavedNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (currentConfig) {
+      setCustomVersionInput(currentConfig.version || '');
+    }
+  }, [currentConfig?.id, currentConfig?.version]);
+
+  const handleUpdateVersion = (newVer: string) => {
+    if (!currentConfig) return;
+    const cleanVer = newVer.trim();
+    const updated = { ...currentConfig, version: cleanVer || undefined };
+    updateBot(updated);
+    setCustomVersionInput(cleanVer);
+    setVersionSavedNotice(
+      cleanVer
+        ? `Version updated to ${cleanVer}.`
+        : `Version set to Auto (${isBedrock ? 'Best working: 1.26.51' : 'Auto-detect'}).`
+    );
+    setTimeout(() => setVersionSavedNotice(null), 5000);
+  };
+
+  const handleQuickReconnect = () => {
+    if (!currentConfig) return;
+    stopBot(currentConfig.id);
+    setTimeout(() => {
+      startBot(currentConfig.id);
+    }, 600);
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -358,7 +393,132 @@ function ChatContent() {
                     <InfoCard label="Account" value={currentConfig.name} icon={<Users className="h-4 w-4" />} />
                     <InfoCard label="Server" value={`${currentConfig.host}:${currentConfig.port}`} icon={<Server className="h-4 w-4" />} />
                     <InfoCard label="Edition" value={`${currentConfig.edition || 'java'} · ${currentConfig.authType}`} icon={<Terminal className="h-4 w-4" />} />
+                    <InfoCard label="Version" value={currentConfig.version && currentConfig.version.toLowerCase() !== 'auto' ? currentConfig.version : (isBedrock ? 'Auto (Best: 1.26.51)' : 'Auto-detect')} icon={<Layers className="h-4 w-4" />} />
                     <InfoCard label="Reconnect" value={currentConfig.autoReconnect ? `On · ${Math.round(currentConfig.reconnectDelayMs / 1000)}s delay` : 'Off'} icon={<Activity className="h-4 w-4" />} />
+                  </div>
+
+                  {/* Dedicated Interactive Version Settings Card */}
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3.5 shadow-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <Layers className="h-4 w-4 stroke-[2.5]" />
+                        </div>
+                        <div>
+                          <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                            Connection Version & Protocol
+                          </h2>
+                          <p className="text-[11px] text-slate-500">
+                            {isBedrock
+                              ? 'Change Bedrock protocol or use "Auto" for verified compatibility.'
+                              : 'Change Java version or use Auto-detect to match the server.'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold uppercase text-slate-400">Current:</span>
+                        <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 font-mono text-xs font-bold border border-emerald-300">
+                          {currentConfig.version && currentConfig.version.toLowerCase() !== 'auto'
+                            ? currentConfig.version
+                            : (isBedrock ? 'Auto (Best: 1.26.51)' : 'Auto-detect')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Quick Preset Buttons */}
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-2">
+                        Quick Select Version:
+                      </span>
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        {/* Auto (Best working) */}
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateVersion('')}
+                          className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 border shadow-2xs ${
+                            !currentConfig.version || currentConfig.version.toLowerCase() === 'auto'
+                              ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                              : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-300'
+                          }`}
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                          <span>Auto (Best: {isBedrock ? '1.26.51' : 'Detect'})</span>
+                        </button>
+
+                        {/* Presets */}
+                        {(isBedrock
+                          ? [
+                              { label: '1.26.51 (FreshSMP / Latest)', val: '1.26.51' },
+                              { label: '1.26.40', val: '1.26.40' },
+                              { label: '1.26.0', val: '1.26.0' },
+                              { label: '1.21.130', val: '1.21.130' },
+                              { label: '1.21.100', val: '1.21.100' },
+                              { label: '1.20.80', val: '1.20.80' },
+                            ]
+                          : [
+                              { label: '1.21.4 (Latest)', val: '1.21.4' },
+                              { label: '1.21.1', val: '1.21.1' },
+                              { label: '1.20.4', val: '1.20.4' },
+                              { label: '1.19.4', val: '1.19.4' },
+                              { label: '1.18.2', val: '1.18.2' },
+                              { label: '1.16.5', val: '1.16.5' },
+                            ]
+                        ).map((preset) => (
+                          <button
+                            key={preset.val}
+                            type="button"
+                            onClick={() => handleUpdateVersion(preset.val)}
+                            className={`px-2.5 py-1.5 rounded-xl font-bold font-mono text-xs transition border ${
+                              currentConfig.version === preset.val
+                                ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                                : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-300'
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Custom Input */}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleUpdateVersion(customVersionInput);
+                      }}
+                      className="flex items-center gap-2 pt-1"
+                    >
+                      <input
+                        type="text"
+                        placeholder="Custom version (e.g. 1.26.51, 1.20.4)"
+                        value={customVersionInput}
+                        onChange={(e) => setCustomVersionInput(e.target.value)}
+                        className="flex-1 bg-slate-50 border border-slate-300 focus:border-emerald-600 focus:bg-white focus:outline-none rounded-xl px-3 py-2 text-xs text-slate-900 font-mono shadow-2xs"
+                      />
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition shadow-xs"
+                      >
+                        Apply
+                      </button>
+                    </form>
+
+                    {/* Feedback and Reconnect prompt */}
+                    {versionSavedNotice && (
+                      <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-900">
+                        <span className="font-semibold">{versionSavedNotice}</span>
+                        {(isOnline || isConnecting) && (
+                          <button
+                            type="button"
+                            onClick={handleQuickReconnect}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg transition shadow-xs"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            <span>Reconnect Bot Now</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-wrap items-center justify-between gap-4">
                     <div><p className="text-sm font-bold text-slate-900">Bot status</p><p className="mt-1 text-xs text-slate-500">{currentTelemetry?.statusMessage || currentTelemetry?.status || 'Offline'} · Daemon {daemonConnected ? 'connected' : 'disconnected'}</p></div>
