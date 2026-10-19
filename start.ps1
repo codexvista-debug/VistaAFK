@@ -29,9 +29,17 @@ Stop-Process -Name "cloudflared" -Force -ErrorAction SilentlyContinue
 
 # 2. Check Node.js installation
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-    Write-Host "[!] Node.js is not installed or not in PATH!" -ForegroundColor Red
-    Write-Host "Please install Node.js (LTS version) from https://nodejs.org" -ForegroundColor Yellow
-    exit 1
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host "[*] Node.js not found. Attempting auto-install via winget..." -ForegroundColor Yellow
+        winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements --silent
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+    }
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+        Write-Host "[!] Node.js is not installed or not in PATH!" -ForegroundColor Red
+        Write-Host "Please install Node.js (LTS version) from https://nodejs.org" -ForegroundColor Yellow
+        Start-Process "https://nodejs.org/en/download"
+        exit 1
+    }
 }
 
 # 3. Navigate into repository root
@@ -40,26 +48,15 @@ if ($ScriptDir) {
     Set-Location $ScriptDir
 }
 
-# Pull latest updates if in git repo
+# Pull latest updates if in git repo and git is available
 try {
-    if (Test-Path ".git") {
+    if ((Test-Path ".git") -and (Get-Command git -ErrorAction SilentlyContinue)) {
         Write-Host "[*] Checking for latest VistaAFK updates..." -ForegroundColor Gray
-        # Reset generated daemon outputs and the npm-managed lockfile so local
-        # install/build changes cannot block the update.
         git restore --worktree -- daemon/dist daemon/package-lock.json 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "[!] Could not reset generated daemon build files and lockfile. Update stopped." -ForegroundColor Red
-            exit 1
-        }
         git pull origin main 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "[!] Git update failed. Resolve other local changes, then run this command again." -ForegroundColor Red
-            exit 1
-        }
     }
 } catch {
-    Write-Host "[!] Git update failed: $($_.Exception.Message)" -ForegroundColor Red
-    exit 1
+    # Non-blocking update failure
 }
 
 # 4. Check credentials
@@ -89,22 +86,11 @@ if ($Reset) {
 # 5. Check dependencies and rebuild the daemon so source updates are used immediately.
 Set-Location $DaemonDir
 
-if (-not (Test-Path "node_modules\.bin\tsc.cmd")) {
-    Write-Host "[*] Installing daemon dependencies and TypeScript build tools..." -ForegroundColor Yellow
-    npm install --include=dev --omit=optional
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "[!] Dependency installation failed. Daemon was not started." -ForegroundColor Red
-        exit 1
-    }
-}
+$npmCmd = if (Get-Command npm.cmd -ErrorAction SilentlyContinue) { "npm.cmd" } else { "npm" }
 
 if (-not (Test-Path "node_modules\bedrock-protocol\package.json")) {
     Write-Host "[*] Installing Bedrock Edition protocol support..." -ForegroundColor Yellow
-    npm install bedrock-protocol --ignore-scripts --omit=optional
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "[!] Bedrock dependency installation failed. Daemon was not started." -ForegroundColor Red
-        exit 1
-    }
+    & $npmCmd install bedrock-protocol --ignore-scripts --omit=optional
 }
 
 $NodeMajorVersion = [int]((node -p "process.versions.node.split('.')[0]").Trim())
@@ -112,11 +98,13 @@ if ($NodeMajorVersion -lt 24) {
     Write-Host "[!] Bedrock connections require Node.js 24 or newer. Update Node.js to enable Bedrock bots." -ForegroundColor Yellow
 }
 
-Write-Host "[*] Compiling the latest daemon source..." -ForegroundColor Yellow
-npm run build
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[!] Daemon build failed. Daemon was not started." -ForegroundColor Red
-    exit 1
+if (-not (Test-Path "dist\server.js")) {
+    if (-not (Test-Path "node_modules\.bin\tsc.cmd")) {
+        Write-Host "[*] Installing daemon build dependencies..." -ForegroundColor Yellow
+        & $npmCmd install --include=dev --omit=optional
+    }
+    Write-Host "[*] Compiling the latest daemon source..." -ForegroundColor Yellow
+    & $npmCmd run build
 }
 
 # 6. Start Cloudflare Tunnel for secure cloud access
