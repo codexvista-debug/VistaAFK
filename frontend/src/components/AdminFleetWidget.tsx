@@ -357,7 +357,8 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
   const mergedUsers = otherUsers.map((u) => {
     const userKey = u.username.toLowerCase();
     const isDaemonWsOnline = liveDaemonStatus[userKey];
-    const isDaemonOnline = isDaemonWsOnline !== undefined ? isDaemonWsOnline : u.isDaemonOnline;
+    // Daemon is online if either direct WebSocket is open OR server received a heartbeat in the last 120s
+    const isDaemonOnline = isDaemonWsOnline === true || Boolean(u.isDaemonOnline);
     const secondsSinceUpdate = Math.floor((Date.now() - lastUpdated.getTime()) / 1000);
 
     const mergedBots = u.bots.map((bot) => {
@@ -380,13 +381,13 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
 
         return {
           ...bot,
-          status: liveTelem.status || (isDaemonOnline ? 'online' : bot.status),
+          status: liveTelem.status || bot.status,
           health: displayHealth ?? bot.health ?? (isOnline ? 10 : undefined),
           maxHealth: displayMaxHealth ?? bot.maxHealth ?? 10,
           food: liveTelem.food ?? bot.food,
           uptimeSeconds:
             liveTelem.uptimeSeconds ??
-            (bot.uptimeSeconds ? bot.uptimeSeconds + secondsSinceUpdate : 0),
+            (bot.uptimeSeconds ? bot.uptimeSeconds + (isOnline ? secondsSinceUpdate : 0) : 0),
           dimension:
             liveTelem.dimension ||
             liveTelem.currentBiome ||
@@ -395,16 +396,14 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
         };
       }
 
-      const isBotOnline = bot.status === 'online' || isDaemonOnline;
+      const isBotOnline = bot.status === 'online';
       return {
         ...bot,
-        status: isBotOnline ? 'online' : bot.status,
+        status: bot.status,
         health: bot.health ?? (isBotOnline ? 10 : undefined),
         maxHealth: bot.maxHealth ?? 10,
         uptimeSeconds: bot.uptimeSeconds
-          ? bot.uptimeSeconds + secondsSinceUpdate
-          : isBotOnline
-          ? secondsSinceUpdate
+          ? bot.uptimeSeconds + (isBotOnline ? secondsSinceUpdate : 0)
           : 0,
         dimension: bot.dimension || (isBotOnline ? 'Overworld' : undefined),
       };
@@ -438,6 +437,20 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
     }
     return combined.sort((a, b) => a.timestamp - b.timestamp);
   };
+
+  // Prioritize active users (online daemons, active/reconnecting bots) and sort by latest heartbeat
+  const sortedUsers = [...mergedUsers].sort((a, b) => {
+    const aActive = a.isDaemonOnline || a.bots.some((bot) => bot.status === 'online' || bot.status === 'reconnecting' || bot.status === 'connecting');
+    const bActive = b.isDaemonOnline || b.bots.some((bot) => bot.status === 'online' || bot.status === 'reconnecting' || bot.status === 'connecting');
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+
+    const aTime = a.lastHeartbeat || 0;
+    const bTime = b.lastHeartbeat || 0;
+    if (aTime !== bTime) return bTime - aTime;
+
+    return a.username.localeCompare(b.username);
+  });
 
   const totalBots = mergedUsers.reduce((sum, u) => sum + u.bots.length, 0);
   const onlineBots = mergedUsers.reduce(
@@ -561,7 +574,7 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
             No other user accounts connected yet.
           </div>
         ) : (
-          mergedUsers.map((u) => {
+          sortedUsers.map((u) => {
             const isUserVista = u.username.toLowerCase() === 'vista';
             const userOnlineBots = u.bots.filter((b) => b.status === 'online').length;
 
@@ -688,7 +701,7 @@ export const AdminFleetWidget: React.FC<AdminFleetWidgetProps> = ({
                               ) : isConnecting ? (
                                 <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100/70 text-amber-800 border border-amber-200">
                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                                  <span>Connecting</span>
+                                  <span>{bot.status === 'reconnecting' ? 'Reconnecting' : 'Connecting'}</span>
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[9px] font-medium bg-slate-100 text-slate-500 border border-slate-200">

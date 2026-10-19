@@ -79,32 +79,15 @@ export interface UserSummary {
 
 const SECRET_KEY = process.env.VISTAAFK_AUTH_SECRET || 'vistaafk_cloud_auth_secret_token_2026';
 
-let resolvedUsersTable: string = process.env.VISTAAFK_USERS_TABLE || 'vista_users';
-let resolvedSettingsTable: string = process.env.VISTAAFK_SETTINGS_TABLE || 'vista_settings';
-
-function isMissingTableError(error: any): boolean {
-  if (!error) return false;
-  const code = String(error.code || '');
-  const msg = (String(error.message || '') + ' ' + String(error.details || '')).toLowerCase();
-  return code === 'PGRST205' || code === '42P01' || msg.includes('does not exist') || msg.includes('not found') || msg.includes('schema cache');
-}
+const VISTAAFK_USERS_TABLE = 'vista_users';
+const VISTAAFK_SETTINGS_TABLE = 'vista_settings';
 
 async function queryUsersTable<T = any>(runQuery: (tableName: string) => PromiseLike<{ data: T; error: any }> | any): Promise<{ data: T; error: any }> {
-  let res = await runQuery(resolvedUsersTable);
-  if (isMissingTableError(res?.error) && resolvedUsersTable !== 'users') {
-    resolvedUsersTable = 'users';
-    res = await runQuery('users');
-  }
-  return res as { data: T; error: any };
+  return await runQuery(VISTAAFK_USERS_TABLE);
 }
 
 async function querySettingsTable<T = any>(runQuery: (tableName: string) => PromiseLike<{ data: T; error: any }> | any): Promise<{ data: T; error: any }> {
-  let res = await runQuery(resolvedSettingsTable);
-  if (isMissingTableError(res?.error) && resolvedSettingsTable !== 'settings') {
-    resolvedSettingsTable = 'settings';
-    res = await runQuery('settings');
-  }
-  return res as { data: T; error: any };
+  return await runQuery(VISTAAFK_SETTINGS_TABLE);
 }
 
 // In-memory cache for ultra-fast session & auth verification
@@ -501,7 +484,7 @@ export async function getAllFleetUsers(): Promise<FleetUserInfo[]> {
   const users: UserRecord[] = [];
   const processed = new Set<string>();
 
-  // 1. Fetch from Supabase
+  // 1. Fetch from Supabase vista_users
   try {
     const { data, error } = await queryUsersTable((table) =>
       supabase.from(table).select('*')
@@ -513,8 +496,27 @@ export async function getAllFleetUsers(): Promise<FleetUserInfo[]> {
         processed.add(u.username);
         users.push(u);
       });
+
+      // Synchronize into local storage so local dev fallbacks also have live users
+      try {
+        const local = loadLocalUsers();
+        let changed = false;
+        users.forEach((u) => {
+          if (!local[u.username] || (u.updatedAt && local[u.username].updatedAt < u.updatedAt)) {
+            local[u.username] = u;
+            changed = true;
+          }
+        });
+        if (changed) {
+          saveLocalUsers(local);
+        }
+      } catch (e) {}
+    } else if (error) {
+      console.warn('[UserStore] Error querying vista_users in getAllFleetUsers:', error.message);
     }
-  } catch (e) {}
+  } catch (e: any) {
+    console.error('[UserStore] Unexpected error in getAllFleetUsers Supabase fetch:', e?.message);
+  }
 
   // 2. Fetch local storage fallback
   try {
@@ -542,7 +544,7 @@ export async function getAllFleetUsers(): Promise<FleetUserInfo[]> {
 
     const bots: FleetBotInfo[] = (u.botConfigs || []).map((bot: any) => {
       const telem = telemetryMap[bot.id] || bot.lastTelemetry || {};
-      const status = telem.status || (isDaemonOnline ? 'online' : 'offline');
+      const status = telem.status || bot.status || (isDaemonOnline ? 'online' : 'offline');
       const isOnline = status === 'online';
       const dimension = telem.dimension || telem.currentBiome || (isOnline ? 'Overworld' : undefined);
       return {
@@ -597,6 +599,18 @@ export async function getAllFleetUsers(): Promise<FleetUserInfo[]> {
   }).sort((a, b) => {
     if (a.username.toLowerCase() === 'vista') return -1;
     if (b.username.toLowerCase() === 'vista') return 1;
+
+    // Prioritize users with online daemons or active bots
+    const aActive = a.isDaemonOnline || a.bots.some((b) => b.status === 'online' || b.status === 'reconnecting' || b.status === 'connecting');
+    const bActive = b.isDaemonOnline || b.bots.some((b) => b.status === 'online' || b.status === 'reconnecting' || b.status === 'connecting');
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+
+    // Then latest heartbeat
+    const aTime = a.lastHeartbeat || 0;
+    const bTime = b.lastHeartbeat || 0;
+    if (aTime !== bTime) return bTime - aTime;
+
     return a.username.localeCompare(b.username);
   });
 }
