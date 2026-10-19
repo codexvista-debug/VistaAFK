@@ -1127,6 +1127,7 @@ class BotInstance {
                 });
                 this.setupTelemetryLoop();
                 this.setupAntiAfk();
+                this.setupAutoCommands();
                 this.emitTelemetry();
             });
             client.on('start_game', (packet) => {
@@ -3690,13 +3691,24 @@ class BotInstance {
             this.spawnCommandTimeout = null;
         }
         // On-Spawn Auto Command (e.g. /lifesteal)
-        const onSpawnCmd = this.config.survival?.onSpawnCommand?.trim();
+        let onSpawnCmd = this.config.survival?.onSpawnCommand?.trim();
+        let delayMs = (this.config.survival?.onSpawnDelaySeconds || 2) * 1000;
+        const isFreshSMP = Boolean(this.config.host?.toLowerCase().includes('freshsmp') ||
+            this.config.server?.toLowerCase().includes('freshsmp'));
+        if (isFreshSMP) {
+            if (!onSpawnCmd) {
+                onSpawnCmd = '/lifesteal';
+                delayMs = 4000;
+            }
+            else if (!this.config.survival?.onSpawnDelaySeconds || delayMs < 4000) {
+                delayMs = 4000;
+            }
+        }
         if (onSpawnCmd) {
-            const delayMs = (this.config.survival.onSpawnDelaySeconds || 2) * 1000;
             this.spawnCommandTimeout = setTimeout(() => {
-                if (this.bot && this.currentStatus === 'online') {
+                if ((this.bot || this.bedrockClient) && this.currentStatus === 'online') {
                     try {
-                        this.bot.chat(onSpawnCmd);
+                        this.sendChat(onSpawnCmd);
                         this.emitActivity('command', `⚡ Executed spawn command: ${onSpawnCmd}`);
                         this.sendDiscordAlert(`⚡ **${this.config.name}** executed spawn command: \`${onSpawnCmd}\``);
                         this.callbacks.onChatMessage({
@@ -3716,9 +3728,9 @@ class BotInstance {
         const intervalSec = this.config.survival?.recurringIntervalSeconds;
         if (recurringCmd && intervalSec && intervalSec > 0) {
             this.recurringCommandInterval = setInterval(() => {
-                if (this.bot && this.currentStatus === 'online') {
+                if ((this.bot || this.bedrockClient) && this.currentStatus === 'online') {
                     try {
-                        this.bot.chat(recurringCmd);
+                        this.sendChat(recurringCmd);
                         this.emitActivity('command', `⏱️ Executed recurring command: ${recurringCmd}`);
                         this.sendDiscordAlert(`⏱️ **${this.config.name}** executed recurring command: \`${recurringCmd}\``);
                         this.callbacks.onChatMessage({

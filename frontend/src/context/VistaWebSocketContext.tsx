@@ -996,6 +996,7 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   ) => {
     // DonutSMP is strictly sensitive to non-idle actions; default anti-actions to OFF for safety
     const isDonut = server.host.toLowerCase().includes('donut');
+    const isFresh = server.host.toLowerCase().includes('freshsmp');
     const edition = server.edition || account.edition || (server.port === 19132 ? 'bedrock' : 'java');
     let host = (server.host || '').trim();
     let port = edition === 'bedrock' && server.port === 25565 ? 19132 : server.port;
@@ -1031,6 +1032,8 @@ export const VistaWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
         autoEat: !isDonut, // Disabled by default on DonutSMP
         eatThreshold: 14,
         autoTotem: !isDonut, // Disabled by default on DonutSMP
+        onSpawnCommand: isFresh ? '/lifesteal' : undefined,
+        onSpawnDelaySeconds: isFresh ? 4 : 2,
       },
     };
     addBot(newBotConfig);

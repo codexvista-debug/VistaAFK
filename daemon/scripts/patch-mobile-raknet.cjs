@@ -94,6 +94,22 @@ try {
     'Number.isFinite(num) ? (-num - 1) : 255',
     'safe IPv4 address packet encoding'
   )
+
+  patchFile(
+    'node_modules/jsp-raknet/js/Connection.js',
+    '        if (this.recvQueue.length) {\n            const messages = this.recvQueue.splice(0, 4);',
+    '        if (this.recvQueue.length) {\n            const messages = this.recvQueue.splice(0, this.recvQueue.length);',
+    'this.recvQueue.splice(0, this.recvQueue.length)',
+    'jsp-raknet unthrottled receive queue'
+  )
+
+  patchFile(
+    'node_modules/jsp-raknet/js/Connection.js',
+    '    recieve(buffer) {\n        this.recvQueue.push(buffer);\n        this.lastUpdate = Date.now();\n    }',
+    '    recieve(buffer) {\n        this.lastUpdate = Date.now();\n        try {\n            this.receiveOnline(buffer);\n            if (this.ackQueue.length > 0) {\n                const pk = new ACK_1.default();\n                pk.packets = this.ackQueue;\n                pk.encode();\n                this.sendPacket(pk);\n                this.ackQueue = [];\n            }\n        } catch (_) {\n            this.recvQueue.push(buffer);\n        }\n    }',
+    'this.receiveOnline(buffer)',
+    'jsp-raknet zero-latency incoming packet dispatch'
+  )
 } catch (error) {
   console.error(`[VistaAFK Mobile] Could not patch the Bedrock transport: ${error.message}`)
   process.exitCode = 1

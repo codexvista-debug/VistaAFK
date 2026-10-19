@@ -27,10 +27,13 @@ if ! command -v pkg >/dev/null 2>&1; then
   exit 0
 fi
 
-pkg install -y cmake clang make git || {
+pkg install -y cmake clang make git python nodejs-lts || {
   echo "⚠️ Could not install native build tools; the daemon will use the JSP RakNet fallback."
   exit 0
 }
+
+export CC=clang
+export CXX=clang++
 
 # The daemon installs dependencies with lifecycle scripts disabled for Android.
 # Install the native package if a lockfile/install variation left it out.

@@ -34,8 +34,8 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
       autoEat: initialConfig?.survival?.autoEat ?? true,
       eatThreshold: initialConfig?.survival?.eatThreshold || 14,
       autoTotem: initialConfig?.survival?.autoTotem ?? true,
-      onSpawnCommand: initialConfig?.survival?.onSpawnCommand || '',
-      onSpawnDelaySeconds: initialConfig?.survival?.onSpawnDelaySeconds || 2,
+      onSpawnCommand: initialConfig?.survival?.onSpawnCommand || (initialConfig?.host?.toLowerCase().includes('freshsmp') ? '/lifesteal' : ''),
+      onSpawnDelaySeconds: initialConfig?.survival?.onSpawnDelaySeconds || (initialConfig?.host?.toLowerCase().includes('freshsmp') ? 4 : 2),
       recurringCommand: initialConfig?.survival?.recurringCommand || '',
       recurringIntervalSeconds: initialConfig?.survival?.recurringIntervalSeconds || undefined,
     },
@@ -243,12 +243,23 @@ export const AddBotModal: React.FC<AddBotModalProps> = ({ onClose, onSave, initi
                     onChange={(e) => {
                       const newHost = e.target.value;
                       const isDonut = newHost.toLowerCase().includes('donut');
+                      const isFresh = newHost.toLowerCase().includes('freshsmp');
                       if (isDonut && !initialConfig) {
                         setFormData((prev) => ({
                           ...prev,
                           host: newHost,
                           antiAfk: { ...prev.antiAfk, enabled: false, rotateHead: false, sneak: false, swingArm: false },
                           survival: { ...prev.survival, autoEat: false, autoTotem: false },
+                        }));
+                      } else if (isFresh && !initialConfig) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          host: newHost,
+                          survival: {
+                            ...prev.survival,
+                            onSpawnCommand: prev.survival.onSpawnCommand || '/lifesteal',
+                            onSpawnDelaySeconds: prev.survival.onSpawnDelaySeconds === 2 ? 4 : prev.survival.onSpawnDelaySeconds,
+                          },
                         }));
                       } else {
                         setFormData((prev) => ({ ...prev, host: newHost }));

@@ -83,7 +83,7 @@ fi
 
 # Termux Bedrock transport setup (native RakNet with full FreshSMP/Bedrock protocol support)
 echo -e " ${CYAN}🔧${RESET} Preparing Bedrock transport for Termux..."
-node ./scripts/patch-mobile-raknet.cjs >/dev/null 2>&1 || true
+node ./scripts/patch-mobile-raknet.cjs 2>/dev/null || true
 bash ./scripts/prepare-mobile-raknet.sh || true
 
 # Use precompiled production build if available, otherwise compile daemon source
